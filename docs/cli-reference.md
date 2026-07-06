@@ -119,8 +119,10 @@ correcting agent-written records or resolving a blocker from the human side.
 ### zentext audit
 
 **Purpose:** Audit the memory store for staleness, inconsistencies, and potential
-issues (e.g., records referencing code that has since changed, unresolved blockers
-older than a threshold, records that look like they may contain secrets).
+issues (e.g., unresolved blockers older than a threshold, records missing
+recommended fields, records that look like they may contain secrets, and
+age/status/completed-task/manual staleness). Reference-based staleness (records
+referencing code that has since changed) is a Stretch goal, not MVP behavior.
 
 **Example invocation:** `zentext audit`
 
