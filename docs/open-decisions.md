@@ -210,8 +210,11 @@ that agents should not have to re-derive.
 - Reference-based (records referencing code that has changed).
 - Manual audit only.
 
-**Current lean:** Combine age-based and reference-based heuristics, surfaced via
-`zentext audit`. Do not auto-delete; flag for review.
+**Current lean:** MVP combines age-based, status-based, completed-task, and
+manually-marked staleness, surfaced via `zentext audit`. Reference-based
+staleness (records referencing code that has changed) is deferred to a post-MVP
+Stretch goal. Do not auto-delete; flag for review. See
+[`implementation/staleness-and-audit-spec.md`](./implementation/staleness-and-audit-spec.md).
 
 **Why it matters:** Stale memory misleads the next agent. Detection is needed
 before it becomes a trust problem.

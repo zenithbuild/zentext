@@ -67,10 +67,14 @@ When repacking, records are included in this priority order:
 
 ## Avoiding stale or bloated context
 
-- **Staleness detection:** Records whose `refs` point to code that has since
-  changed, or that have not been updated within a configurable age while the task
-  is still active, are flagged stale. Stale records are either omitted from
-  repacking or included with a clear `stale` marker.
+- **Staleness detection (MVP):** age-based, status-based, completed-task, and
+  manually-marked staleness (see
+  [`implementation/staleness-and-audit-spec.md`](./implementation/staleness-and-audit-spec.md)).
+  Stale records are either omitted from repacking or included with a clear
+  `stale` marker.
+- **Reference-based staleness (Stretch, not MVP):** detecting records whose
+  `refs` point to code that has since changed, using repo state, is deferred to a
+  post-MVP stretch goal; it is not part of Stage 1 repack/audit behavior.
 - **Size budget:** The repack respects a size budget (configurable via `max_size`).
   Lower-priority records are dropped or summarized first.
 - **Status filtering:** Resolved blockers and superseded decisions are excluded by

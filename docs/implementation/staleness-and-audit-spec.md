@@ -34,6 +34,10 @@ MVP. No implementation.
 - **File/reference-based staleness:** records whose `refs` point to code that has
   since changed, using repo state (git diff / file mtimes). Do **not** build this
   in the MVP; it adds real complexity and is not needed to prove the value prop.
+  This is the post-MVP Stretch goal referenced by
+  [`context-repacking.md`](../context-repacking.md),
+  [`cli-reference.md`](../cli-reference.md), and open-decision #10, which are
+  aligned to defer it (see PR #2 review).
 
 ## Non-goals
 

@@ -63,6 +63,10 @@ Nine commands: `init`, `status`, `show`, `list`, `add`, `handoff`, `repack`,
 - **Args/flags:** type-specific flags for required/recommended fields; falls back
   to opening an editor for longer text fields if flags are omitted. Implementation
   details stay planning-level — no complex interactive UI required in the plan.
+- **Inputs:** only user/agent-supplied fields (`type`, `title`, optional `status`,
+  type-specific content, plus recommended `summary`/`tags`/`refs`). Generated
+  fields (`id`, `project`, `created_at`, `updated_at`) are assigned by Zentext on
+  create and are not accepted as input.
 - **Author:** recorded as `user:<name>`.
 - **Output:** the created record's id and a readable summary.
 - **Safety:** same secret-rejection heuristics as `memory.write` (see

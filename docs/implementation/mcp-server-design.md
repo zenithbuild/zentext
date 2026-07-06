@@ -59,8 +59,14 @@ description text is finalized in implementation and tuned against real agents
 - **When:** to load a specific record by id.
 
 ### memory.write
-- **Input:** a record of one of the eight types with required fields.
-- **Output:** the created record with assigned id and timestamps.
+- **Input:** a record of one of the eight types supplying only user/agent
+  fields: `type`, `title`, optional `status` (defaults to `active`), and
+  type-specific content. Do **not** send `id`, `project`, `created_at`, or
+  `updated_at` — Zentext generates them on create (`project` is resolved from
+  the current working directory). Recommended fields (`summary`, `author`,
+  `tags`, `refs`) are accepted but not enforced.
+- **Output:** the created record with the full envelope — assigned `id`,
+  resolved `project`, generated `created_at`/`updated_at`, and the rest.
 - **When:** on a non-obvious decision, a blocker, a completed step, a validation,
   or before a handoff. Do not write trivial noise or secrets.
 - **Safety:** reject obvious secrets; cap payload size; sanitize log excerpts.
