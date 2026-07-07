@@ -1,7 +1,7 @@
 # ADR 0002 — Memory Storage Location
 
-**Status:** proposed (not final)
-**Date:** 2026-07-05
+**Status:** accepted for Stage 1 (promoted from proposed on 2026-07-06)
+**Date:** 2026-07-05 (proposed); 2026-07-06 (accepted for Stage 1)
 **Related:** [open-decisions.md](../open-decisions.md) #1, #6, [cloud-boundary.md](../cloud-boundary.md)
 
 ## Problem
@@ -99,8 +99,19 @@ sharing requires cloud sync (Stage 2) or re-export.
 - If the store path is hard to remember or locate in practice, consider an in-repo
   pointer file (`.zentext-store` containing the absolute path) for discoverability.
 
+## Accepted decision (Stage 1)
+
+**Option C — Out-of-repo store + optional in-repo export.** The canonical store is
+out-of-repo at `~/.zentext/projects/<project-id>/`. The in-repo artifact is produced
+via `zentext repack --out .zentext/context.md`. There is **no separate `zentext export`
+command in Stage 1** — export is a repack output target. The in-repo artifact is a
+read-only, point-in-time snapshot, never the live store.
+
 ## Decision status
 
-**Proposed.** Not final. Should be validated against a real multi-machine and
-multi-teammate scenario during MVP implementation. Must be decided before the store
-backend is built, since changing locations later requires a migration.
+Accepted for Stage 1 on 2026-07-06, after the strategic foundation and the Stage 1 implementation plan were reviewed and merged into `main`. This is the working decision for Stage 1; it is not necessarily forever and remains revisitable as Stage 1 usage evidence accumulates. See [`open-decisions.md`](../open-decisions.md).
+
+The validation hooks below remain open for later stages (multi-machine, multi-teammate
+scenarios); they do not block Stage 1, which is single-user local. Changing the store
+location later would require a migration, so the abstracted store API and
+`schema_version` (per [`implementation/data-model-and-store.md`](../implementation/data-model-and-store.md)) mitigate that risk.

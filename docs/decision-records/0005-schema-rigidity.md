@@ -1,7 +1,7 @@
 # ADR 0005 — Schema Rigidity
 
-**Status:** proposed (not final)
-**Date:** 2026-07-05
+**Status:** accepted for Stage 1 (promoted from proposed on 2026-07-06)
+**Date:** 2026-07-05 (proposed); 2026-07-06 (accepted for Stage 1)
 **Related:** [open-decisions.md](../open-decisions.md) #2, [memory-schema.md](../memory-schema.md), [context-repacking.md](../context-repacking.md)
 
 ## Problem
@@ -115,11 +115,20 @@ structured fields and repacking support. Defer until there is evidence.
 - If the baseline types cover >90% of records in real usage and `custom` stays rare,
   Option C is validated and Option D may never be needed.
 
+## Accepted decision (Stage 1)
+
+**Option C — Opinionated baseline types + `custom` escape hatch.** Stage 1 record
+types: `task`, `decision`, `blocker`, `handoff`, `log`, `validation`, `policy`,
+`custom`. Zentext does **not** move to fully schemaless memory (Option B) and does
+**not** add pluggable templates (Option D) in Stage 1. Pluggable templates remain a
+credible Stage 2+ evolution if real projects consistently need first-class custom
+types. Required fields per type are minimal; the rest are recommended and surfaced
+by `audit`, not rejected (see [`implementation/data-model-and-store.md`](../implementation/data-model-and-store.md)).
+
 ## Decision status
 
-**Proposed.** Not final. The baseline types and their required/recommended fields
-should be validated against the demo scenario in
-[0003-better-than-markdown-demo.md](./0003-better-than-markdown-demo.md) and against
-2–3 real projects before being locked. Must be decided before the store and
-repacking logic are built, since both depend on the schema shape. Revisitable as
-usage evidence accumulates.
+Accepted for Stage 1 on 2026-07-06, after the strategic foundation and the Stage 1 implementation plan were reviewed and merged into `main`. This is the working decision for Stage 1; it is not necessarily forever and remains revisitable as Stage 1 usage evidence accumulates. See [`open-decisions.md`](../open-decisions.md) #2.
+
+The baseline types and required/recommended fields are accepted for Stage 1; the
+demo scenario and real projects will inform any Stage 2+ evolution toward
+pluggable templates, not a Stage 1 reopen.

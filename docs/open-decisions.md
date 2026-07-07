@@ -4,6 +4,16 @@ These are unresolved strategic and product decisions. Each lists the question,
 options, current lean, why it matters, what evidence would settle it, and when it
 must be decided. This is a living document for ongoing discussion.
 
+> **Stage 1 status (2026-07-06):** Decisions #1, #2, #3, #4, #6, #7, and the Stage 1
+> subset of #10 are **accepted for Stage 1** (see
+> [`decision-records/0002`](./decision-records/0002-memory-storage-location.md),
+> [`0004`](./decision-records/0004-mcp-tool-naming.md),
+> [`0005`](./decision-records/0005-schema-rigidity.md), and
+> [`implementation/tech-stack-decision.md`](./implementation/tech-stack-decision.md)
+> for ADR 0006). They are accepted for Stage 1, not necessarily forever, and remain
+> revisitable as Stage 1 usage evidence accumulates. The entries below are kept for
+> context and to record what would change them in later stages.
+
 ## 1. Memory storage location: in-repo vs out-of-repo
 
 **Question:** Should the memory store live inside the repo (e.g., `.zentext/`) or
@@ -15,9 +25,12 @@ outside it (e.g., `~/.zentext/`)?
 - Out-of-repo (`~/.zentext/`): cleaner repos, no git conflicts. Not shared via git
   clone (cloud sync needed for sharing).
 
+**Status:** Accepted for Stage 1 (2026-07-06). See ADR 0002.
+
 **Current lean:** Out-of-repo for the store, with an option to export a portable
 bundle into the repo (e.g., `.zentext/context.md`) for git-based sharing. Bridges
-both.
+both. For Stage 1 the export path is `zentext repack --out .zentext/context.md`
+(no separate `zentext export` command).
 
 **Why it matters:** Affects sharing model, git hygiene, and whether cloud sync is
 the only sharing path.
@@ -25,7 +38,7 @@ the only sharing path.
 **What would settle it:** Real-world usage — do users want memory in git, or do
 they find it noisy?
 
-**When it must be decided:** Before MVP implementation begins.
+**When it must be decided:** Before MVP implementation begins. (Decided for Stage 1.)
 
 ---
 
@@ -38,6 +51,9 @@ they find it noisy?
 - Fully schemaless key-value.
 - Opinionated baseline types + a `custom` escape hatch.
 
+**Status:** Accepted for Stage 1 (2026-07-06). See ADR 0005. No move to fully
+schemaless memory and no pluggable templates in Stage 1.
+
 **Current lean:** Opinionated baseline types (task, decision, blocker, handoff,
 log, validation, policy, custom) with a `custom` escape hatch. See
 [`memory-schema.md`](./memory-schema.md).
@@ -49,6 +65,7 @@ records. A blank-canvas store is no better than a markdown file.
 baseline cover the common cases without forcing every project into a rigid shape?
 
 **When it must be decided:** Before MVP implementation begins (schema is core).
+(Decided for Stage 1.)
 
 ---
 
@@ -61,6 +78,10 @@ baseline cover the common cases without forcing every project into a rigid shape
 - JSON.
 - Per-agent custom formats.
 
+**Status:** Accepted for Stage 1 (2026-07-06). Structured markdown is the Stage 1
+default; JSON export/snapshot remains optional and later. Per-agent custom formats
+are deferred.
+
 **Current lean:** Structured markdown as the default, with templates and per-agent
 customization later. See [`context-repacking.md`](./context-repacking.md).
 
@@ -70,7 +91,8 @@ prop fails.
 **What would settle it:** Testing repack output with multiple agents — do they
 consume markdown well, or does JSON work better for some?
 
-**When it must be decided:** During MVP implementation; revisitable.
+**When it must be decided:** During MVP implementation; revisitable. (Default
+decided for Stage 1.)
 
 ---
 
@@ -83,6 +105,10 @@ consume markdown well, or does JSON work better for some?
 - `zentext.*` namespace.
 - `project.*` namespace.
 
+**Status:** Accepted for Stage 1 (2026-07-06). See ADR 0004. The `memory.*`
+namespace and the initial seven-tool surface are accepted; tool **description
+wording** stays testable/tunable during demo validation (see #12).
+
 **Current lean:** `memory.*` — clear, agent-readable, describes the domain.
 
 **Why it matters:** Tool names affect how reliably agents decide to call them.
@@ -90,7 +116,8 @@ consume markdown well, or does JSON work better for some?
 **What would settle it:** Testing tool naming with real agents and measuring call
 reliability.
 
-**When it must be decided:** During MVP implementation; revisitable.
+**When it must be decided:** During MVP implementation; revisitable. (Namespace
+decided for Stage 1; descriptions remain tunable.)
 
 ---
 
@@ -126,6 +153,10 @@ whether they immediately get it.
 - Internal versioning (memory in a store, versioned internally).
 - Hybrid (internal versioning + optional git export).
 
+**Status:** Accepted for Stage 1 (2026-07-06). Internal versioning of the store
+with optional git export via the read-only `repack --out` snapshot; the live store is
+not coupled to git.
+
 **Current lean:** Internal versioning for the store, with optional git export.
 Don't couple the store to git.
 
@@ -135,7 +166,7 @@ complexity.
 **What would settle it:** Whether users expect memory history in git or are happy
 with internal versioning plus export.
 
-**When it must be decided:** During MVP implementation.
+**When it must be decided:** During MVP implementation. (Decided for Stage 1.)
 
 ---
 
@@ -148,6 +179,9 @@ with internal versioning plus export.
 - Clipboard copy.
 - File output referenced by the agent.
 
+**Status:** Accepted for Stage 1 (2026-07-06). `zentext repack` (stdout or
+`--out <file>`) is the Stage 1 non-MCP fallback.
+
 **Current lean:** `zentext repack` emits markdown to stdout or a file, which the
 developer pastes or references. See [`cli-reference.md`](./cli-reference.md).
 
@@ -156,7 +190,7 @@ developer pastes or references. See [`cli-reference.md`](./cli-reference.md).
 **What would settle it:** Testing with non-MCP agents — is paste/file convenient
 enough?
 
-**When it must be decided:** During MVP implementation.
+**When it must be decided:** During MVP implementation. (Decided for Stage 1.)
 
 ---
 
@@ -169,6 +203,8 @@ handled?
 - Open (any team member can write/delete).
 - Role-based (admin/author tiers).
 - Conservative (no deletes; supersede only).
+
+**Status:** Unresolved for Stage 2. Not a Stage 1 gate (single-user local).
 
 **Current lean:** Stage 2 decision. For MVP, single-user, so moot.
 
@@ -210,6 +246,11 @@ that agents should not have to re-derive.
 - Reference-based (records referencing code that has changed).
 - Manual audit only.
 
+**Status:** Accepted for Stage 1 (2026-07-06). The MVP staleness subset
+(age-based, status-based, completed-task, manually-marked) is accepted; reference-
+based staleness is deferred to a post-MVP Stretch goal. Stale-detection thresholds
+remain tunable during implementation.
+
 **Current lean:** MVP combines age-based, status-based, completed-task, and
 manually-marked staleness, surfaced via `zentext audit`. Reference-based
 staleness (records referencing code that has changed) is deferred to a post-MVP
@@ -236,6 +277,9 @@ flags are accurate.
 - AGPL (protects cloud commercialization, may reduce adoption).
 - BSL (source-available, delays competing cloud, non-OSI).
 
+**Status:** Unresolved release gate. Does not block Stage 1 implementation
+planning or coding.
+
 **Current lean:** Undecided. Tension between adoption (Apache 2.0) and protecting
 cloud monetization (AGPL/BSL).
 
@@ -261,6 +305,9 @@ reliable agent calls?
 - Query-oriented descriptions ("Find current blockers...").
 - Minimal descriptions and let the agent infer.
 
+**Status:** Open. The `memory.*` namespace and tool surface are accepted (ADR
+0004); description **wording** stays testable/tunable during demo validation.
+
 **Current lean:** Action-oriented, explicit descriptions that tell the agent when to
 call each tool.
 
@@ -271,3 +318,36 @@ descriptions. Vague descriptions reduce call reliability.
 rates and correctness.
 
 **When it must be decided:** During MVP implementation; revisitable.
+
+---
+
+## 13. Tech stack / runtime / store format
+
+**Question:** What implementation runtime, local store format, MCP SDK, repack
+output format, and project-id derivation should Stage 1 use?
+
+**Status:** Accepted for Stage 1 (2026-07-06). See
+[`implementation/tech-stack-decision.md`](./implementation/tech-stack-decision.md)
+(ADR 0006).
+
+**Accepted decision:**
+- TypeScript/Node for Stage 1.
+- SQLite for the local structured store.
+- MCP TypeScript SDK for Stage 1, assuming it remains stable enough during
+  implementation (the one open risk; revisited before Phase 4 if unstable).
+- Structured markdown as the default repack output; JSON export/snapshot remains
+  optional and later.
+- Project ID: hash the normalized git remote `origin` URL if available, else hash
+  the absolute project path; store the human-readable project name separately from
+  the stable project id.
+- Rust is not rejected permanently; it is deferred unless later evidence shows a
+  need for hardened verification, performance-critical pieces, or a Rust kernel.
+
+**Why it matters:** Locks the runtime/store/SDK before Phase 1 begins; store format
+is the main lock-in risk (mitigated by an abstracted store API and schema
+versioning).
+
+**What would settle it / change it:** MCP TypeScript SDK instability, or clearly
+trivial SQLite query needs favoring JSON-on-disk, would revisit this for Stage 1.
+
+**When it must be decided:** Before Phase 1 begins. (Decided for Stage 1.)
