@@ -1,7 +1,7 @@
-# ADR 0006 (proposed) — Stage 1 Tech Stack
+# ADR 0006 — Stage 1 Tech Stack
 
-**Status:** proposed (not final)
-**Date:** 2026-07-05
+**Status:** accepted for Stage 1 (promoted from proposed on 2026-07-06)
+**Date:** 2026-07-05 (proposed); 2026-07-06 (accepted for Stage 1)
 **Related:** [`stage-1-plan.md`](./stage-1-plan.md), ADR 0002, ADR 0004, ADR 0005
 
 ## Purpose
@@ -98,8 +98,9 @@ cloned repo stable when the remote exists. Detailed in
 
 ## Assumptions
 
-- ADR 0002 (out-of-repo store), ADR 0004 (`memory.*`), ADR 0005 (baseline + custom)
-  are treated as Stage 1 working assumptions (see [`stage-1-plan.md`](./stage-1-plan.md)).
+- ADR 0002 (out-of-repo store), ADR 0004 (`memory.*`), and ADR 0005 (baseline +
+  custom) are **accepted for Stage 1** as of 2026-07-06 (see
+  [`../decision-records/`](../decision-records/) and [`stage-1-plan.md`](./stage-1-plan.md)).
 - License is a release gate and does not block this decision.
 
 ## Acceptance criteria
@@ -127,7 +128,27 @@ cloned repo stable when the remote exists. Detailed in
 - If a future Zenith UI path is not TypeScript, revisit the runtime (but this is
   Stage 4+ and does not block Stage 1).
 
+## Accepted decision (Stage 1)
+
+- **Runtime:** TypeScript/Node for Stage 1.
+- **Local store:** SQLite (structured, queryable, single-file); JSON snapshots are
+  an optional later output format, not the canonical store.
+- **MCP SDK:** MCP TypeScript SDK for Stage 1, assuming it remains stable enough
+  during implementation; if it proves unstable, this is revisited before Phase 4
+  (see Risks).
+- **Repack output:** structured markdown as the default; JSON export/snapshot
+  remains optional and later.
+- **Project ID:** hash the normalized git remote `origin` URL if available, else
+  hash the absolute project path; store the human-readable project name separately
+  from the stable project id (see [`data-model-and-store.md`](./data-model-and-store.md)).
+
+**Rust is not rejected permanently.** It is deferred unless later evidence shows a
+need for hardened verification, performance-critical pieces, or a Rust kernel. Any
+such move would be a later-stage decision and does not block Stage 1.
+
 ## Decision status
 
-**Proposed.** Not final. Must be confirmed before Phase 1 begins. The current
-recommendation is the working assumption for the rest of the implementation docs.
+Accepted for Stage 1 on 2026-07-06, after the strategic foundation and the Stage 1 implementation plan were reviewed and merged into `main`. This is the working decision for Stage 1; it is not necessarily forever and remains revisitable as Stage 1 usage evidence accumulates. See [`open-decisions.md`](../open-decisions.md) #6, #11.
+
+The MCP TypeScript SDK stability caveat remains the one open risk: it must be
+confirmed during implementation and could force a runtime change before Phase 4.

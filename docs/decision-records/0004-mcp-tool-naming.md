@@ -1,7 +1,7 @@
 # ADR 0004 — MCP Tool Naming and Positioning
 
-**Status:** proposed (not final)
-**Date:** 2026-07-05
+**Status:** accepted for Stage 1 (promoted from proposed on 2026-07-06)
+**Date:** 2026-07-05 (proposed); 2026-07-06 (accepted for Stage 1)
 **Related:** [open-decisions.md](../open-decisions.md) #4, #12, [mcp-tools.md](../mcp-tools.md)
 
 ## Problem
@@ -107,8 +107,18 @@ See [mcp-tools.md](../mcp-tools.md) for the full tool descriptions.
 - If a future agent ecosystem standardizes on a memory-tool convention (e.g., a
   shared `context.*` schema), align with the convention rather than inventing one.
 
+## Accepted decision (Stage 1)
+
+**Option A — `memory.*` namespace with action-oriented descriptions.** The Stage 1
+tool surface is: `memory.read`, `memory.write`, `memory.query`, `memory.handoff`,
+`memory.repack`, `memory.update`, `memory.list`. The namespace and the initial tool
+surface are accepted for Stage 1. **Tool descriptions remain a first-class, testable
+artifact** and may be tuned during demo validation based on agent call reliability
+(see open-decision #12 and [`implementation/demo-and-validation-plan.md`](../implementation/demo-and-validation-plan.md)).
+
 ## Decision status
 
-**Proposed.** Not final. Must be validated empirically with at least two real agents
-before the MVP demo. The namespace can stay stable while descriptions are tuned
-iteratively. Revisitable at any time based on call-reliability evidence.
+Accepted for Stage 1 on 2026-07-06, after the strategic foundation and the Stage 1 implementation plan were reviewed and merged into `main`. This is the working decision for Stage 1; it is not necessarily forever and remains revisitable as Stage 1 usage evidence accumulates. See [`open-decisions.md`](../open-decisions.md) #4, #12.
+
+The namespace and tool surface are stable for Stage 1; only description wording
+remains tunable and is not a blocking gate.
