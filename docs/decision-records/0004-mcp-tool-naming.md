@@ -18,7 +18,7 @@ demo's success depends on agents calling the tools correctly.
 
 ## Options
 
-### Option A — `memory.*` namespace (current lean)
+### Option A — `memory.*` namespace (accepted for Stage 1)
 
 Tools: `memory.read`, `memory.write`, `memory.query`, `memory.handoff`,
 `memory.repack`, `memory.update`, `memory.list`.
@@ -50,7 +50,7 @@ ambiguous in a multi-tool environment).
 | Verb/action clarity | Medium (`memory.read`) | Medium | Medium | High but unsafe |
 | Stability across product rename | High (memory is generic) | Low (tied to brand) | High | High |
 
-## Current recommendation
+## Accepted Stage 1 decision
 
 **Option A — `memory.*` namespace, with action-oriented descriptions.**
 

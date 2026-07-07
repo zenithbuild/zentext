@@ -21,7 +21,7 @@ declares the MVP successful. No implementation.
 
 - Run the ADR 0003 demo for real with two MCP-compatible agents.
 - Measure agent MCP tool call reliability.
-- Run the markdown (`CLAUDE.md`) contrast.
+- Run the competent markdown (`CLAUDE.md`/`AGENTS.md`) contrast.
 - Iterate on tool descriptions and repack output until the success criteria pass.
 - Run the non-MCP fallback path as a secondary demo.
 
@@ -56,8 +56,9 @@ Agent B reads repacked context and continues without re-explanation.
    markdown payload.
 6. Agent B's first response correctly references the prior decision and the
    blocker, and continues without re-explanation.
-7. Run the same scenario with a hand-maintained `CLAUDE.md` and record the
-   contrast (manual edits, full-file reads, no query, no audit).
+7. Run the same scenario with a competent `CLAUDE.md`/`AGENTS.md` workflow and
+   record the contrast. Assume markdown can be edited by agents; the contrast is
+   typed/queryable/repacked/audited memory versus prose conventions.
 
 ### Non-MCP fallback path (secondary)
 Agent A writes via MCP; the developer runs `zentext repack --out` and pastes the
@@ -96,8 +97,10 @@ Inherited from ADR 0003 + `mvp-specification.md`:
    re-explain.
 4. Agent B received repacked context and correctly referenced the prior decision
    and blocker in its first response.
-5. The `CLAUDE.md` contrast required manual edits, full-file reads, and was
-   visibly more friction.
+5. The `CLAUDE.md`/`AGENTS.md` contrast was visibly weaker because it lacked typed
+   records, query/filter behavior, deterministic repack priority, generated
+   handoff payloads, stale marking, revision tracking, safer focused outputs, or
+   less manual pruning.
 
 ## Failure criteria
 
@@ -128,6 +131,8 @@ Inherited from ADR 0003 + `mvp-specification.md`:
   descriptions; CLI `add` fallback; seed the store if needed.
 - **Repack payload ignored.** Mitigation: iterate on priority/size/focus.
 - **Markdown contrast feels like a strawman.** Mitigation: frame honestly —
-  markdown is manual/static; Zentext is agent-written, structured, queryable.
+  competent markdown can be agent-edited and useful; Zentext must beat it through
+  typed records, query/filter behavior, deterministic repacking, stale marking,
+  revision tracking, and safer focused outputs.
 - **Only one MCP agent available.** Mitigation: run the non-MCP fallback path;
   the proof still holds.

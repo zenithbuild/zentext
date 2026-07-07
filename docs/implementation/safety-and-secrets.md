@@ -52,9 +52,10 @@ states plainly that they are **not a guarantee**. No implementation.
 - Never store raw unsanitized command output as a log.
 
 ### Size caps
-- Cap stored log/excerpt size (default finalized in implementation).
-- Cap single-record payload size on write (mitigates noise/flood, per ADR 0004
-  risk).
+- Cap `log.safe_excerpt` at 8000 characters after redaction.
+- Cap a single record create/update payload at 32000 characters serialized.
+- Cap values before storage and return a validation error when the cap is exceeded
+  unless the field can be safely summarized.
 
 ### Conservative output defaults
 - Reads/repacks return summaries and refs, not full bodies where possible.
@@ -85,17 +86,23 @@ discipline. This must be stated in user-facing docs.
 
 - Writes matching high-signal secret patterns are rejected with a clear error.
 - Logs store only sanitized excerpts (`sanitized: true`).
-- Stored log/excerpt size is capped.
+- Stored log excerpts are capped at 8000 characters; single-record payloads are
+  capped at 32000 serialized characters.
 - No CLI/MCP output prints secrets.
 - `audit` flags secret-suspect records for review.
 - User-facing docs state plainly that heuristics are not a guarantee.
+
+## Override policy
+
+Human override is allowed only for false positives in local Stage 1 flows, must be
+explicit, and must not be available to silent agent writes. Overrides should record
+an audit/history event. Overrides never permit known raw secrets or `.env` dumps.
 
 ## Risks
 
 - **False negatives** let a secret through. Mitigation: explicit non-guarantee;
   instruct agents/humans not to write secrets; audit flags suspects.
 - **False positives** reject legitimate content (e.g., a long base64 asset).
-  Mitigation: allow explicit override for a field the user marks non-secret
-  (keep this minimal in Stage 1).
+  Mitigation: allow an explicit local human override for false positives only.
 - **Heuristic drift** as secret formats evolve. Mitigation: revisitable patterns;
   revisit from audit findings.

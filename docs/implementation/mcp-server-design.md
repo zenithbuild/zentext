@@ -31,6 +31,7 @@ implementation.
 
 - No HTTP/WebSocket transport in Stage 1 (stdio only).
 - No cloud, no sync, no auth, no multi-project routing server.
+- No explicit project-routing inputs on Stage 1 tools.
 - No tool for secret storage, agent execution, or team operations.
 - No vector search tool.
 - No tool that transfers hidden model state.
@@ -42,7 +43,9 @@ implementation.
   stdin/stdout). Matches the MCP TypeScript SDK's standard local mode.
 - **Project resolution:** the server resolves the project from the current working
   directory (project-id per [`data-model-and-store.md`](./data-model-and-store.md)).
-  A server instance serves one project at a time for Stage 1.
+  A server instance serves one project at a time for Stage 1. Tool inputs do not
+  require or accept `project`; stored/output records still include the resolved
+  `project` id.
 - **Lifecycle:** the agent starts the server; the server opens the local store;
   the server shuts down with the agent session. No long-running daemon in Stage 1.
 
@@ -50,39 +53,41 @@ implementation.
 
 Names and action-oriented descriptions follow ADR 0004. Each description tells
 the agent *when* to call the tool, the constraints, and the record types. Full
-description text is finalized in implementation and tuned against real agents
-(see [`demo-and-validation-plan.md`](./demo-and-validation-plan.md)).
+description text starts from [`mcp-tools.md`](../mcp-tools.md) and may be tuned
+against real agents during validation (see
+[`demo-and-validation-plan.md`](./demo-and-validation-plan.md)).
 
 ### memory.read
-- **Input:** `{ project: string, id: string }`
+- **Input:** `{ id: string }`
 - **Output:** the full record (refs only, never file contents; never secrets).
 - **When:** to load a specific record by id.
 
 ### memory.write
 - **Input:** a record of one of the eight types supplying only user/agent
-  fields: `type`, `title`, optional `status` (defaults to `active`), and
+  fields: `type`, `title`, optional `status` (defaults by type), and
   type-specific content. Do **not** send `id`, `project`, `created_at`, or
-  `updated_at` — Zentext generates them on create (`project` is resolved from
-  the current working directory). Recommended fields (`summary`, `author`,
+  `updated_at`, or `revision` — Zentext generates them on create (`project` is
+  resolved from the current working directory). Recommended fields (`summary`, `author`,
   `tags`, `refs`) are accepted but not enforced.
 - **Output:** the created record with the full envelope — assigned `id`,
-  resolved `project`, generated `created_at`/`updated_at`, and the rest.
+  resolved `project`, generated `created_at`/`updated_at`, `revision=1`, and the
+  rest.
 - **When:** on a non-obvious decision, a blocker, a completed step, a validation,
   or before a handoff. Do not write trivial noise or secrets.
 - **Safety:** reject obvious secrets; cap payload size; sanitize log excerpts.
 
 ### memory.query
-- **Input:** `{ project: string, type?: string, status?: string, tags?: string[], text?: string }`
+- **Input:** `{ type?: string, status?: string, tags?: string[], text?: string }`
 - **Output:** a list of matching records, summarized.
 - **When:** to answer specific questions ("current blockers?", "auth decisions?").
 
 ### memory.handoff
-- **Input:** `{ project: string, context, state, next, open_questions?, completed_this_session? }`
+- **Input:** `{ context: string, state: string, next: string, open_questions?: string[], completed_this_session?: string[] }`
 - **Output:** the created handoff record, marked latest for the project.
 - **When:** at end of session, before a switch, or when asked to hand off.
 
 ### memory.repack
-- **Input:** `{ project: string, focus?: string, max_size?: number }`
+- **Input:** `{ focus?: string, max_size?: number }`
 - **Output:** a structured markdown context payload (same engine as
   `zentext repack`).
 - **When:** at session start to load ready context, or for a compact sub-task
@@ -96,7 +101,7 @@ description text is finalized in implementation and tuned against real agents
 - **Safety:** reject updates that introduce secrets.
 
 ### memory.list
-- **Input:** `{ project: string, type?: string, limit?: number }`
+- **Input:** `{ type?: string, limit?: number }`
 - **Output:** a summarized list (id, type, title, status, updated_at).
 - **When:** quick overview before deciding what to read in detail.
 
@@ -118,12 +123,12 @@ is specified in [`repacking-spec.md`](./repacking-spec.md) and built in Phase 3.
 
 ## Decisions and assumptions
 
-- Namespace: `memory.*` (ADR 0004, working assumption).
+- Namespace: `memory.*` (ADR 0004, accepted for Stage 1).
 - Descriptions: action-oriented, treated as a first-class testable artifact, tuned
   against real agents during Phase 9.
 - SDK: MCP TypeScript SDK, pending stability confirmation before Phase 4 (per
   [`tech-stack-decision.md`](./tech-stack-decision.md)).
-- ADR 0004 is a working assumption, not yet accepted.
+- Explicit project routing is future scope; Stage 1 resolves one project from cwd.
 
 ## Acceptance criteria
 
@@ -134,6 +139,20 @@ is specified in [`repacking-spec.md`](./repacking-spec.md) and built in Phase 3.
   state.
 - `memory.write` accepts all eight types and rejects obvious secrets.
 - `memory.update` preserves prior state via supersession where it matters.
+
+## Doc-level acceptance tests
+
+- Calling any Stage 1 MCP tool with a required `project` input is unnecessary;
+  tools operate on the cwd-resolved project and stored/output records include the
+  resolved `project`.
+- `memory.read` with `{ id }` returns exactly one full record or a not-found error.
+- `memory.read` does not return an active-context bundle; use `memory.repack`,
+  `memory.query`, or `memory.list` for broader context.
+- `memory.write` rejects generated create fields (`id`, `project`, timestamps,
+  `revision`) supplied by the caller and returns a created record with those fields
+  assigned by Zentext.
+- `memory.repack` returns the same markdown payload as `zentext repack` for the
+  same store state, focus, and max-size budget.
 
 ## Risks
 

@@ -84,14 +84,13 @@ are the proof that structured, agent-writable memory exists.
     "protect /api/profile",
     "write smoke test"
   ],
-  "progress": "in-progress",
+  "status": "accepted",
   "next": "create /login/callback route and exchange code for token",
   "refs": {
     "files": ["src/server.js", "src/routes/login.js", "package.json"],
     "branches": ["feat/oauth"],
     "commits": ["a1b2c3d"]
   },
-  "status": "active",
   "created_at": "2026-07-05T14:00:00Z",
   "updated_at": "2026-07-05T14:18:00Z",
   "author": "agent:codex",
@@ -112,7 +111,7 @@ are the proof that structured, agent-writable memory exists.
   "alternatives_considered": [
     "hand-rolled fetch to github.com/login/oauth/access_token (rejected: state/csrf handling)"
   ],
-  "status": "active",
+  "status": "open",
   "refs": { "files": ["src/routes/login.js"] },
   "created_at": "2026-07-05T14:05:00Z",
   "author": "agent:codex",
@@ -131,7 +130,7 @@ are the proof that structured, agent-writable memory exists.
   "blocker": "callback route needs GITHUB_CLIENT_SECRET; it is not set in .env yet",
   "severity": "high",
   "workaround": "none; user must add the secret to .env (do NOT commit it)",
-  "status": "active",
+  "status": "open",
   "related": ["rec_task_01"],
   "created_at": "2026-07-05T14:16:00Z",
   "author": "agent:codex",
@@ -151,6 +150,7 @@ itself. This respects the cloud/local boundary.
   "project": "acme-api",
   "from": "agent:codex",
   "to": "any",
+  "status": "latest",
   "context": "Adding GitHub OAuth to acme-api. /login route done and starts the flow.",
   "state": "/login exists and redirects to GitHub. /login/callback exists but cannot exchange the code because GITHUB_CLIENT_SECRET is missing from .env. /api/profile is not yet protected.",
   "next": "User adds GITHUB_CLIENT_SECRET to .env, then finish /login/callback token exchange, then add session middleware, then protect /api/profile.",
@@ -179,13 +179,13 @@ $ zentext status
 Project: acme-api
 Store: ~/.zentext/projects/acme-api/
 Records: 4
-Active task: Add GitHub OAuth login (in-progress)
+Active task: Add GitHub OAuth login (active)
 Open blockers: 1 (GITHUB_CLIENT_SECRET not in env — high)
 Latest handoff: 2026-07-05T14:20:00Z from agent:codex
 Decisions: 1 (use passport-github)
 
 $ zentext list --type blocker
-rec_blocker_01  blocker  GITHUB_CLIENT_SECRET not in env  active  2026-07-05T14:16:00Z
+rec_blocker_01  blocker  GITHUB_CLIENT_SECRET not in env  open  2026-07-05T14:16:00Z
 
 $ zentext show rec_decision_01
 type:     decision
@@ -193,7 +193,7 @@ title:    Use passport-github, not hand-rolled OAuth
 decision: use passport + passport-github for the OAuth flow
 rationale: passport handles state param and session serialization; hand-rolling is error-prone
 alternatives: hand-rolled fetch (rejected: state/csrf handling)
-status:   active
+status:   accepted
 ```
 
 This is the typed-record proof: the developer can query "what are the blockers?" and
@@ -209,7 +209,7 @@ project. They give a minimal instruction:
 
 ### Step 4 — Agent B reads repacked context
 
-Claude Code calls `memory.repack` (or `memory.read` for the active context). Zentext
+Claude Code calls `memory.repack`. Zentext
 returns a structured markdown payload following the priority order from
 [context-repacking.md](../context-repacking.md). Example repack output:
 
@@ -218,7 +218,7 @@ returns a structured markdown payload following the priority order from
 # Generated: 2026-07-05T14:21:00Z  |  focus: auth  |  from: 4 records
 
 ## Active task
-- Add GitHub OAuth login (in-progress)
+- Add GitHub OAuth login (active)
 - Goal: /login starts OAuth; /login/callback exchanges code; /api/profile requires session
 - Next: create /login/callback route and exchange code for token
 - Refs: src/server.js, src/routes/login.js, package.json  |  branch feat/oauth  |  commit a1b2c3d
@@ -276,25 +276,29 @@ has failed.
 
 ### Step 6 — The same flow with a markdown file (the contrast)
 
-To prove Zentext is better, run the same scenario with a hand-maintained
-`CLAUDE.md` instead of Zentext and observe the differences.
+To prove Zentext is better, run the same scenario with a competent `CLAUDE.md` or
+`AGENTS.md` workflow instead of Zentext and observe the differences. Do not
+strawman markdown: assume the file is organized, the developer knows how to use
+it, and an agent can edit it when instructed.
 
 **With `CLAUDE.md`:**
 
-- The developer must **manually** edit `CLAUDE.md` after Agent A's session to record
-  the decision, the blocker, the progress, and the handoff. The agent does not write
-  it for them (a static file is not agent-writable through a standard interface).
-- `CLAUDE.md` is **unstructured**. To find "what are the blockers?" the developer (or
-  Agent B) must read the entire file and scan for it. There is no `zentext list
-  --type blocker`.
-- `CLAUDE.md` is **stale-prone**. If the developer forgets to update it after a
-  change, Agent B reads outdated context. Zentext's typed records are updated by the
-  agent as it works and surfaced by `zentext audit` when they go stale.
+- The developer or agent must update one shared prose file after Agent A's session
+  to record the decision, blocker, progress, and handoff. Agents can edit markdown,
+  but there is no typed standard interface that tells them what kind of memory they
+  are writing or when to write it.
+- Even a good `CLAUDE.md` is **prose-first**. To find "what are the blockers?" the
+  developer or Agent B must rely on headings/search/convention. There is no
+  typed `zentext list --type blocker`.
+- `CLAUDE.md` is **stale-prone**. If the developer or agent forgets to update it
+  after a change, Agent B reads outdated context. Zentext records carry statuses,
+  revisions, timestamps, and audit/staleness markers.
 - `CLAUDE.md` is **not queryable**. There is no "give me the active task and open
   blockers, focused on auth." Zentext's `memory.repack --focus auth` does exactly
   that.
-- `CLAUDE.md` is **one fixed file**. It cannot be scoped to a sub-task or sized to a
-  budget. Zentext's repack produces a focused payload per request.
+- `CLAUDE.md` is **one fixed file** unless someone manually prunes or copies a
+  focused excerpt. Zentext's repack produces a focused payload per request with a
+  deterministic priority order and size budget.
 - `CLAUDE.md` has **no handoff concept**. The developer writes a freeform paragraph.
   Zentext's `handoff` record has explicit `state`, `next`, `open_questions`, and
   `completed_this_session` fields that the next agent reads predictably.
@@ -303,16 +307,18 @@ To prove Zentext is better, run the same scenario with a hand-maintained
 
 | Action | With CLAUDE.md | With Zentext |
 |--------|----------------|--------------|
-| Record the decision after Agent A | Developer hand-edits file | Agent calls `memory.write` via MCP |
-| Record the blocker | Developer hand-edits file | Agent calls `memory.write` via MCP |
-| Find the blocker before Agent B | Read the whole file | `zentext list --type blocker` |
+| Record the decision after Agent A | Developer or agent edits prose by convention | Agent calls `memory.write` via MCP with type `decision` |
+| Record the blocker | Developer or agent edits prose by convention | Agent calls `memory.write` via MCP with type `blocker` |
+| Find the blocker before Agent B | Search/read headings in the shared file | `zentext list --type blocker` |
 | Give Agent B focused context | Paste the whole file | `memory.repack --focus auth` |
-| Detect stale context | Developer notices | `zentext audit` flags it |
-| Hand off with explicit next step | Write a freeform paragraph | `memory.handoff` with typed fields |
+| Detect stale context | Developer or agent notices by inspection | `zentext audit` flags stale records and revisions |
+| Hand off with explicit next step | Write a prose handoff section | `memory.handoff` with typed fields |
 | Avoid re-litigating the passport decision | Hope Agent B reads that paragraph | Decision record is queryable and explicit |
 
-The markdown flow is **more manual, less precise, and more stale-prone**. Zentext's
-flow is **agent-written, structured, queryable, and repackable.**
+The markdown flow can work, but it is **less typed, less queryable, less
+deterministic, and more dependent on manual pruning conventions**. Zentext's flow
+is **agent-writable through a standard tool surface, typed, queryable, revisioned,
+auditable, and repackable.**
 
 ## Demo success criteria
 
@@ -325,8 +331,10 @@ The demo is successful when all of these are true in a single real session:
    ("continue the auth work") and did not re-explain the project.
 4. Agent B received repacked context and correctly referenced the prior decision and
    the blocker in its first response.
-5. The same scenario done with `CLAUDE.md` required manual edits, full-file reads,
-   and was visibly more friction.
+5. The same scenario done with a competent `CLAUDE.md`/`AGENTS.md` workflow was
+   visibly more manual or less precise because it lacked typed records,
+   query/filter behavior, deterministic repack priority, revision tracking, stale
+   marking, and generated handoff payloads.
 
 ## Demo failure criteria
 
@@ -360,7 +368,8 @@ The demo fails if:
 ## What evidence would change the decision
 
 - If observers of the demo do not perceive a clear advantage over a well-maintained
-  `CLAUDE.md`, the value prop needs reframing (or the demo needs to be sharper).
+  agent-editable `CLAUDE.md`, the value prop needs reframing (or the demo needs to
+  be sharper).
 - If Agent B reliably ignores the repack payload and asks the developer to
   re-explain anyway, repack format/priority needs rework before the MVP is credible.
 - If the non-MCP fallback (`zentext repack` + paste) proves nearly as good as the MCP

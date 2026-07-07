@@ -1,8 +1,9 @@
 # Open Decisions
 
-These are unresolved strategic and product decisions. Each lists the question,
-options, current lean, why it matters, what evidence would settle it, and when it
-must be decided. This is a living document for ongoing discussion.
+This is the decision registry for strategic and product decisions. It includes
+accepted Stage 1 decisions, unresolved later-stage gates, why each decision
+matters, what evidence would change it, and when it must be revisited. This is a
+living document for ongoing discussion.
 
 > **Stage 1 status (2026-07-06):** Decisions #1, #2, #3, #4, #6, #7, and the Stage 1
 > subset of #10 are **accepted for Stage 1** (see
@@ -27,7 +28,7 @@ outside it (e.g., `~/.zentext/`)?
 
 **Status:** Accepted for Stage 1 (2026-07-06). See ADR 0002.
 
-**Current lean:** Out-of-repo for the store, with an option to export a portable
+**Stage 1 contract:** Out-of-repo for the store, with an option to export a portable
 bundle into the repo (e.g., `.zentext/context.md`) for git-based sharing. Bridges
 both. For Stage 1 the export path is `zentext repack --out .zentext/context.md`
 (no separate `zentext export` command).
@@ -54,7 +55,7 @@ they find it noisy?
 **Status:** Accepted for Stage 1 (2026-07-06). See ADR 0005. No move to fully
 schemaless memory and no pluggable templates in Stage 1.
 
-**Current lean:** Opinionated baseline types (task, decision, blocker, handoff,
+**Stage 1 contract:** Opinionated baseline types (task, decision, blocker, handoff,
 log, validation, policy, custom) with a `custom` escape hatch. See
 [`memory-schema.md`](./memory-schema.md).
 
@@ -82,7 +83,7 @@ baseline cover the common cases without forcing every project into a rigid shape
 default; JSON export/snapshot remains optional and later. Per-agent custom formats
 are deferred.
 
-**Current lean:** Structured markdown as the default, with templates and per-agent
+**Stage 1 default:** Structured markdown as the default, with templates and per-agent
 customization later. See [`context-repacking.md`](./context-repacking.md).
 
 **Why it matters:** If the format is not useful to the receiving agent, the value
@@ -101,7 +102,7 @@ decided for Stage 1.)
 **Question:** What should the MCP tools be named?
 
 **Options:**
-- `memory.*` namespace (current lean).
+- `memory.*` namespace (accepted for Stage 1).
 - `zentext.*` namespace.
 - `project.*` namespace.
 
@@ -109,7 +110,7 @@ decided for Stage 1.)
 namespace and the initial seven-tool surface are accepted; tool **description
 wording** stays testable/tunable during demo validation (see #12).
 
-**Current lean:** `memory.*` — clear, agent-readable, describes the domain.
+**Stage 1 contract:** `memory.*` — clear, agent-readable, describes the domain.
 
 **Why it matters:** Tool names affect how reliably agents decide to call them.
 
@@ -157,7 +158,7 @@ whether they immediately get it.
 with optional git export via the read-only `repack --out` snapshot; the live store is
 not coupled to git.
 
-**Current lean:** Internal versioning for the store, with optional git export.
+**Stage 1 contract:** Internal versioning for the store, with optional git export.
 Don't couple the store to git.
 
 **Why it matters:** Coupling to git limits storage location choices and adds merge
@@ -182,7 +183,7 @@ with internal versioning plus export.
 **Status:** Accepted for Stage 1 (2026-07-06). `zentext repack` (stdout or
 `--out <file>`) is the Stage 1 non-MCP fallback.
 
-**Current lean:** `zentext repack` emits markdown to stdout or a file, which the
+**Stage 1 contract:** `zentext repack` emits markdown to stdout or a file, which the
 developer pastes or references. See [`cli-reference.md`](./cli-reference.md).
 
 **Why it matters:** Widens compatibility without per-agent integrations.
@@ -251,7 +252,7 @@ that agents should not have to re-derive.
 based staleness is deferred to a post-MVP Stretch goal. Stale-detection thresholds
 remain tunable during implementation.
 
-**Current lean:** MVP combines age-based, status-based, completed-task, and
+**Stage 1 contract:** MVP combines age-based, status-based, completed-task, and
 manually-marked staleness, surfaced via `zentext audit`. Reference-based
 staleness (records referencing code that has changed) is deferred to a post-MVP
 Stretch goal. Do not auto-delete; flag for review. See

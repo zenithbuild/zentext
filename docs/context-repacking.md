@@ -75,12 +75,21 @@ When repacking, records are included in this priority order:
 - **Reference-based staleness (Stretch, not MVP):** detecting records whose
   `refs` point to code that has since changed, using repo state, is deferred to a
   post-MVP stretch goal; it is not part of Stage 1 repack/audit behavior.
-- **Size budget:** The repack respects a size budget (configurable via `max_size`).
-  Lower-priority records are dropped or summarized first.
+- **Size budget:** The repack respects a character budget (default 12000
+  characters, configurable via `max_size`). Lower-priority records are dropped or
+  summarized first.
 - **Status filtering:** Resolved blockers and superseded decisions are excluded by
   default unless the focus explicitly asks for history.
 - **Log pruning:** Only recent, sanitized log excerpts are included; older logs are
   summarized or omitted.
+
+## Deterministic behavior
+
+Stage 1 repack output must be deterministic for identical store state and
+parameters. Records are sorted by priority group, status relevance, `updated_at`
+descending, then id ascending. If multiple active tasks exist, repack selects the
+focused matching task first, otherwise the latest updated active task, and
+summarizes the remaining active tasks instead of dumping them.
 
 ## How this differs from dumping a markdown file
 

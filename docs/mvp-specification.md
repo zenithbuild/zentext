@@ -50,7 +50,7 @@ non-MCP fallback.
 - Baseline memory schema (see [`memory-schema.md`](./memory-schema.md)):
   - task, decision, blocker, handoff, log, validation, policy, custom
 - CLI commands (see [`cli-reference.md`](./cli-reference.md)):
-  - `init`, `status`, `show`, `list`, `handoff`, `repack`, `edit`, `audit`
+  - `init`, `status`, `show`, `list`, `add`, `handoff`, `repack`, `edit`, `audit`
 - Context repacking (see [`context-repacking.md`](./context-repacking.md)):
   - generate a structured markdown payload from current memory state, optimized
     for agent consumption.

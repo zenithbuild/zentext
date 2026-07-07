@@ -53,7 +53,7 @@ explicit export.
 | Conflict with teammate memory | Likely (if both commit) | N/A (separate stores) | Avoidable (export is read-only snapshot) | N/A |
 | Coupling store to git | Yes | No | No | Partially |
 
-## Current recommendation
+## Accepted Stage 1 decision
 
 **Option C — Out-of-repo store + optional in-repo export.**
 
@@ -61,9 +61,10 @@ Rationale:
 - The canonical store is out-of-repo (`~/.zentext/projects/<id>/`), keeping repos
   clean and avoiding git merge conflicts on memory records. Memory is internal to
   the user/machine, not part of the project artifact.
-- `zentext export` (or `zentext repack --out .zentext/context.md`) writes a portable,
-  human-readable snapshot into the repo on demand. This snapshot is git-trackable,
-  so sharing via git clone is possible without coupling the live store to git.
+- `zentext repack --out .zentext/context.md` writes a portable, human-readable
+  snapshot into the repo on demand. This snapshot is git-trackable, so sharing via
+  git clone is possible without coupling the live store to git. There is no
+  separate `zentext export` command in Stage 1.
 - This decouples the storage model from the sharing model: live memory is local and
   fast; sharing is explicit and snapshot-based or via cloud sync (Stage 2).
 - Avoids the in-repo failure mode where every agent write produces a git diff and

@@ -46,11 +46,11 @@ Nine commands: `init`, `status`, `show`, `list`, `add`, `handoff`, `repack`,
   task, open blockers, latest handoff, decisions count, last-updated timestamps.
 
 ### zentext show <id>
-- **Args/flags:** `<id>`; optional `--json`
+- **Args/flags:** `<id>`; optional/stretch `--json`
 - **Output:** full record, readable by default; raw JSON with `--json`.
 
 ### zentext list
-- **Args/flags:** `[--type <type>]` `[--status <status>]` `[--tag <tag>]` `[--limit <n>]` `[--json]`
+- **Args/flags:** `[--type <type>]` `[--status <status>]` `[--tag <tag>]` `[--limit <n>]` optional/stretch `[--json]`
 - **Output:** summarized table (id, type, title, status, updated_at); JSON with
   `--json`.
 
@@ -71,6 +71,9 @@ Nine commands: `init`, `status`, `show`, `list`, `add`, `handoff`, `repack`,
 - **Output:** the created record's id and a readable summary.
 - **Safety:** same secret-rejection heuristics as `memory.write` (see
   [`safety-and-secrets.md`](./safety-and-secrets.md)).
+- **Log note:** `add log` is not a primary Stage 1 human command. Logs are mostly
+  agent/system-written through `memory.write`; humans can correct logs with
+  `edit` or use `custom` for manual notes.
 
 ### zentext handoff
 - **Args/flags:** flags for `context`, `state`, `next`, `open_questions`,
@@ -80,12 +83,11 @@ Nine commands: `init`, `status`, `show`, `list`, `add`, `handoff`, `repack`,
   Stage 1 scope).
 
 ### zentext repack
-- **Args/flags:** `[--focus <topic>]` `[--max-size <bytes>]` `[--out <path>]` `[--json]`
+- **Args/flags:** `[--focus <topic>]` `[--max-size <chars>]` `[--out <path>]`
 - **Behavior:** produce a structured markdown payload via the **shared repack
   engine** (same as `memory.repack`). `--out` writes to a file — this is the
   in-repo export path (`.zentext/context.md`) and the non-MCP fallback artifact.
-  `--json` emits a JSON snapshot instead (optional later format; MVP default is
-  markdown).
+  JSON snapshot/export output is optional later, not required for Stage 1.
 - **Output:** markdown to stdout by default; file with `--out`; warns if the
   exported snapshot is stale relative to the live store.
 
@@ -96,23 +98,26 @@ Nine commands: `init`, `status`, `show`, `list`, `add`, `handoff`, `repack`,
 - **Safety:** re-run secret rejection on save.
 
 ### zentext audit
-- **Args/flags:** `[--json]`
+- **Args/flags:** optional/stretch `[--json]`
 - **Output:** a report flagging stale/suspicious records and suggesting cleanup
   (see [`staleness-and-audit-spec.md`](./staleness-and-audit-spec.md)).
 
 ## Output format rules
 
 - Default: human-readable (tables/sections) for terminal use.
-- `--json`: machine-readable JSON for every command that produces structured
-  output (enables scripting and the non-MCP fallback).
+- Optional/stretch `--json`: machine-readable JSON may be added for inspection
+  commands (`show`, `list`, `audit`) if cheap, but it is not required for Stage 1
+  acceptance and is not the repack/export format.
 - No secrets in any output. No full file contents.
 
 ## Exit codes
 
 - `0` success.
-- non-zero for: not initialized, record not found, validation/secret rejection,
-  store errors, invalid args. Specific codes are finalized in implementation but
-  must be stable and documented.
+- `1` invalid args or validation/secret rejection.
+- `2` project/store not initialized.
+- `3` record not found.
+- `4` retryable store-busy/concurrent write conflict.
+- `5` store/internal error.
 
 ## Decisions and assumptions
 
@@ -128,8 +133,24 @@ Nine commands: `init`, `status`, `show`, `list`, `add`, `handoff`, `repack`,
 - A human can initialize, author (task/decision/blocker/validation/policy/custom),
   inspect, hand off, repack, edit, and audit without an agent.
 - `repack --out .zentext/context.md` produces a pasteable/exportable snapshot.
-- `--json` is available for scripted use.
+- Structured markdown is the only required repack/export output.
 - No secrets appear in any output.
+
+## Doc-level acceptance tests
+
+- `zentext init` creates or finds the cwd-resolved project store, prints the store
+  path, and is idempotent.
+- `zentext add task` with `title` and `goal` creates a task with generated
+  `id`, resolved `project`, timestamps, `revision=1`, and default status `active`.
+- `zentext add decision` with `title` and `decision` creates a decision with
+  default status `accepted`.
+- `zentext add log` is not required for Stage 1.
+- `zentext show <id>` prints a full record; `zentext list --type blocker` prints a
+  summarized list.
+- `zentext repack --out .zentext/context.md` writes a point-in-time markdown
+  snapshot and does not create or mutate the live store.
+- Optional/stretch `--json` support, if present, must not be required by any Stage
+  1 workflow.
 
 ## Risks
 
