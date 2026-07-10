@@ -51,6 +51,8 @@ AGENT_SYNC.md
 
 This file is a field-test artifact only. It is a generated/manual view of the
 state Zentext may later store structurally. It is not the long-term database.
+Start from [`AGENT_SYNC.template.md`](./AGENT_SYNC.template.md) unless the test
+repo already has a stronger local format.
 
 ## Suggested Shape
 
@@ -108,6 +110,95 @@ Use different task modes if possible:
 - blocked task to continuation
 - stale information to reconciliation
 
+## Agent Update Rules
+
+Each agent must treat `AGENT_SYNC.md` as shared project memory, not a private
+scratchpad.
+
+Rules:
+
+- Read the full file before starting work.
+- Update the handoff section before ending a session.
+- Do not delete locked decisions; supersede them explicitly.
+- Do not mark blockers resolved unless the resolving evidence is included.
+- Do not replace validation history with a vague summary.
+- Do not paste raw secrets, credentials, or full unsanitized logs.
+- Keep session-local notes out of shared truth unless they are promoted through
+  a handoff, decision, blocker, or validation entry.
+- If state conflicts, add it to `Reconciliation Needed` instead of guessing.
+
+## Locked Vs Mutable Sections
+
+| Section | Rule |
+|---------|------|
+| Current Role | Mutable by the active session. |
+| Active Task | Mutable, but changes should be explained in the handoff. |
+| Shared Context | Mutable only for facts that should survive the session. |
+| Locked Decisions | Append or supersede; do not silently rewrite. |
+| Mutable State | Safe for agents to update with a reason. |
+| Session-Local State | Private to the current session unless promoted. |
+| Open Blockers | Append, resolve with evidence, or mark stale. |
+| Last Validation | Append-only during the test; newest result goes first. |
+| Reconciliation Needed | Append conflicts or stale claims; human clears them. |
+| Handoff | Replaced by each session, but prior handoffs may be copied to history if useful. |
+
+## Handoff Format
+
+Each handoff should include:
+
+- what was attempted;
+- what changed;
+- decisions made;
+- blockers found or resolved;
+- validation run and result;
+- files or docs referenced;
+- what the next agent should do;
+- what the next agent should avoid;
+- what needs human reconciliation.
+
+Keep the handoff focused. If it becomes a transcript, the format is failing.
+
+## Validation Log Format
+
+Use a short, repeatable format:
+
+```md
+- 2026-07-10 14:30 CT - `git diff --check`
+  - result: passed
+  - scope: docs only
+  - notes: no whitespace errors
+```
+
+If a command fails, record:
+
+- command;
+- result;
+- failure reason if known;
+- whether the failure blocks the next step;
+- whether the result may be stale.
+
+Do not store full command output by default. Store a safe summary and a short
+excerpt only when it helps the next agent.
+
+## Conflict And Reconciliation Process
+
+When an agent sees conflicting state:
+
+1. Do not overwrite either claim.
+2. Add a reconciliation item with the conflicting claims.
+3. Include the evidence or missing evidence for each claim.
+4. Mark whether the conflict blocks the active task.
+5. Propose a resolution if obvious, but leave final authority to the user unless
+   the task instructions explicitly allow the agent to decide.
+
+Reconciliation outcomes:
+
+- keep old state;
+- accept new state;
+- supersede both with corrected state;
+- mark one claim stale;
+- create a new decision explaining the correction.
+
 ## What To Observe
 
 For each handoff, record:
@@ -143,6 +234,23 @@ The expected long-term direction remains:
 - updates should be revisioned;
 - stale writes should not silently overwrite newer state;
 - rollback should mean a new revision or supersession event, not history rewrite.
+
+## Rollback And Supersession Behavior
+
+During the manual test, do not rewrite history to hide a bad agent update.
+
+Use one of these patterns:
+
+- **Supersede:** add a new locked decision that marks the older decision wrong or
+  outdated.
+- **Restore:** copy a previous known-good state into a new entry and explain why
+  it is being restored.
+- **Mark stale:** keep the old claim visible but mark it stale or no longer
+  trusted.
+- **Escalate:** add a reconciliation item when the correct state is unclear.
+
+This mirrors the expected product direction: Zentext should preserve enough
+history to explain why the current context is trusted.
 
 ## Mapping To Zentext Concepts
 
@@ -210,3 +318,24 @@ Before starting `feature/stage-1-schema-store`, answer:
 The default assumption remains: Stage 1 uses the accepted TypeScript/Node +
 SQLite plan unless field-test evidence proves the store contract needs to change
 before implementation.
+
+## Product Assumptions This Validates
+
+This field test validates these assumptions from the current Zentext plan:
+
+- external project memory is enough to improve agent handoff;
+- typed records map cleanly to real agent coordination needs;
+- deterministic repacking can beat a single static markdown wall;
+- session-local state should stay separate from durable project memory;
+- conflicts need explicit reconciliation instead of silent overwrite;
+- Stage 1 can start with SQLite unless real handoffs prove graph/vector behavior
+  is needed immediately.
+
+## Decisions Blocked Until The Field Test Runs
+
+- Whether the current record types are sufficient.
+- Whether rollback/supersession needs a richer event model in Stage 1.
+- Whether session-local state should become a first-class record type or stay out
+  of canonical memory.
+- Whether the repack priority order matches what agents actually need.
+- Whether SQLite remains enough for the first implementation branch.
