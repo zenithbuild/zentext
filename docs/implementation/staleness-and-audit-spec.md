@@ -21,13 +21,14 @@ MVP. No implementation.
 
 - **Age-based staleness:** a record older than a configurable threshold while the
   task is still active.
-- **Status-based staleness:** records whose `status` is `stale` or `superseded`,
-  or whose task `progress` is `done`/`abandoned` but the record is not marked
-  resolved.
+- **Status-based staleness:** records in terminal/inactive statuses
+  (`done`, `canceled`, `resolved`, `archived`, `inactive`, `superseded`,
+  `rejected`) that are still being surfaced as current context.
 - **Completed-task staleness:** records related to a task that is `done` or
-  `abandoned` are stale relative to a new active task.
+  `canceled` are stale relative to a new active task unless explicitly referenced.
 - **Manually-marked stale:** a human or agent explicitly marks a record stale via
-  `edit`/`memory.update`.
+  `edit`/`memory.update` by moving it to an inactive status or adding an explicit
+  stale flag/reason.
 
 ## Stage 1 Stretch (not MVP-required)
 
@@ -49,8 +50,9 @@ MVP. No implementation.
 
 ## Staleness detection rules (MVP)
 
-- Thresholds are configurable with sensible defaults (finalized in
-  implementation); e.g., an active task with no record updates beyond N days.
+- Thresholds are configurable with sensible defaults. Stage 1 planning defaults:
+  active/blocked task with no updates for 14 days, open blocker with no updates
+  for 7 days, and latest handoff older than 14 days.
 - A record is flagged stale when any MVP signal fires.
 - Stale flags are surfaced to:
   - `zentext audit` (report).
@@ -80,7 +82,9 @@ Output: human-readable by default; `--json` for scripting.
 - No auto-delete; flag-for-review only.
 - Audit also surfaces missing recommended fields (ties to ADR 0005's "recommended,
   not enforced" stance) and secret-suspect records (ties to safety).
-- Thresholds are configurable; defaults finalized in implementation.
+- Thresholds are configurable; the Stage 1 planning defaults are active/blocked
+  task older than 14 days, open blocker older than 7 days, and latest handoff
+  older than 14 days.
 
 ## Acceptance criteria
 
@@ -91,6 +95,18 @@ Output: human-readable by default; `--json` for scripting.
   secret-suspect records.
 - No stale record is auto-deleted.
 - Ref-based staleness is absent from the MVP (Stretch only).
+
+## Doc-level acceptance tests
+
+- An open blocker older than 7 days appears in `audit` with reason
+  `old_open_blocker`.
+- A task in status `done` does not appear as the active task in default repack.
+- A record related only to a canceled task is flagged stale relative to a newer
+  active task.
+- A stale low-priority record is omitted from default repack; a stale blocker tied
+  to the selected task is included with a stale marker.
+- `audit --json`, if implemented as optional/stretch, reports the same findings as
+  human-readable audit.
 
 ## Risks
 

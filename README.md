@@ -66,7 +66,7 @@ in all documentation and messaging.
 | [docs/self-hosting.md](./docs/self-hosting.md) | Open-source and enterprise self-hosting |
 | [docs/staged-roadmap.md](./docs/staged-roadmap.md) | Four-stage plan and triggers |
 | [docs/risks-and-antipatterns.md](./docs/risks-and-antipatterns.md) | Risks and anti-patterns to avoid |
-| [docs/open-decisions.md](./docs/open-decisions.md) | Unresolved strategic decisions |
+| [docs/open-decisions.md](./docs/open-decisions.md) | Decision registry for accepted Stage 1 decisions and unresolved later gates |
 
 ## Status
 

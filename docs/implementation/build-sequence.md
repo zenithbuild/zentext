@@ -189,9 +189,9 @@ are met in a real session.
 ## Assumptions
 
 - Tech stack per [`tech-stack-decision.md`](./tech-stack-decision.md)
-  (TypeScript/Node, SQLite, MCP TS SDK) is confirmed before Phase 1.
-- ADRs 0002/0004/0005 remain working assumptions; promotion to accepted happens
-  after this plan is reviewed, not during the build.
+  (TypeScript/Node, SQLite, MCP TS SDK if stable enough) is accepted for Stage 1.
+- ADRs 0002/0004/0005/0006 are accepted for Stage 1 and can be revisited after
+  Stage 1 evidence, but implementation should treat them as the current contract.
 
 ## Acceptance criteria (sequence-level)
 
@@ -200,9 +200,35 @@ are met in a real session.
 - No phase introduces cloud, sync, UI, or any non-goal from
   [`stage-1-plan.md`](./stage-1-plan.md).
 
+## Doc-level acceptance tests by phase
+
+- **Phase 1:** create/read/update/list all eight record types through the store
+  API; generated fields are assigned by Zentext; exact minimum create fields are
+  enforced; updates increment `revision` and write history/events.
+- **Phase 2:** `init`, `status`, `show`, and `list` work on a hand-seeded store and
+  print the resolved store path without an agent.
+- **Phase 3:** `zentext repack` is deterministic for fixed input, selects one
+  primary active task, respects the 12000-character default budget, and omits or
+  marks stale records per spec.
+- **Phase 4:** MCP read-side tools omit required `project` inputs, `memory.read`
+  is id-only, and `memory.repack` matches CLI repack output.
+- **Phase 5:** MCP write-side tools create typed records without caller-supplied
+  generated fields, reject obvious secrets, and preserve prior state through
+  status changes/history/supersession.
+- **Phase 6:** `zentext add` supports task, decision, blocker, validation, policy,
+  and custom; `add log` is not required; `edit` re-runs safety checks.
+- **Phase 7:** `audit` reports the MVP staleness signals, missing recommended
+  fields, secret suspects, and custom overuse without auto-mutating records.
+- **Phase 8:** `repack --out .zentext/context.md` writes a labeled point-in-time
+  snapshot and warns when the snapshot is stale relative to the live store.
+- **Phase 9:** the real-agent demo and competent-markdown contrast pass the
+  validation checklist.
+
 ## Risks
 
 - **Phase 5 reliability** may lag; Phase 6 (`add`) is the fallback that keeps the
   demo viable.
 - **Phase 3 repack quality** determines whether Phase 9 succeeds; iterate early.
-- **Tech-stack ADR not confirmed** blocks Phase 1 — it is the first gate.
+- **MCP TypeScript SDK instability** may block Phase 4. Confirm the SDK before
+  implementing the MCP server; keep the store/repack layers independent enough to
+  survive an SDK change.

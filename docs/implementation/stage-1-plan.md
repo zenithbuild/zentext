@@ -66,23 +66,26 @@ Stage 1 includes exactly:
 
 ## Decisions and assumptions
 
-### ADR working assumptions (do not rewrite prior ADRs in this pass)
+### Accepted Stage 1 ADRs
 
-ADR 0002, 0004, and 0005 are **status: proposed, not final**. For Stage 1
-planning they are treated as **working assumptions**:
+ADR 0002, 0004, 0005, and 0006 are **accepted for Stage 1**. They are not
+necessarily permanent beyond Stage 1 and can be revisited after Stage 1 evidence
+accumulates:
 
 - **ADR 0002** — storage location: out-of-repo store
   (`~/.zentext/projects/<project-id>/`) + optional in-repo export via
   `repack --out .zentext/context.md`.
 - **ADR 0004** — MCP tool naming: `memory.*` namespace with action-oriented
-  descriptions.
+  descriptions. In Stage 1, MCP tools resolve the project from the server cwd and
+  do not accept a required `project` input.
 - **ADR 0005** — schema rigidity: opinionated baseline types + `custom` escape
   hatch.
+- **ADR 0006** — tech stack: TypeScript/Node, SQLite, MCP TypeScript SDK if stable
+  enough for implementation, structured markdown repack output, and the accepted
+  project-id rule.
 
-These should be promoted to **accepted** in a later ADR status update, after the
-implementation plan is reviewed. **Do not silently change their status in this
-pass.** See `open-decisions.md` and the ADR files for the unresolved evidence
-gates.
+License status is unchanged: it remains an unresolved release gate and does not
+block Stage 1 implementation.
 
 ### Locked Stage 1 decisions
 
@@ -91,7 +94,7 @@ gates.
 | Export command | No separate `zentext export` in Stage 1. Use `zentext repack --out .zentext/context.md`. The export concept is just a repack output target. |
 | Generic CLI authoring | Add `zentext add` in Stage 1: `add task`, `add decision`, `add blocker`, `add validation`, `add policy`, `add custom`. Humans must have a clean correction/authoring path independent of agents. |
 | Staleness | MVP: age-based, status-based, completed-task, manually-marked. Stretch: file/reference-based staleness using repo state. |
-| Tech stack | Proposed ADR (`tech-stack-decision.md`) with current recommendation: TypeScript/Node, SQLite local store, MCP TypeScript SDK, structured markdown repack, JSON snapshot only as optional later output. |
+| Tech stack | Accepted Stage 1 ADR (`tech-stack-decision.md`): TypeScript/Node, SQLite local store, MCP TypeScript SDK if stable enough, structured markdown repack, JSON snapshot only as optional later output. |
 | Project ID | If git remote origin exists: hash normalized origin URL. Else: hash absolute project path. Human-readable project name stored separately from stable project id. |
 | Repack engine | One shared repack engine. CLI `zentext repack` and MCP `memory.repack` call the same underlying logic so outputs do not drift. |
 | Safety | Heuristic safeguards only, not a guarantee. Conservative defaults: reject obvious secrets, redact likely tokens, no full unsanitized command logs, cap stored log size, prefer summaries over raw logs. |
@@ -155,6 +158,6 @@ Plus the demo success criteria in ADR 0003 / `demo-and-validation-plan.md`.
 - **Schema too rigid or too loose.** Mitigated by ADR 0005 Option C; validate
   against the demo scenario before locking.
 - **Storage location regret.** Out-of-repo is hard to migrate later. Mitigated by
-  validating ADR 0002 against real usage before promoting to accepted.
+  validating ADR 0002 against real usage before making it permanent beyond Stage 1.
 - **Over-building.** Staleness ref-detection, pluggable schema, and per-agent
   formats are explicitly deferred to keep the MVP lean.

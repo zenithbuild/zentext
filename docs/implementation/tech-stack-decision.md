@@ -9,8 +9,8 @@
 The foundation docs are runtime- and storage-agnostic. Before Phase 1 can begin,
 Zentext needs a working tech-stack decision: implementation language/runtime,
 local store format, MCP SDK, repack output format, and project-id derivation.
-This is a **decision document**, not a design document. It records options and a
-current recommendation. It contains no code, packages, or scaffolding.
+This is a **decision document**, not a design document. It records options and the
+accepted Stage 1 choice. It contains no code, packages, or scaffolding.
 
 ## Foundation docs this derives from
 
@@ -30,7 +30,7 @@ Decide only what is needed to build Stage 1. Nothing here commits Stage 2+.
 - No choice that forces UI/editor-plugin architecture.
 - No license decision (license is a release gate, not a build gate).
 
-## Decisions to make
+## Decision details
 
 ### 1. Implementation language/runtime
 
@@ -42,7 +42,7 @@ Decide only what is needed to build Stage 1. Nothing here commits Stage 2+.
 - **Rust** — fast and safe, but higher build friction for product validation;
   better suited to later hardened verification pieces.
 
-**Current recommendation: TypeScript/Node.**
+**Accepted Stage 1 choice: TypeScript/Node.**
 
 Rationale: Stage 1 is product validation, not kernel hardening. TypeScript keeps
 the MCP server, CLI, and a future Zenith UI path in one language. Rust may be
@@ -57,7 +57,7 @@ is not Stage 1.
 - **JSON files on disk** — simplest, human-inspectable, no dependency; weaker
   query/index and concurrency story.
 
-**Current recommendation: SQLite.**
+**Accepted Stage 1 choice: SQLite.**
 
 Rationale: the schema is typed and queryable by design (ADR 0005); SQLite matches
 that without over-engineering. JSON snapshots remain an optional output format
@@ -69,7 +69,7 @@ later (e.g., for `repack --out` snapshots), not the canonical store.
 - **MCP TypeScript SDK** — matches the recommended runtime.
 - Alternative-language MCP SDKs — only if the runtime decision changes.
 
-**Current recommendation: MCP TypeScript SDK, assuming it is stable enough for
+**Accepted Stage 1 choice: MCP TypeScript SDK, assuming it is stable enough for
 the MVP.**
 
 Risk: SDK stability must be confirmed before Phase 4. If the SDK is not stable
@@ -79,7 +79,7 @@ enough, this decision is revisited (and may push toward a different runtime).
 
 **Options:** structured markdown (default), JSON, per-agent custom.
 
-**Current recommendation: structured markdown.**
+**Accepted Stage 1 choice: structured markdown.**
 
 Rationale: matches [`context-repacking.md`](../context-repacking.md) and
 open-decision #3. JSON export/snapshot is an optional later output format, not
@@ -87,7 +87,7 @@ the MVP default.
 
 ### 5. Project-id derivation
 
-**Current recommendation:**
+**Accepted Stage 1 choice:**
 - If a git remote `origin` exists: hash the normalized origin URL.
 - Else: hash the absolute project path.
 - Store the human-readable project name separately from the stable project id.

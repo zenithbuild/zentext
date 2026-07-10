@@ -28,7 +28,7 @@ required fields enforced on write. No escape hatch.
 Any record is a freeform JSON blob with only `id`, `type` (free string), and `body`.
 Maximum flexibility; repacking must infer structure.
 
-### Option C — Opinionated baseline types + `custom` escape hatch (current lean)
+### Option C — Opinionated baseline types + `custom` escape hatch (accepted for Stage 1)
 
 A small set of well-defined baseline types (task, decision, blocker, handoff, log,
 validation, policy), each with recommended fields, plus a `custom` type with a
@@ -56,7 +56,7 @@ registered templates. Maximum extensibility, highest complexity.
 | Stale detection quality | High (typed refs/status) | Low | High for baseline; medium for custom | Depends on templates |
 | MVP speed | Fast | Fast | Fast | Slow |
 
-## Current recommendation
+## Accepted Stage 1 decision
 
 **Option C — Opinionated baseline types + `custom` escape hatch.**
 
@@ -70,8 +70,10 @@ Rationale:
   baseline type — without forcing every project into a rigid shape.
 - This avoids both failure modes: not so rigid that odd projects break (Option A), and
   not so flexible that repacking degrades to guessing (Option B).
-- Required fields per baseline type should be minimal (e.g., `id`, `type`, `title`,
-  `status`, timestamps) so writes are not rejected for missing optional context.
+- Required create-input fields per baseline type should be minimal (e.g., `type`,
+  `title`, and the smallest type-specific content field). Generated fields such as
+  `id`, `project`, timestamps, and `revision` are assigned by Zentext and are not
+  client-supplied.
 - Repacking treats `custom` records as low priority by default unless tagged or
   referenced by the active task, which prevents custom noise from drowning out
   baseline signal.

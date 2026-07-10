@@ -29,16 +29,18 @@ Every record shares a common envelope:
   "project": "my-app",            // project this record belongs to
   "title": "short human title",
   "summary": "1-3 sentence summary",
-  "status": "active | resolved | stale | superseded",
+  "status": "type-specific status",
   "created_at": "ISO-8601",
   "updated_at": "ISO-8601",
+  "revision": 1,
   "author": "agent:codex | agent:claude | user:judah | ci:github-actions",
   "tags": ["auth", "backend"],
   "refs": {                       // repo references, not file contents
     "files": ["src/auth/login.ts"],
     "commits": ["a1b2c3d"],
     "branches": ["feat/auth"]
-  }
+  },
+  "schema_version": 1
 }
 ```
 
@@ -58,7 +60,7 @@ secrets.
   "type": "task",
   "goal": "what success looks like",
   "steps": ["step 1 done", "step 2 in progress"],
-  "progress": "in-progress | blocked | done | abandoned",
+  "status": "active | blocked | done | canceled",
   "next": "the immediate next action",
   "related": ["rec_decision_...", "rec_blocker_..."]
 }
@@ -85,7 +87,7 @@ it is not re-litigated by the next agent.
   "decision": "use Postgres for the audit store",
   "rationale": "transactional integrity needed for audit records",
   "alternatives_considered": ["SQLite (rejected: no concurrent writers)"],
-  "status": "active | superseded | reverted",
+  "status": "proposed | accepted | superseded | rejected",
   "supersedes": ["rec_decision_..."]
 }
 ```
@@ -110,7 +112,7 @@ a change that might conflict with a prior decision.
   "blocker": "OAuth callback fails in staging",
   "severity": "high | medium | low",
   "workaround": "none known",
-  "status": "active | resolved",
+  "status": "open | resolved | canceled",
   "related": ["rec_task_..."]
 }
 ```
@@ -135,6 +137,7 @@ explicit bridge between sessions.
   "type": "handoff",
   "from": "agent:codex",
   "to": "agent:claude | user:judah | any",
+  "status": "latest | archived | superseded",
   "context": "what was being done and why",
   "state": "where things stand right now",
   "next": "what the next agent should do",
@@ -165,7 +168,8 @@ or unsanitized output.
   "exit_code": 1,
   "summary": "3 tests failed in auth suite",
   "safe_excerpt": "...safe lines only...",
-  "sanitized": true
+  "sanitized": true,
+  "status": "recorded | redacted"
 }
 ```
 
@@ -188,7 +192,7 @@ checks, proofs) so the next agent does not redo it or re-litigate a passed check
 {
   "type": "validation",
   "check": "npm test | tsc --noEmit | build | lint",
-  "result": "pass | fail | unknown",
+  "result": "passed | failed | inconclusive",
   "summary": "all tests pass except auth callback",
   "run_at": "ISO-8601",
   "details_ref": "rec_log_..."
@@ -216,7 +220,7 @@ here later.
   "rule": "never commit directly to main",
   "scope": "project | team | workspace",
   "enforcement": "advisory | required",
-  "status": "active"
+  "status": "active | inactive | superseded"
 }
 ```
 
@@ -239,7 +243,8 @@ type, without forcing the schema to grow unboundedly.
 {
   "type": "custom",
   "kind": "a user/agent-defined sub-type string",
-  "body": { /* freeform structured fields */ }
+  "body": { /* freeform structured fields */ },
+  "status": "active | archived"
 }
 ```
 

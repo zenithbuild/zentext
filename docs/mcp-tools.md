@@ -1,8 +1,8 @@
 # MCP Tools
 
-This document defines the proposed MCP tool surface for Zentext conceptually. It is
-not implementation code. Tool names and descriptions matter for agent behavior, so
-the surface is kept small, clear, and agent-readable.
+This document defines the Stage 1 MCP tool surface for Zentext. Tool names and
+descriptions matter for agent behavior, so the surface is kept small, clear, and
+agent-readable.
 
 ## Design principles
 
@@ -18,17 +18,16 @@ the surface is kept small, clear, and agent-readable.
 
 ### memory.read
 
-**Purpose:** Read a single memory record by id, or the current active context for a
-project.
+**Purpose:** Read one memory record by id.
 
-**Conceptual input:** `{ id?: string, project: string }`
+**Conceptual input:** `{ id: string }`
 
-**Conceptual output:** A single record, or the active context bundle (active task,
-open blockers, recent decisions, latest handoff).
+**Conceptual output:** A single stored/output record, including the resolved
+`project` id assigned by Zentext.
 
-**Agent behavior guidance:** Call at the start of a session to load current project
-memory before acting. Prefer `memory.repack` when you need a ready-to-use context
-payload.
+**Agent behavior guidance:** Use when you already have a record id and need the
+full record. Use `memory.list` for an overview, `memory.query` for filtered search,
+and `memory.repack` to load ready-to-use agent context at session start.
 
 **Safety concerns:** Returns only stored structured records. Never returns secrets
 (secrets are not stored). `refs` are paths/SHAs, not file contents.
@@ -42,7 +41,9 @@ payload.
 **Purpose:** Create a new memory record (task, decision, blocker, handoff, log,
 validation, policy, custom).
 
-**Conceptual input:** A record of one of the baseline types with required fields.
+**Conceptual input:** A create-input record of one of the baseline types with
+required fields. Do not send generated fields (`id`, `project`, `created_at`,
+`updated_at`, `revision`); Zentext assigns them.
 
 **Conceptual output:** The created record with its assigned id and timestamps.
 
@@ -59,9 +60,10 @@ check). Reject overly large payloads. Sanitize log excerpts.
 
 ### memory.query
 
-**Purpose:** Query memory records by type, status, tags, or free-text filter.
+**Purpose:** Query memory records for the cwd-resolved project by type, status,
+tags, or free-text filter.
 
-**Conceptual input:** `{ project: string, type?: string, status?: string, tags?: string[], text?: string }`
+**Conceptual input:** `{ type?: string, status?: string, tags?: string[], text?: string }`
 
 **Conceptual output:** A list of matching records, summarized.
 
@@ -79,7 +81,7 @@ current blockers?", "what decisions exist about auth?") without loading everythi
 **Purpose:** Create a handoff record summarizing the current session for the next
 agent or teammate.
 
-**Conceptual input:** `{ project: string, context: string, state: string, next: string, open_questions?: string[], completed_this_session?: string[] }`
+**Conceptual input:** `{ context: string, state: string, next: string, open_questions?: string[], completed_this_session?: string[] }`
 
 **Conceptual output:** The created handoff record, and a confirmation that it is
 marked as the latest handoff for the project.
@@ -99,7 +101,7 @@ excerpts.
 **Purpose:** Generate a focused, agent-ready context payload from current project
 memory.
 
-**Conceptual input:** `{ project: string, focus?: string, max_size?: number }`
+**Conceptual input:** `{ focus?: string, max_size?: number }`
 
 **Conceptual output:** A structured markdown context payload (see
 [`context-repacking.md`](./context-repacking.md)).
@@ -137,9 +139,10 @@ silent deletes in favor of status changes where it matters.
 
 ### memory.list
 
-**Purpose:** List memory records for a project, optionally filtered by type.
+**Purpose:** List memory records for the cwd-resolved project, optionally filtered
+by type.
 
-**Conceptual input:** `{ project: string, type?: string, limit?: number }`
+**Conceptual input:** `{ type?: string, limit?: number }`
 
 **Conceptual output:** A summarized list of records (id, type, title, status,
 updated_at).
@@ -153,9 +156,16 @@ before deciding what to read in detail.
 
 ## Tool naming note
 
-Tool names affect how reliably agents call them. `memory.*` is the current lean. The
-exact names and descriptions should be tested with real agents and may change. See
-[`open-decisions.md`](./open-decisions.md).
+Tool names affect how reliably agents call them. `memory.*` is accepted for Stage
+1. Description wording remains testable and may be tuned with real-agent evidence.
+See [`open-decisions.md`](./open-decisions.md).
+
+## Project resolution
+
+In Stage 1, the MCP server resolves the project from its current working
+directory and serves one project at a time. Tool inputs do not accept `project`.
+Stored/output records still include the resolved `project` id. Explicit project
+routing is future scope.
 
 ## Out of scope for the MVP tool surface
 

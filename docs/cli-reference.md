@@ -72,6 +72,25 @@ updated_at).
 
 ---
 
+### zentext add
+
+**Purpose:** Create a structured memory record from the human side.
+
+**Example invocation:** `zentext add decision`
+
+**Expected behavior:** Captures required fields via flags and/or an editor and
+creates one of the Stage 1 human-authored record types: `task`, `decision`,
+`blocker`, `validation`, `policy`, or `custom`. Generated fields such as `id`,
+`project`, timestamps, and revision are assigned by Zentext.
+
+`zentext add log` is not a primary Stage 1 command. Logs are mostly agent/system
+written through `memory.write`; humans can correct logs with `zentext edit` or use
+`custom` for manual notes that do not fit the baseline types.
+
+**MVP status:** MVP.
+
+---
+
 ### zentext handoff
 
 **Purpose:** Create a handoff record from the human side, summarizing the current
