@@ -152,9 +152,9 @@ Inherited verbatim from `staged-roadmap.md`:
 
 Plus the demo success criteria in ADR 0003 / `demo-and-validation-plan.md`.
 
-Pre-coding gate: the Stage 0.5 field test has been run, or deliberately skipped
-with a documented reason. If it reveals a contract issue, the relevant planning
-doc is patched before Phase 1 begins.
+Pre-coding gate: Stage 0.5 must be run before Phase 1 coding. If Stage 0.5
+reveals a contract issue, the relevant planning docs must be patched before
+product implementation starts.
 
 ## Risks (carried from foundation docs)
 
