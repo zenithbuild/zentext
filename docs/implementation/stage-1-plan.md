@@ -33,6 +33,11 @@ Stage 1 is the **Local MVP**: a developer can switch between AI coding agents
 while preserving the same external project memory, and the next agent continues
 without the developer re-explaining the project.
 
+Stage 1 coding should start only after the Stage 0.5 manual field test either
+supports this plan or produces specific docs patches. The field test is a
+pre-coding evidence gate, not an implementation phase. See
+[`../field-tests/agent-sync-field-test.md`](../field-tests/agent-sync-field-test.md).
+
 Stage 1 includes exactly:
 
 1. **Local memory store** (per-project, out-of-repo).
@@ -146,6 +151,10 @@ Inherited verbatim from `staged-roadmap.md`:
 - The experience is clearly better than maintaining a `CLAUDE.md` by hand.
 
 Plus the demo success criteria in ADR 0003 / `demo-and-validation-plan.md`.
+
+Pre-coding gate: Stage 0.5 must be run before Phase 1 coding. If Stage 0.5
+reveals a contract issue, the relevant planning docs must be patched before
+product implementation starts.
 
 ## Risks (carried from foundation docs)
 
