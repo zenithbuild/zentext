@@ -7,18 +7,18 @@ project memory for agent handoff testing.
 ## Current Role
 
 - Agent: Codex
-- Role: planner / field-test initiator
-- Session started: 2026-07-10 11:10 CDT
+- Role: reviewer / field-test continuation
+- Session started: 2026-07-10 11:47 CDT
 
 ## Active Task
 
-- Task: Start the Stage 0.5 Agent Sync dogfood test in the Zentext repo.
-- Goal: Prove the manual agent-sync workflow before building the product around
-  it.
-- Current status: initial sync file and first run note are being created on
-  `field-test/agent-sync-dogfood`.
-- Owner: current Codex session until handoff; next agent/session should continue
-  from this file and the run note.
+- Task: Continue the Stage 0.5 Agent Sync dogfood test as a fresh session.
+- Goal: Test whether repo state plus `AGENT_SYNC.md` are sufficient to continue
+  without the user re-explaining the project.
+- Current status: second-session continuation is being recorded in
+  `docs/field-tests/runs/002-agent-sync-continuation.md`.
+- Owner: current Codex continuation session until handoff; next agent/session
+  should continue from this file plus run notes 001 and 002.
 
 ## Shared Context
 
@@ -36,6 +36,11 @@ project memory for agent handoff testing.
   - The Stage 1 product plan remains local memory store + MCP server + thin CLI
     + shared repack engine, but coding should not start until this field test
     gives enough evidence or patches the planning docs.
+  - Run 001 seeded the manual substrate and explicitly did not prove cross-agent
+    continuation.
+  - Run 002 found the handoff sufficient to recover the current task, branch,
+    locked decisions, blockers, validation state, and next action without asking
+    the user to restate the project.
 
 ## Locked Decisions
 
@@ -73,41 +78,50 @@ State agents may update with a reason.
   - last updated by: Codex, 2026-07-10 11:10 CDT
 - State: field-test artifacts
   - value: root `AGENT_SYNC.md` plus
-    `docs/field-tests/runs/001-agent-sync-dogfood.md`
-  - reason: first manual run should leave both the shared substrate and a
-    specific run note
-  - last updated by: Codex, 2026-07-10 11:10 CDT
+    `docs/field-tests/runs/001-agent-sync-dogfood.md` and
+    `docs/field-tests/runs/002-agent-sync-continuation.md`
+  - reason: field-test runs should leave both the shared substrate and specific
+    run notes
+  - last updated by: Codex, 2026-07-10 11:47 CDT
 - State: Stage 0.5 completion
-  - value: not complete; this is handoff 1 of the 3 to 5 recommended handoffs
-  - reason: at least one different agent/session still needs to read this file
-    and attempt to continue
-  - last updated by: Codex, 2026-07-10 11:10 CDT
+  - value: not complete; this is handoff 2 of the 3 to 5 recommended handoffs
+  - reason: the second session could continue, but the field test still needs
+    more handoffs or a deliberate field-test summary before Stage 1 coding
+  - last updated by: Codex, 2026-07-10 11:47 CDT
 
 ## Session-Local State
 
 Notes for the current agent/session only. Promote to shared context, decision,
 blocker, validation, or handoff only if it should become durable project memory.
 
-- This session used the merged Stage 0.5 docs and template as source material.
-- The current agent is the first writer of the manual sync file, so this pass
-  can only seed the system. It cannot prove cross-agent continuation yet.
-- The next session should test whether it can reconstruct the current project
-  state from this file plus the repo without needing the prior chat.
+- This continuation session used `AGENT_SYNC.md` as the primary handoff
+  substrate, then verified it against the field-test guide, run 001, README,
+  roadmap, and Stage 1 plan.
+- The prior handoff was sufficient for task reconstruction; the user did not
+  need to restate product direction or branch state.
+- The file is verbose enough that a future repack engine will need stricter
+  prioritization than this manual substrate.
 
 ## Open Blockers
 
 - Blocker: no second agent/session has continued from `AGENT_SYNC.md` yet.
+  - status: resolved
+  - blocks: no longer blocks proving the first continuation step
+  - evidence: this continuation session recovered the current task, scope,
+    branch, blockers, validation state, and next action from `AGENT_SYNC.md`,
+    run 001, and the repo docs without needing the user to restate the project.
+  - resolution needed: none for this blocker
+- Blocker: Stage 0.5 does not yet have the recommended 3 to 5 handoffs.
   - status: open
-  - blocks: declaring Stage 0.5 useful or moving toward Phase 1 coding
-  - evidence: this file is the initial seed; the field-test procedure requires
-    3 to 5 real handoffs.
-  - resolution needed: have a different agent/session read the repo plus this
-    file and continue the field test.
+  - blocks: declaring the field test complete or starting Phase 1 coding
+  - evidence: run 002 is only the first continuation after the seed run.
+  - resolution needed: run at least one more continuation/review/validation pass
+    or write a field-test summary explaining why the observed evidence is enough.
 - Blocker: field-test findings are not yet mapped back to Stage 1 docs.
   - status: open
   - blocks: deciding whether Stage 1 contracts need changes before coding
-  - evidence: `docs/field-tests/runs/001-agent-sync-dogfood.md` is the first
-    note and does not yet include follow-up agent behavior.
+  - evidence: run 002 adds follow-up agent behavior, but there is not yet enough
+    repeated evidence to patch Stage 1 contracts.
   - resolution needed: after additional handoffs, summarize findings and patch
     planning docs only if evidence shows a contract issue.
 
@@ -116,6 +130,11 @@ blocker, validation, or handoff only if it should become durable project memory.
 Newest first. Store safe summaries, not full unsanitized logs.
 
 - 2026-07-10 11:10 CDT - `git diff --check`
+  - result: passed
+  - scope: field-test docs only
+  - notes: no whitespace errors
+  - blocks next step: no
+- 2026-07-10 11:47 CDT - `git diff --check`
   - result: passed
   - scope: field-test docs only
   - notes: no whitespace errors
@@ -145,30 +164,46 @@ until the conflict is resolved.
   - proposed resolution: keep SQLite as default unless actual handoff evidence
     shows Stage 1 needs a richer substrate before coding.
   - human decision needed: not yet
+- Conflict:
+  - old claim: a single shared markdown substrate may be enough for manual
+    handoff.
+  - new claim: the current file is useful but already verbose after two runs.
+  - evidence: run 002 could continue from it, but the most important context was
+    spread across multiple sections and the run note.
+  - blocks active task: no
+  - proposed resolution: keep using the manual file for Stage 0.5, but watch
+    whether verbosity becomes evidence for a stricter repack priority or a
+    separate concise handoff view.
+  - human decision needed: not yet
 
 ## Handoff
 
 Update this before ending the session.
 
-- What was attempted: started the first Zentext Stage 0.5 dogfood branch and
-  seeded the manual project-memory artifact from the approved template.
-- What changed: root `AGENT_SYNC.md` was created; a first run note was added
-  under `docs/field-tests/runs/`.
-- Decisions made: no product scope changed; Stage 0.5 remains a manual,
-  pre-coding evidence gate.
-- Blockers found/resolved: open blocker remains that a different agent/session
-  must continue from this file before the workflow is actually proven.
+- What was attempted: continued the field test as a fresh session by reading
+  `AGENT_SYNC.md`, the field-test guide, run 001, README, roadmap, and Stage 1
+  plan before acting.
+- What changed: root `AGENT_SYNC.md` was updated with second-session findings;
+  `docs/field-tests/runs/002-agent-sync-continuation.md` was added.
+- Decisions made: no product scope changed; the manual substrate worked for this
+  continuation, but Stage 0.5 is not complete.
+- Blockers found/resolved: resolved the "no second agent/session" blocker; kept
+  open the need for more handoffs and a later summary before coding.
 - Validation run: `git diff --check` passed for the field-test docs.
 - Files/docs referenced:
+  - `AGENT_SYNC.md`
   - `docs/field-tests/AGENT_SYNC.template.md`
   - `docs/field-tests/agent-sync-field-test.md`
+  - `docs/field-tests/runs/001-agent-sync-dogfood.md`
   - `docs/staged-roadmap.md`
   - `docs/implementation/stage-1-plan.md`
   - `README.md`
 - Next agent should:
   - read this file first;
-  - read `docs/field-tests/runs/001-agent-sync-dogfood.md`;
+  - read `docs/field-tests/runs/001-agent-sync-dogfood.md` and
+    `docs/field-tests/runs/002-agent-sync-continuation.md`;
   - verify the branch and validation state;
+  - continue the field test with another role, preferably review or validation;
   - update this file with what it used, ignored, or found vague;
   - add the next run note rather than starting product implementation.
 - Next agent should avoid:
@@ -176,6 +211,7 @@ Update this before ending the session.
   - treating this file as canonical product storage;
   - rewriting locked decisions instead of superseding them.
 - Reconciliation needed:
-  - determine whether this structure is too verbose for real handoff use;
-  - determine whether session-local state should be excluded, summarized, or
-    promoted into a future Zentext record type.
+  - decide after more runs whether this file is too verbose and needs a concise
+    current-context section;
+  - decide whether reconciliation items should feed into a future record type,
+    audit output, or repack priority rule.
