@@ -1,9 +1,51 @@
 # Staged Roadmap
 
-Zentext is built in four stages. Each stage has a clear purpose, deliverables,
+Zentext is built in four stages, with one manual field-test gate before Stage 1
+coding. Each stage has a clear purpose, deliverables,
 acceptance criteria, non-goals, and a trigger to move to the next stage. Do not
 start a stage until its trigger is met. Over-building ahead of the trigger is an
 anti-pattern (see [`risks-and-antipatterns.md`](./risks-and-antipatterns.md)).
+
+## Stage 0.5: Manual agent sync field test
+
+**Purpose:** Validate the agent handoff workflow manually before building the
+local store, MCP server, CLI, or repack engine.
+
+**Deliverables:**
+
+- A temporary `AGENT_SYNC.md` field-test file in one real project.
+- 3 to 5 real handoffs between different agents or agent roles.
+- Notes on what agents used, ignored, overwrote, or treated as stale.
+- A decision on whether the accepted Stage 1 store/repack plan still fits the
+  observed workflow.
+
+**Acceptance criteria:**
+
+- At least two different agents continue from the manual sync file.
+- Handoffs require materially less re-explanation by the developer.
+- Locked decisions, blockers, and validation results remain visible across agent
+  switches.
+- Conflicts or stale claims are identifiable.
+- The useful state maps cleanly to Zentext record types or creates a specific
+  planning-doc change request.
+
+**Non-goals:**
+
+- No product code.
+- No MCP server.
+- No CLI.
+- No package setup.
+- No UI.
+- No change to the accepted Stage 1 architecture unless field-test evidence shows
+  a contract flaw.
+
+**Trigger to move to Stage 1 coding:**
+
+The field-test findings support the Stage 1 plan, or the planning docs have been
+patched to address any workflow contract issues discovered during the test. See
+[`field-tests/agent-sync-field-test.md`](./field-tests/agent-sync-field-test.md).
+
+---
 
 ## Stage 1: Local MVP
 
@@ -16,7 +58,8 @@ developer re-explaining the project.
 - Local memory store (per-project).
 - MCP server exposing: `memory.read`, `memory.write`, `memory.query`,
   `memory.handoff`, `memory.repack`, `memory.update`, `memory.list`.
-- Thin CLI: `init`, `status`, `show`, `list`, `handoff`, `repack`, `edit`, `audit`.
+- Thin CLI: `init`, `status`, `show`, `list`, `add`, `handoff`, `repack`,
+  `edit`, `audit`.
 - Baseline memory schema: task, decision, blocker, handoff, log, validation,
   policy, custom.
 - Context repacking (structured markdown output, default priority order).

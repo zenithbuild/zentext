@@ -23,6 +23,12 @@ MVP scope, monetization, cloud boundary, self-hosting model, risks, and open
 decisions. Future implementation work should be driven from these docs, and any
 drift from them should be a conscious, recorded decision.
 
+Before product code starts, Zentext has a manual Stage 0.5 field-test gate:
+validate the agent handoff workflow with a temporary `AGENT_SYNC.md` in a real
+project, then patch the planning contracts if the workflow exposes a bad
+assumption. See
+[`docs/field-tests/agent-sync-field-test.md`](./docs/field-tests/agent-sync-field-test.md).
+
 ## MVP target
 
 The MVP is a **local MCP memory layer + thin CLI.**
@@ -65,6 +71,7 @@ in all documentation and messaging.
 | [docs/monetization.md](./docs/monetization.md) | Pricing model and pricing units |
 | [docs/self-hosting.md](./docs/self-hosting.md) | Open-source and enterprise self-hosting |
 | [docs/staged-roadmap.md](./docs/staged-roadmap.md) | Four-stage plan and triggers |
+| [docs/field-tests/agent-sync-field-test.md](./docs/field-tests/agent-sync-field-test.md) | Manual pre-coding field test for agent handoff behavior |
 | [docs/risks-and-antipatterns.md](./docs/risks-and-antipatterns.md) | Risks and anti-patterns to avoid |
 | [docs/open-decisions.md](./docs/open-decisions.md) | Decision registry for accepted Stage 1 decisions and unresolved later gates |
 
