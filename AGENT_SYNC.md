@@ -7,18 +7,19 @@ project memory for agent handoff testing.
 ## Current Role
 
 - Agent: Codex
-- Role: reviewer / field-test continuation
-- Session started: 2026-07-10 11:47 CDT
+- Role: fresh session / review-validation pass
+- Session started: 2026-07-12
 
 ## Active Task
 
 - Task: Continue the Stage 0.5 Agent Sync dogfood test as a fresh session.
-- Goal: Test whether repo state plus `AGENT_SYNC.md` are sufficient to continue
-  without the user re-explaining the project.
-- Current status: second-session continuation is being recorded in
-  `docs/field-tests/runs/002-agent-sync-continuation.md`.
-- Owner: current Codex continuation session until handoff; next agent/session
-  should continue from this file plus run notes 001 and 002.
+- Goal: Validate the updated `AGENT_SYNC.md` handoff substrate after run 002,
+  assess whether the manual file is stabilizing or becoming noisy, and record
+  run 003. No product implementation.
+- Current status: third-session review/validation pass is being recorded in
+  `docs/field-tests/runs/003-agent-sync-review.md`.
+- Owner: current Codex review-validation session until handoff; next agent/session
+  should continue from this file plus run notes 001, 002, and 003.
 
 ## Shared Context
 
@@ -41,6 +42,10 @@ project memory for agent handoff testing.
   - Run 002 found the handoff sufficient to recover the current task, branch,
     locked decisions, blockers, validation state, and next action without asking
     the user to restate the project.
+  - Run 002 is committed at `9813aee` on branch `field-test/agent-sync-dogfood`.
+  - Run 003 is a review/validation pass that reconciled a stale external commit
+    reference (`b892c83`) against actual repo HEAD (`9813aee`) and updated only
+    `AGENT_SYNC.md` plus field-test run docs.
 
 ## Locked Decisions
 
@@ -84,23 +89,22 @@ State agents may update with a reason.
     run notes
   - last updated by: Codex, 2026-07-10 11:47 CDT
 - State: Stage 0.5 completion
-  - value: not complete; this is handoff 2 of the 3 to 5 recommended handoffs
-  - reason: the second session could continue, but the field test still needs
-    more handoffs or a deliberate field-test summary before Stage 1 coding
-  - last updated by: Codex, 2026-07-10 11:47 CDT
+  - value: not complete; 2 of the 3 to 5 recommended handoffs are done; run 003 is the review/validation pass
+  - reason: the third session could continue and validate the substrate, but the field test still needs a deliberate summary or at least one more handoff before Stage 1 coding
+  - last updated by: Codex, 2026-07-12
 
 ## Session-Local State
 
 Notes for the current agent/session only. Promote to shared context, decision,
 blocker, validation, or handoff only if it should become durable project memory.
 
-- This continuation session used `AGENT_SYNC.md` as the primary handoff
-  substrate, then verified it against the field-test guide, run 001, README,
-  roadmap, and Stage 1 plan.
-- The prior handoff was sufficient for task reconstruction; the user did not
-  need to restate product direction or branch state.
-- The file is verbose enough that a future repack engine will need stricter
-  prioritization than this manual substrate.
+- This review-validation session started from actual repo state
+  (`HEAD` `9813aee`), not the stale `b892c83` reference in the incoming prompt.
+- The agent reconciled the stale commit reference in `Reconciliation Needed`
+  before updating any other state.
+- Run 003's main observation is that the manual substrate works for continuation
+  but is becoming verbose; this is a finding for the run note, not durable project
+  truth until more runs confirm it.
 
 ## Open Blockers
 
@@ -129,12 +133,17 @@ blocker, validation, or handoff only if it should become durable project memory.
 
 Newest first. Store safe summaries, not full unsanitized logs.
 
-- 2026-07-10 11:10 CDT - `git diff --check`
+- 2026-07-12 - `git diff --check`
   - result: passed
   - scope: field-test docs only
   - notes: no whitespace errors
   - blocks next step: no
 - 2026-07-10 11:47 CDT - `git diff --check`
+  - result: passed
+  - scope: field-test docs only
+  - notes: no whitespace errors
+  - blocks next step: no
+- 2026-07-10 11:10 CDT - `git diff --check`
   - result: passed
   - scope: field-test docs only
   - notes: no whitespace errors
@@ -145,6 +154,13 @@ Newest first. Store safe summaries, not full unsanitized logs.
 Use this when state conflicts or looks stale. Do not overwrite competing claims
 until the conflict is resolved.
 
+- Conflict:
+  - old claim: the current commit / starting point for this run is `b892c83`.
+  - new claim: actual repo HEAD is `9813aee`; run 002 is already committed.
+  - evidence: `git log --oneline` shows `9813aee test: continue Agent Sync dogfood field test` as HEAD on `field-test/agent-sync-dogfood`; `docs/field-tests/runs/002-agent-sync-continuation.md` exists and is committed.
+  - blocks active task: no
+  - proposed resolution: treat actual repo state as authoritative; record the stale external reference here; continue with run 003 instead of rewriting run 002.
+  - human decision needed: no
 - Conflict:
   - old claim: Stage 1 could begin after planning gates alone.
   - new claim: Stage 0.5 must run before Phase 1 coding.
@@ -180,30 +196,38 @@ until the conflict is resolved.
 
 Update this before ending the session.
 
-- What was attempted: continued the field test as a fresh session by reading
-  `AGENT_SYNC.md`, the field-test guide, run 001, README, roadmap, and Stage 1
-  plan before acting.
-- What changed: root `AGENT_SYNC.md` was updated with second-session findings;
-  `docs/field-tests/runs/002-agent-sync-continuation.md` was added.
-- Decisions made: no product scope changed; the manual substrate worked for this
-  continuation, but Stage 0.5 is not complete.
-- Blockers found/resolved: resolved the "no second agent/session" blocker; kept
-  open the need for more handoffs and a later summary before coding.
+- What was attempted: continued the field test as a fresh review-validation
+  session by reading `AGENT_SYNC.md`, the field-test guide, run notes 001, 002,
+  README, roadmap, and Stage 1 plan before acting.
+- What changed: root `AGENT_SYNC.md` was updated with the stale commit
+  reconciliation, run 003 role/task, and new validation entry;
+  `docs/field-tests/runs/003-agent-sync-review.md` was added.
+- Decisions made: no product scope changed; the manual substrate survived a
+  stale external reference and a third-hand review pass, but Stage 0.5 is still
+  not complete.
+- Blockers found/resolved: resolved no new blockers; kept open the need for a
+  field-test summary or at least one more handoff before Stage 1 coding; kept
+  open the mapping of findings back to Stage 1 docs unless a later run finds a
+  concrete contract issue.
 - Validation run: `git diff --check` passed for the field-test docs.
 - Files/docs referenced:
   - `AGENT_SYNC.md`
   - `docs/field-tests/AGENT_SYNC.template.md`
   - `docs/field-tests/agent-sync-field-test.md`
   - `docs/field-tests/runs/001-agent-sync-dogfood.md`
+  - `docs/field-tests/runs/002-agent-sync-continuation.md`
+  - `docs/field-tests/runs/003-agent-sync-review.md`
   - `docs/staged-roadmap.md`
   - `docs/implementation/stage-1-plan.md`
   - `README.md`
 - Next agent should:
   - read this file first;
-  - read `docs/field-tests/runs/001-agent-sync-dogfood.md` and
-    `docs/field-tests/runs/002-agent-sync-continuation.md`;
+  - read run notes 001, 002, and 003;
   - verify the branch and validation state;
-  - continue the field test with another role, preferably review or validation;
+  - continue the field test with another role, preferably stale-context
+    reconciliation, planning-to-review, or review-to-validation;
+  - decide whether 3 handoffs is enough evidence to write a field-test summary
+    or whether a fourth handoff is needed;
   - update this file with what it used, ignored, or found vague;
   - add the next run note rather than starting product implementation.
 - Next agent should avoid:
@@ -214,4 +238,5 @@ Update this before ending the session.
   - decide after more runs whether this file is too verbose and needs a concise
     current-context section;
   - decide whether reconciliation items should feed into a future record type,
-    audit output, or repack priority rule.
+    audit output, or repack priority rule;
+  - confirm whether 3 handoffs is enough evidence or whether a fourth is needed.
