@@ -7,20 +7,19 @@ project memory for agent handoff testing.
 ## Current Role
 
 - Agent: Codex
-- Role: fresh session / reconciliation-compression stress test
+- Role: Stage 0.5 summary / go-no-go recommendation
 - Session started: 2026-07-12
 
 ## Active Task
 
-- Task: Stress-test the manual `AGENT_SYNC.md` substrate by compressing
-  stale/duplicate state and adding a concise current-truth view.
-- Goal: Determine whether the substrate can stay accurate as it becomes verbose,
-  and whether Stage 0.5 now has enough evidence to summarize or needs a final
-  handoff.
-- Current status: run 004 reconciliation/compression pass is being recorded in
-  `docs/field-tests/runs/004-agent-sync-reconciliation.md`.
-- Owner: current Codex stress-test session until handoff; next agent/session
-  should continue from this file plus run notes 001–004.
+- Task: Summarize the completed Stage 0.5 dogfood field test and decide whether
+  Zentext is ready to proceed to Phase 1 schema/store implementation.
+- Goal: Record the field-test verdict, product implications, Stage 1 go/no-go
+  recommendation, and remaining risks.
+- Current status: Stage 0.5 summary and go/no-go is recorded in
+  `docs/field-tests/runs/005-agent-sync-summary.md`.
+- Owner: current Codex summary session until handoff; next step is to open a PR
+  for the field-test branch.
 
 ## Current Truth
 
@@ -28,19 +27,16 @@ Concise current context. Full history lives in the run notes and the sections
 below.
 
 - **Branch:** `field-test/agent-sync-dogfood`
-- **HEAD:** `51bbe90`
-- **Field-test progress:** 3 of 3–5 handoffs completed; run 004 is the
-  reconciliation/compression stress test
-- **Active next action:** evaluate whether the substrate is still usable after
-  compression; then decide whether to write a field-test summary or run one more
-  handoff
-- **Unresolved blockers:**
-  - Stage 0.5 still needs a deliberate field-test summary before Stage 1 coding.
-  - Field-test findings are not yet mapped back to Stage 1 docs (only if a
-    concrete contract issue emerges).
+- **HEAD:** `1fc4cd7` (summary commit will advance HEAD; see run 005)
+- **Field-test progress:** complete. Runs 001–005 captured seed, continuation,
+  review/validation, reconciliation/compression, and summary/go-no-go.
+- **Active next action:** push the branch and open a PR for Stage 0.5; after
+  merge, begin Phase 1 on `feature/stage-1-schema-store`.
+- **Unresolved blockers:** none for Stage 0.5. No concrete Stage 1 contract issue
+  was found.
 - **Latest validation:** 2026-07-12 - `git diff --check` passed
-- **Stage 1 implementation:** still blocked. No product code until the field-test
-  summary or one more handoff confirms contracts.
+- **Stage 1 implementation:** go, after the field-test branch merges. No Stage 1
+  contract patch is required before coding.
 
 ## Shared Context
 
@@ -103,20 +99,19 @@ State agents may update with a reason.
   - reason: isolate the manual dogfood artifacts from `main`
   - last updated by: Codex, 2026-07-10 11:10 CDT
 - State: field-test artifacts
-  - value: root `AGENT_SYNC.md` plus
-    `docs/field-tests/runs/001-agent-sync-dogfood.md`,
-    `docs/field-tests/runs/002-agent-sync-continuation.md`,
-    `docs/field-tests/runs/003-agent-sync-review.md`, and
-    `docs/field-tests/runs/004-agent-sync-reconciliation.md`
+  - value: root `AGENT_SYNC.md` plus run notes 001–005
+    (`001-agent-sync-dogfood.md`, `002-agent-sync-continuation.md`,
+    `003-agent-sync-review.md`, `004-agent-sync-reconciliation.md`,
+    `005-agent-sync-summary.md`)
   - reason: field-test runs should leave both the shared substrate and specific
     run notes
   - last updated by: Codex, 2026-07-12
 - State: Stage 0.5 completion
-  - value: not complete; 3 of the 3 to 5 recommended handoffs are done; run 004
-    evaluates whether to summarize or continue
-  - reason: continuation, stale-reference reconciliation, and compression stress
-    all worked, but a deliberate field-test summary (or one more handoff) is
-    still needed before Stage 1 coding
+  - value: complete. Runs 001–005 captured seed, continuation, review/validation,
+    reconciliation/compression, and summary/go-no-go.
+  - reason: the manual workflow works, maps cleanly to Stage 1 record types, and
+    produced no concrete contract issue; Stage 1 may proceed after the
+    field-test branch merges
   - last updated by: Codex, 2026-07-12
 
 ## Session-Local State
@@ -134,22 +129,16 @@ blocker, validation, or handoff only if it should become durable project memory.
 
 - Blocker: Stage 0.5 still needs a deliberate field-test summary before Stage 1
   coding.
-  - status: open
-  - blocks: declaring the field test complete or starting Phase 1 coding
-  - evidence: 3 continuation handoffs plus the run 004 compression/reconciliation
-    stress test have been completed. The manual workflow works, but the
-    observations need to be summarized before deciding if planning docs need
-    patches.
-  - resolution needed: add a field-test summary run note, or run one more handoff
-    if more evidence is desired.
+  - status: resolved
+  - blocks: no longer blocks anything
+  - evidence: run 005 records the summary and go/no-go recommendation.
+  - resolution needed: none; proceed to PR and Phase 1 after merge.
 - Blocker: field-test findings are not yet mapped back to Stage 1 docs.
-  - status: open
-  - blocks: deciding whether Stage 1 contracts need changes before coding
-  - evidence: runs 001–004 discovered no concrete contract issue. The accepted
-    Stage 1 plan still fits the observed workflow.
-  - resolution needed: if a concrete contract issue emerges from the summary,
-    patch the relevant planning doc; otherwise close this blocker with the
-    summary.
+  - status: resolved
+  - blocks: no longer blocks anything
+  - evidence: runs 001–005 discovered no concrete contract issue. No Stage 1
+    planning-doc patch is required before coding.
+  - resolution needed: none.
 - Blocker: no second agent/session has continued from `AGENT_SYNC.md` yet.
   - status: resolved / stale
   - blocks: no longer blocks anything
@@ -161,6 +150,11 @@ blocker, validation, or handoff only if it should become durable project memory.
 
 Newest first. Store safe summaries, not full unsanitized logs.
 
+- 2026-07-12 - `git diff --check`
+  - result: passed
+  - scope: field-test docs only (AGENT_SYNC.md + run 005 summary)
+  - notes: no whitespace errors
+  - blocks next step: no
 - 2026-07-12 - `git diff --check`
   - result: passed
   - scope: field-test docs only
@@ -234,52 +228,11 @@ until the conflict is resolved.
     substrate.
   - human decision needed: not yet
 
-## Handoff
-
-Update this before ending the session.
-
-- What was attempted: a reconciliation/compression stress test on the manual
-  `AGENT_SYNC.md` substrate after three prior runs.
-- What changed: root `AGENT_SYNC.md` was compressed and clarified; a new
-  **Current Truth** section was added; stale entries were marked resolved/stale
-  rather than deleted; `docs/field-tests/runs/004-agent-sync-reconciliation.md`
-  was added.
-- Decisions made: no product scope changed. The accepted rollback model is
-  supersession / mark stale / escalate, not raw overwrite. Stage 0.5 has enough
-  evidence to summarize, but no concrete contract issue was found.
-- Blockers found/resolved: resolved the old "no second agent/session" blocker as
-  stale; kept open the need for a field-test summary and the mapping of findings
-  to Stage 1 docs.
-- Validation run: `git diff --check` passed for the field-test docs.
-- Files/docs referenced:
-  - `AGENT_SYNC.md`
-  - `docs/field-tests/AGENT_SYNC.template.md`
-  - `docs/field-tests/agent-sync-field-test.md`
-  - `docs/field-tests/runs/001-agent-sync-dogfood.md`
-  - `docs/field-tests/runs/002-agent-sync-continuation.md`
-  - `docs/field-tests/runs/003-agent-sync-review.md`
-  - `docs/field-tests/runs/004-agent-sync-reconciliation.md`
-  - `docs/staged-roadmap.md`
-  - `docs/implementation/stage-1-plan.md`
-  - `README.md`
-- Next agent should:
-  - read this file first, especially the **Current Truth** section;
-  - read run notes 001–004;
-  - either write a Stage 0.5 field-test summary run note or run one final
-    handoff if more evidence is desired;
-  - decide whether any Stage 1 planning docs need patches — default to "no"
-    unless a concrete contract issue is found;
-  - update this file with what it used, ignored, or found vague.
-- Next agent should avoid:
-  - adding package setup, MCP server, CLI, database, UI, or product code;
-  - treating this file as canonical product storage;
-  - rewriting locked decisions instead of superseding them;
-  - deleting stale history instead of marking it stale/superseded.
-- Reconciliation needed:
-  - confirm whether 3 continuation handoffs + run 004 compression stress test is
-    enough evidence to write the field-test summary, or whether a fifth handoff is
-    needed;
-  - decide whether reconciliation items should feed into a future record type,
-    audit output, or repack priority rule;
-  - keep watching whether the **Current Truth** section stays accurate as the
-    next agent updates the file.
+## Handoff / Next step
+Stage 0.5 evidence is sufficient. The four-run dogfood
+(seed → continuation → review → reconciliation) proved the
+manual substrate shape and exposed the product wedge for Zentext.
+- Next step: open a PR for `field-test/agent-sync-dogfood`.
+- After merge: begin Phase 1 on `feature/stage-1-schema-store`.
+- No further handoff runs are required unless deliberately requested.
+- Summary and go/no-go: `docs/field-tests/runs/005-agent-sync-summary.md`.
