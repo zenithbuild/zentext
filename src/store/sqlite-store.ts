@@ -401,7 +401,41 @@ export class SqliteStore implements Store {
       ...payload,
     } as AnyRecord;
 
+    // Prepare superseded_by update statement (used if supersedes is set)
+    const updateSupersededBy = this.db!.prepare(
+      "UPDATE records SET superseded_by = ? WHERE id = ? AND superseded_by IS NULL",
+    );
+
+    // Prepare statement to fetch old record row for supersede history
+    const getRow = this.db!.prepare("SELECT * FROM records WHERE id = ?");
+
     const tx = this.db!.transaction(() => {
+      // If supersedes is set, validate each ID exists and update superseded_by
+      if (supersedes && supersedes.length > 0) {
+        for (const oldId of supersedes) {
+          const oldRow = getRow.get(oldId) as RecordRow | undefined;
+          if (!oldRow) {
+            throw new StoreValidationError(
+              `Cannot supersede record '${oldId}': record not found.`,
+            );
+          }
+        }
+        // All IDs are valid — update each old record's superseded_by
+        for (const oldId of supersedes) {
+          const result = updateSupersededBy.run(id, oldId);
+          if (result.changes === 0) {
+            throw new StoreValidationError(
+              `Cannot supersede record '${oldId}': it is already superseded by another record.`,
+            );
+          }
+          // Write a 'supersede' history event for the old record
+          const oldRow = getRow.get(oldId) as RecordRow;
+          const oldRecord = rowToRecord(oldRow);
+          const supersededRecord = { ...oldRecord, superseded_by: id };
+          insertHistory.run(oldId, oldRow.revision, "supersede", now, author, JSON.stringify(supersededRecord));
+        }
+      }
+
       insert.run(row);
       insertHistory.run(id, revision, "create", now, author, JSON.stringify(fullRecord));
     });

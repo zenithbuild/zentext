@@ -12,6 +12,13 @@ import type {
   CreateValidationInput,
   CreatePolicyInput,
   CreateCustomInput,
+  TaskRecord,
+  DecisionRecord,
+  BlockerRecord,
+  HandoffRecord,
+  ValidationRecord,
+  PolicyRecord,
+  CustomRecord,
 } from "../src/types/records.js";
 
 // ---------------------------------------------------------------------------
@@ -285,14 +292,14 @@ describe("SqliteStore — all eight record types", () => {
       tags: ["auth", "backend"],
     });
     expect(created.type).toBe("task");
-    expect(created.goal).toBe("OAuth login flow");
-    expect(created.steps).toEqual(["Set up routes", "Add callback handler"]);
+    expect((created as TaskRecord).goal).toBe("OAuth login flow");
+    expect((created as TaskRecord).steps).toEqual(["Set up routes", "Add callback handler"]);
     expect(created.tags).toEqual(["auth", "backend"]);
 
     const fetched = store.getRecord(created.id);
     expect(fetched).not.toBeNull();
     expect(fetched!.type).toBe("task");
-    expect(fetched!.goal).toBe("OAuth login flow");
+    expect((fetched as TaskRecord).goal).toBe("OAuth login flow");
   });
 
   it("creates and reads a decision record", () => {
@@ -304,11 +311,11 @@ describe("SqliteStore — all eight record types", () => {
       alternatives_considered: ["JSON files on disk"],
     });
     expect(created.type).toBe("decision");
-    expect(created.decision).toBe("SQLite for local store");
+    expect((created as DecisionRecord).decision).toBe("SQLite for local store");
 
     const fetched = store.getRecord(created.id);
     expect(fetched).not.toBeNull();
-    expect(fetched!.decision).toBe("SQLite for local store");
+    expect((fetched as DecisionRecord).decision).toBe("SQLite for local store");
   });
 
   it("creates and reads a blocker record", () => {
@@ -320,11 +327,11 @@ describe("SqliteStore — all eight record types", () => {
       workaround: "Use localhost for testing",
     });
     expect(created.type).toBe("blocker");
-    expect(created.severity).toBe("high");
+    expect((created as BlockerRecord).severity).toBe("high");
 
     const fetched = store.getRecord(created.id);
     expect(fetched).not.toBeNull();
-    expect(fetched!.blocker).toBe("Staging callback URL is wrong");
+    expect((fetched as BlockerRecord).blocker).toBe("Staging callback URL is wrong");
   });
 
   it("creates and reads a handoff record", () => {
@@ -340,11 +347,11 @@ describe("SqliteStore — all eight record types", () => {
       completed_this_session: ["Wrote login.ts"],
     });
     expect(created.type).toBe("handoff");
-    expect(created.from).toBe("agent:codex");
+    expect((created as HandoffRecord).from).toBe("agent:codex");
 
     const fetched = store.getRecord(created.id);
     expect(fetched).not.toBeNull();
-    expect(fetched!.context).toBe("Working on auth module");
+    expect((fetched as HandoffRecord).context).toBe("Working on auth module");
   });
 
   it("creates and reads a log record", () => {
@@ -374,12 +381,12 @@ describe("SqliteStore — all eight record types", () => {
       summary: "No type errors",
     });
     expect(created.type).toBe("validation");
-    expect(created.check).toBe("tsc --noEmit");
+    expect((created as ValidationRecord).check).toBe("tsc --noEmit");
     expect(created.status).toBe("passed");
 
     const fetched = store.getRecord(created.id);
     expect(fetched).not.toBeNull();
-    expect(fetched!.result).toBe("passed");
+    expect((fetched as ValidationRecord).result).toBe("passed");
   });
 
   it("creates and reads a policy record", () => {
@@ -391,11 +398,11 @@ describe("SqliteStore — all eight record types", () => {
       enforcement: "required",
     });
     expect(created.type).toBe("policy");
-    expect(created.rule).toBe("Never commit directly to main");
+    expect((created as PolicyRecord).rule).toBe("Never commit directly to main");
 
     const fetched = store.getRecord(created.id);
     expect(fetched).not.toBeNull();
-    expect(fetched!.rule).toBe("Never commit directly to main");
+    expect((fetched as PolicyRecord).rule).toBe("Never commit directly to main");
   });
 
   it("creates and reads a custom record", () => {
@@ -406,12 +413,12 @@ describe("SqliteStore — all eight record types", () => {
       body: { component: "store", notes: "SQLite with WAL mode" },
     });
     expect(created.type).toBe("custom");
-    expect(created.kind).toBe("architecture-note");
-    expect(created.body).toEqual({ component: "store", notes: "SQLite with WAL mode" });
+    expect((created as CustomRecord).kind).toBe("architecture-note");
+    expect((created as CustomRecord).body).toEqual({ component: "store", notes: "SQLite with WAL mode" });
 
     const fetched = store.getRecord(created.id);
     expect(fetched).not.toBeNull();
-    expect(fetched!.kind).toBe("architecture-note");
+    expect((fetched as CustomRecord).kind).toBe("architecture-note");
   });
 
   it("can list all eight types", () => {
@@ -565,9 +572,9 @@ describe("SqliteStore — update behavior", () => {
       payload: { next: "Do step 2" },
     });
 
-    expect(updated.goal).toBe("Original goal"); // preserved
-    expect(updated.next).toBe("Do step 2"); // new field
-    expect(updated.steps).toEqual(["step1"]); // preserved
+    expect((updated as TaskRecord).goal).toBe("Original goal"); // preserved
+    expect((updated as TaskRecord).next).toBe("Do step 2"); // new field
+    expect((updated as TaskRecord).steps).toEqual(["step1"]); // preserved
   });
 });
 
@@ -877,3 +884,158 @@ describe("SqliteStore — no obvious secrets in fixtures", () => {
     }
   });
 });
+
+describe("SqliteStore — superseded_by behavior", () => {
+  let store: SqliteStore;
+
+  beforeEach(async () => {
+    store = makeStore();
+    await store.initProjectStore(tempProject);
+  });
+
+  afterEach(() => {
+    store.close();
+  });
+
+  it("old record gets superseded_by set to new record id", () => {
+    const original = store.createRecord({
+      type: "decision",
+      title: "Original decision",
+      decision: "Use JSON files",
+    });
+
+    const replacement = store.createRecord({
+      type: "decision",
+      title: "Revised decision",
+      decision: "Use SQLite instead",
+      supersedes: [original.id],
+    });
+
+    // Re-fetch the old record to verify superseded_by was set
+    const oldRecord = store.getRecord(original.id);
+    expect(oldRecord).not.toBeNull();
+    expect(oldRecord!.superseded_by).toBe(replacement.id);
+  });
+
+  it("new record keeps supersedes containing the old id", () => {
+    const original = store.createRecord({
+      type: "decision",
+      title: "Original",
+      decision: "First decision",
+    });
+
+    const replacement = store.createRecord({
+      type: "decision",
+      title: "Revised",
+      decision: "Second decision",
+      supersedes: [original.id],
+    });
+
+    expect(replacement.supersedes).toEqual([original.id]);
+    expect(replacement.superseded_by).toBeUndefined();
+  });
+
+  it("invalid supersedes id fails without creating the new record", () => {
+    expect(() =>
+      store.createRecord({
+        type: "decision",
+        title: "Bad supersede",
+        decision: "This should fail",
+        supersedes: ["rec_decision_nonexistent_id"],
+      }),
+    ).toThrow(StoreValidationError);
+
+    // Verify no new record was created
+    const records = store.listRecords();
+    expect(records.length).toBe(0);
+  });
+
+  it("already-superseded record cannot be superseded again", () => {
+    const original = store.createRecord({
+      type: "decision",
+      title: "Original",
+      decision: "First",
+    });
+
+    const firstReplacement = store.createRecord({
+      type: "decision",
+      title: "First replacement",
+      decision: "Second",
+      supersedes: [original.id],
+    });
+
+    // Try to supersede the original again — should fail
+    expect(() =>
+      store.createRecord({
+        type: "decision",
+        title: "Second replacement",
+        decision: "Third",
+        supersedes: [original.id],
+      }),
+    ).toThrow(StoreValidationError);
+
+    // Verify the original is still superseded by the first replacement
+    const oldRecord = store.getRecord(original.id);
+    expect(oldRecord!.superseded_by).toBe(firstReplacement.id);
+  });
+
+  it("supersede event is written to history for old record", () => {
+    const original = store.createRecord({
+      type: "decision",
+      title: "Original",
+      decision: "First",
+    });
+
+    const replacement = store.createRecord({
+      type: "decision",
+      title: "Replacement",
+      decision: "Second",
+      supersedes: [original.id],
+    });
+
+    // History for original record should have: create + supersede
+    const history = store.getRecordHistory(original.id);
+    expect(history.length).toBe(2);
+    expect(history[0].event).toBe("create");
+    expect(history[0].revision).toBe(1);
+    expect(history[1].event).toBe("supersede");
+    expect(history[1].revision).toBe(1);
+
+    // The supersede event snapshot should have superseded_by set
+    const supersedeSnapshot = JSON.parse(history[1].record_json);
+    expect(supersededRecord_superseded_by(supersedeSnapshot)).toBe(replacement.id);
+  });
+
+  it("can supersede multiple records at once", () => {
+    const first = store.createRecord({
+      type: "decision",
+      title: "First",
+      decision: "A",
+    });
+
+    const second = store.createRecord({
+      type: "decision",
+      title: "Second",
+      decision: "B",
+    });
+
+    const replacement = store.createRecord({
+      type: "decision",
+      title: "Replacement",
+      decision: "C",
+      supersedes: [first.id, second.id],
+    });
+
+    expect(replacement.supersedes).toEqual([first.id, second.id]);
+
+    const firstRecord = store.getRecord(first.id);
+    const secondRecord = store.getRecord(second.id);
+    expect(firstRecord!.superseded_by).toBe(replacement.id);
+    expect(secondRecord!.superseded_by).toBe(replacement.id);
+  });
+});
+
+// Helper for supersede snapshot check
+function supersededRecord_superseded_by(snapshot: Record<string, unknown>): string | undefined {
+  return snapshot["superseded_by"] as string | undefined;
+}

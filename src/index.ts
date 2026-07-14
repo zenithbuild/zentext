@@ -8,7 +8,7 @@
  * needed for schema + store operations.
  */
 
-export { Store, StoreMeta } from "./types/store.js";
+export type { Store, StoreMeta } from "./types/store.js";
 export type {
   AnyRecord,
   BaseRecord,
