@@ -23,6 +23,7 @@ import type {
 import {
   ALLOWED_STATUSES,
   DEFAULT_STATUSES,
+  ENVELOPE_FIELDS,
   GENERATED_FIELDS,
   IMMUTABLE_FIELDS,
   MINIMUM_CREATE_FIELDS,
@@ -522,6 +523,17 @@ export class SqliteStore implements Store {
         throw new StoreValidationError("Status cannot be null.");
       }
       validateStatus(existing.type, input.status);
+    }
+
+    // Reject envelope keys in payload updates
+    if (input.payload) {
+      for (const key of Object.keys(input.payload)) {
+        if ((ENVELOPE_FIELDS as readonly string[]).includes(key)) {
+          throw new StoreValidationError(
+            `Cannot update envelope field '${key}' through payload; use the top-level update field instead.`,
+          );
+        }
+      }
     }
 
     // Build updated record

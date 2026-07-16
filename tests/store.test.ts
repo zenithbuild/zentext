@@ -576,6 +576,44 @@ describe("SqliteStore — update behavior", () => {
     expect((updated as TaskRecord).next).toBe("Do step 2"); // new field
     expect((updated as TaskRecord).steps).toEqual(["step1"]); // preserved
   });
+
+  it("update rejects envelope keys in payload", () => {
+    const created = store.createRecord({
+      type: "task",
+      title: "T",
+      goal: "G",
+    });
+
+    for (const key of [
+      "id",
+      "project",
+      "type",
+      "title",
+      "status",
+      "summary",
+      "created_at",
+      "updated_at",
+      "revision",
+      "author",
+      "tags",
+      "refs",
+      "schema_version",
+      "supersedes",
+      "superseded_by",
+    ]) {
+      expect(() =>
+        store.updateRecord({
+          id: created.id,
+          payload: { [key]: "forged" },
+        }),
+      ).toThrow(StoreValidationError);
+    }
+
+    // Verify the record is unchanged after a rejected payload update
+    const fetched = store.getRecord(created.id) as TaskRecord;
+    expect(fetched.goal).toBe("G");
+    expect(fetched.revision).toBe(1);
+  });
 });
 
 describe("SqliteStore — history/events", () => {

@@ -348,3 +348,25 @@ export const IMMUTABLE_FIELDS = [
   "type",
   "created_at",
 ] as const;
+
+// ---------------------------------------------------------------------------
+// Envelope fields (common record envelope — cannot be stored in payload)
+// ---------------------------------------------------------------------------
+
+export const ENVELOPE_FIELDS = [
+  "id",
+  "project",
+  "type",
+  "title",
+  "status",
+  "summary",
+  "created_at",
+  "updated_at",
+  "revision",
+  "author",
+  "tags",
+  "refs",
+  "schema_version",
+  "supersedes",
+  "superseded_by",
+] as const;
