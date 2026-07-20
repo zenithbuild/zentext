@@ -104,7 +104,7 @@ export async function status(cwd: string): Promise<{ output: string; exitCode: n
       if (record.type === "task" && record.status === "active") {
         activeTasks += 1;
       }
-      if (record.type === "handoff") {
+      if (record.type === "handoff" && record.status === "latest") {
         if (!latestHandoff || record.updated_at > latestHandoff.updated_at) {
           latestHandoff = record;
         }

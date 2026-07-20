@@ -198,6 +198,46 @@ describe("Zentext CLI — Phase 2 read/inspect", () => {
     store.close();
   });
 
+  it("status ignores archived/superseded handoffs when choosing latest", async () => {
+    const store = new SqliteStore();
+    await store.initProjectStore(tempProject);
+
+    const latest = store.createRecord({
+      type: "handoff",
+      title: "Current handoff",
+      summary: "This is the current handoff",
+      status: "latest",
+      author: "user:test",
+      from: "agent:a",
+      to: "agent:b",
+      context: "Current context",
+      state: "Current state",
+      next: "Next steps",
+    });
+
+    // Simulate an archived handoff touched later; it should not replace latest.
+    store.createRecord({
+      type: "handoff",
+      title: "Old archived handoff",
+      summary: "This handoff is archived",
+      status: "archived",
+      author: "user:test",
+      from: "agent:a",
+      to: "agent:b",
+      context: "Old context",
+      state: "Old state",
+      next: "Old next",
+    });
+
+    const result = await status(tempProject);
+    expect(result.exitCode).toBe(0);
+    expect(result.output).toContain("Latest handoff:");
+    expect(result.output).toContain(latest.id);
+    expect(result.output).toContain("Current handoff");
+    expect(result.output).not.toContain("Old archived handoff");
+    store.close();
+  });
+
   it("does not pollute real ~/.zentext", async () => {
     const result = await init(tempProject);
     const expectedPrefix = join(tempHome, ".zentext", "projects");
