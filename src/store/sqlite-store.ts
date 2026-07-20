@@ -317,6 +317,41 @@ export class SqliteStore implements Store {
       createdAt,
     };
   }
+  // ------------------------------------------------------------------
+  // open by project id
+  // ------------------------------------------------------------------
+
+  async openProjectStoreById(projectId: string): Promise<StoreMeta> {
+    const storePath = getProjectStorePath(projectId);
+    const dbPath = getDbPath(projectId);
+
+    if (!existsSync(dbPath)) {
+      throw new StoreNotFoundError("Project not found.");
+    }
+
+    this.db = new Database(dbPath);
+    this.db.pragma("journal_mode = WAL");
+    this.db.pragma("busy_timeout = 5000");
+
+    runMigrations(this.db);
+
+    this.projectId = projectId;
+
+    const getMeta = this.db.prepare("SELECT value FROM meta WHERE key = ?");
+    const projectName = (getMeta.get("project_name") as { value: string } | undefined)?.value ?? projectId;
+    const createdAt = (getMeta.get("created_at") as { value: string } | undefined)?.value ?? nowIso();
+
+    const schemaVersion = getSchemaVersion(this.db);
+
+    return {
+      projectName,
+      projectId,
+      storePath,
+      schemaVersion,
+      createdAt,
+    };
+  }
+
 
   // ------------------------------------------------------------------
   // create

@@ -15,8 +15,10 @@
   "license": "UNLICENSED",
   "private": true,
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "better-sqlite3": "^12.2.0",
-    "ulid": "^3.0.1"
+    "ulid": "^3.0.1",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
@@ -30,7 +32,8 @@
     "fsevents@2.3.3": true
   },
   "bin": {
-    "zentext": "dist/cli/cli.js"
+    "zentext": "dist/cli/cli.js",
+    "zentext-mcp": "dist/mcp/bin.js"
   },
   "files": [
     "dist",
