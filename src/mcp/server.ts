@@ -12,7 +12,7 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 // Input schemas
 // ---------------------------------------------------------------------------
 
-const projectIdSchema = z.string().min(1, "project_id is required");
+const projectIdSchema = z.string().regex(/^[0-9a-f]{16}$/, "project_id must be a valid 16-character hex project ID");
 const recordIdSchema = z.string().min(1, "record_id is required");
 
 const ReadInput = z.object({

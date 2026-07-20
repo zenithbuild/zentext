@@ -27,9 +27,9 @@
     "vitest": "^3.0.0"
   },
   "allowScripts": {
-    "better-sqlite3@12.11.1": true,
-    "esbuild@0.28.1": true,
-    "fsevents@2.3.3": true
+    "better-sqlite3": true,
+    "esbuild": true,
+    "fsevents": true
   },
   "bin": {
     "zentext": "dist/cli/cli.js",
@@ -37,6 +37,7 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "docs/mcp.md"
   ]
 }

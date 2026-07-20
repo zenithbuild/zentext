@@ -101,6 +101,29 @@ describe("SqliteStore — init and open", () => {
   });
 });
 
+describe("SqliteStore — openProjectStoreById project-id validation", () => {
+  it("rejects malformed or traversal project IDs", async () => {
+    const store = makeStore();
+    const adversarial = [
+      "../other",
+      "../../tmp/file",
+      "/absolute/path",
+      "project/child",
+      "project\\child",
+      ".",
+      "..",
+      "",
+      "%2e%2e%2fother",
+      "a".repeat(1000),
+      "0123456789abcdef../other",
+    ];
+    for (const id of adversarial) {
+      await expect(store.openProjectStoreById(id)).rejects.toThrow(/Project not found/);
+    }
+    store.close();
+  });
+});
+
 describe("SqliteStore — generated fields assigned on create", () => {
   let store: SqliteStore;
 

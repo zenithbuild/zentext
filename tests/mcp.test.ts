@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -171,6 +171,63 @@ describe("memory.read", () => {
 // ---------------------------------------------------------------------------
 // memory.list
 // ---------------------------------------------------------------------------
+
+describe("project ID safety", () => {
+  const adversarialIds = [
+    "../other",
+    "../../tmp/file",
+    "/absolute/path",
+    "~/.zentext",
+    "project/child",
+    "project\\child",
+    ".",
+    "..",
+    "",
+    "%2e%2e%2fother",
+    "a".repeat(1000),
+    "0123456789abcdef../other",
+    "0123456789abcdef/sub",
+  ];
+
+  it("rejects adversarial project IDs for memory.read", async () => {
+    for (const id of adversarialIds) {
+      const result = await memoryRead({ project_id: id, record_id: "rec_task_x" } as any);
+      expect(result.isError).toBe(true);
+      const msg = getText(result);
+      expect(msg).toMatch(/Project not found|project_id must be a valid/);
+      expect(msg).not.toContain(".zentext");
+    }
+  });
+
+  it("rejects adversarial project IDs for memory.list", async () => {
+    for (const id of adversarialIds) {
+      const result = await memoryList({ project_id: id } as any);
+      expect(result.isError).toBe(true);
+    }
+  });
+
+  it("rejects adversarial project IDs for memory.query", async () => {
+    for (const id of adversarialIds) {
+      const result = await memoryQuery({ project_id: id, query: "x" } as any);
+      expect(result.isError).toBe(true);
+    }
+  });
+
+  it("rejects adversarial project IDs for memory.repack", async () => {
+    for (const id of adversarialIds) {
+      const result = await memoryRepack({ project_id: id } as any);
+      expect(result.isError).toBe(true);
+    }
+  });
+
+  it("does not create files outside the projects directory for unknown IDs", async () => {
+    const before = readdirSync(join(tempHome, ".zentext"));
+    const result = await memoryRead({ project_id: "zzzzzzzzzzzzzzzz", record_id: "rec_task_x" } as any);
+    expect(result.isError).toBe(true);
+    const after = readdirSync(join(tempHome, ".zentext"));
+    expect(after).toEqual(before);
+  });
+});
 
 describe("memory.list", () => {
   it("lists all records deterministically", async () => {

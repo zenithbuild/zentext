@@ -70,6 +70,15 @@ function getDbPath(projectId: string): string {
   return join(getProjectStorePath(projectId), "store.sqlite");
 }
 
+
+const PROJECT_ID_RE = /^[0-9a-f]{16}$/;
+
+function validateProjectId(projectId: string): void {
+  if (!PROJECT_ID_RE.test(projectId)) {
+    throw new StoreNotFoundError("Project not found.");
+  }
+}
+
 function generateId(type: RecordType): string {
   return `rec_${type}_${ulid()}`;
 }
@@ -322,6 +331,7 @@ export class SqliteStore implements Store {
   // ------------------------------------------------------------------
 
   async openProjectStoreById(projectId: string): Promise<StoreMeta> {
+    validateProjectId(projectId);
     const storePath = getProjectStorePath(projectId);
     const dbPath = getDbPath(projectId);
 

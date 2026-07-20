@@ -62,6 +62,27 @@ supersession state are unchanged after each tool call.
   repack engine to prioritize primary tasks, blockers, decisions, handoffs,
   validations, policies, and other active work, and applies a character budget.
 
+## History ordering
+
+`memory.read` with `include_history` returns the current record under `record`
+and a `history` array ordered from oldest revision to newest revision
+(`revision` ascending). The current record reflects the newest revision; the
+history array ends with the same revision so callers can see how the record
+arrived at its current state.
+
+## Installation note
+
+`zentext-mcp` depends on `better-sqlite3`, which includes a native SQLite
+binding. On npm 12+ the binding is built by an install script that is blocked
+by default. After installing the package, approve and rebuild the dependency:
+
+```bash
+npm install-scripts approve better-sqlite3
+npm rebuild better-sqlite3
+```
+
+Without this step the `zentext-mcp` binary will fail to open stores.
+
 ## Stage 1 limitations
 
 - No write tools (`memory.add`, `memory.edit`, `memory.handoff`, etc.).
