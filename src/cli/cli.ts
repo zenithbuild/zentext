@@ -79,9 +79,13 @@ async function main(): Promise<void> {
         break;
       }
       case "repack": {
+        const maxSizeRaw = flags["max-size"];
+        if (maxSizeRaw !== undefined && typeof maxSizeRaw !== "number") {
+          throw new CliError("--max-size must be a positive number", 1);
+        }
         result = await repack(cwd, {
           focus: typeof flags.focus === "string" ? flags.focus : undefined,
-          maxSize: typeof flags["max-size"] === "number" ? flags["max-size"] : undefined,
+          maxSize: typeof maxSizeRaw === "number" ? maxSizeRaw : undefined,
           out: typeof flags.out === "string" ? flags.out : undefined,
         });
         break;

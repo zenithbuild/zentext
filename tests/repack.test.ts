@@ -63,6 +63,32 @@ describe("Zentext repack engine", () => {
     store.close();
   });
 
+  it("selects the most recently updated active or blocked task", async () => {
+    const store = openStore();
+    const meta = await store.openProjectStore(tempProject);
+    store.createRecord({
+      type: "task",
+      title: "Old active task",
+      goal: "Old goal",
+      author: "user:test",
+    });
+    await delay(50);
+    const blocked = store.createRecord({
+      type: "task",
+      title: "Recent blocked task",
+      goal: "New goal",
+      status: "blocked",
+      author: "user:test",
+    });
+
+    const result = repack(store, meta);
+    expect(result.markdown).toContain("## Active task");
+    expect(result.markdown).toContain("Recent blocked task");
+    expect(result.markdown).toContain("## Other active tasks");
+    expect(result.markdown).toContain("Old active task");
+    store.close();
+  });
+
   it("selects most recently updated active task when multiple exist", async () => {
     const store = openStore();
     const meta = await store.openProjectStore(tempProject);
@@ -216,9 +242,7 @@ describe("Zentext repack engine", () => {
     const result = repack(store, meta);
     expect(result.markdown).toContain("## Latest handoff");
     expect(result.markdown).toContain("Current handoff");
-    // Archived handoff must not appear in the latest-handoff section.
-    const latestHandoffSection = result.markdown.split("## Stale records flagged")[0] ?? result.markdown;
-    expect(latestHandoffSection).not.toContain("Archived handoff");
+    expect(result.markdown).not.toContain("Archived handoff");
     store.close();
   });
 
@@ -285,6 +309,28 @@ describe("Zentext repack engine", () => {
     store.close();
   });
 
+  it("formats handoff timestamps deterministically as ISO", async () => {
+    const store = openStore();
+    const meta = await store.openProjectStore(tempProject);
+    const handoff = store.createRecord({
+      type: "handoff",
+      title: "H",
+      status: "latest",
+      author: "user:test",
+      from: "agent:a",
+      to: "agent:b",
+      context: "C",
+      state: "S",
+      next: "N",
+    });
+
+    const result = repack(store, meta);
+    expect(result.markdown).toContain(handoff.updated_at);
+    // Must not contain locale-dependent formatting like AM/PM markers.
+    expect(result.markdown).not.toMatch(/\bAM\b|\bPM\b/);
+    store.close();
+  });
+
   it("produces deterministic output for same store state", async () => {
     const store = openStore();
     const meta = await store.openProjectStore(tempProject);
@@ -297,7 +343,11 @@ describe("Zentext repack engine", () => {
 
     const result1 = repack(store, meta);
     const result2 = repack(store, meta);
-    expect(result1.markdown).toBe(result2.markdown);
+    // The generation timestamp in the header is expected to differ across calls,
+    // so compare the body only. The body must be byte-identical for identical store state.
+    const body1 = result1.markdown.split("\n\n").slice(2).join("\n\n");
+    const body2 = result2.markdown.split("\n\n").slice(2).join("\n\n");
+    expect(body1).toBe(body2);
     store.close();
   });
 
@@ -421,6 +471,31 @@ describe("Zentext repack engine", () => {
     store.close();
   });
 
+  it("honestly overflows budget when mandatory content exceeds it", async () => {
+    const store = openStore();
+    const meta = await store.openProjectStore(tempProject);
+    store.createRecord({
+      type: "task",
+      title: "Huge task",
+      goal: "G".repeat(500),
+      author: "user:test",
+    });
+    store.createRecord({
+      type: "blocker",
+      title: "Huge blocker",
+      blocker: "B".repeat(500),
+      status: "open",
+      author: "user:test",
+    });
+
+    const result = repack(store, meta, { maxSize: 100 });
+    expect(result.markdown).toContain("Huge task");
+    expect(result.markdown).toContain("Huge blocker");
+    // The omission notice must not make a mandatory overflow worse.
+    expect(result.markdown).not.toContain("Omitted context notice");
+    store.close();
+  });
+
   it("CLI repack --out writes the same payload to a file", async () => {
     await init(tempProject);
     const outPath = join(tempProject, "context.md");
@@ -438,6 +513,23 @@ describe("Zentext repack engine", () => {
     expect(result.exitCode).toBe(0);
     const written = readFileSync(outPath, "utf8");
     expect(written).toBe(result.output);
+  });
+
+  it("CLI repack rejects non-numeric --max-size", async () => {
+    await init(tempProject);
+    await expect(repackCli(tempProject, { maxSize: NaN })).rejects.toThrow(
+      /--max-size must be a positive number/,
+    );
+  });
+
+  it("CLI repack rejects non-positive --max-size", async () => {
+    await init(tempProject);
+    await expect(repackCli(tempProject, { maxSize: 0 })).rejects.toThrow(
+      /--max-size must be a positive number/,
+    );
+    await expect(repackCli(tempProject, { maxSize: -100 })).rejects.toThrow(
+      /--max-size must be a positive number/,
+    );
   });
 
   it("CLI repack before init tells the user to run init", async () => {

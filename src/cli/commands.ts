@@ -186,6 +186,10 @@ export async function repack(
   cwd: string,
   options: { focus?: string; maxSize?: number; out?: string },
 ): Promise<{ output: string; exitCode: number }> {
+  if (options.maxSize !== undefined && (!Number.isFinite(options.maxSize) || options.maxSize <= 0)) {
+    throw new CliError("--max-size must be a positive number", 1);
+  }
+
   const store = await openStore(cwd);
   try {
     const meta = await store.openProjectStore(cwd);

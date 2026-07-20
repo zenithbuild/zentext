@@ -227,11 +227,11 @@ function statusRank(status: string): number {
   // Lower = more relevant / current.
   switch (status) {
     case "active":
+    case "blocked":
     case "latest":
     case "open":
     case "accepted":
       return 1;
-    case "blocked":
     case "proposed":
     case "passed":
     case "failed":
@@ -532,31 +532,11 @@ function renderCustomRecords(records: AnyRecord[]): string {
   return lines.join("\n");
 }
 
-function renderStaleSection(inactive: ClassifiedRecord[]): string | null {
-  if (inactive.length === 0) return null;
-
-  const relevant = inactive.filter((c) => {
-    // Only surface stale blockers that still affect active work. Archived handoffs
-    // are excluded here because the latest handoff section already captures the
-    // current handoff state.
-    const r = c.record;
-    if (r.type === "blocker" && r.status !== "canceled") return true;
-    return false;
-  });
-
-  if (relevant.length === 0) return null;
-
-  const lines: string[] = [
-    `## Stale records flagged (${relevant.length})`,
-    "These records are inactive but may still matter to the current task.",
-  ];
-  for (const c of relevant.slice(0, 10)) {
-    lines.push(`- [${c.record.type}] ${c.record.title} — status: ${c.record.status}`);
-  }
-  if (relevant.length > 10) {
-    lines.push(`- … and ${relevant.length - 10} more`);
-  }
-  return lines.join("\n");
+function renderStaleSection(_inactive: ClassifiedRecord[]): string | null {
+  // Phase 3 intentionally does not surface a stale-records section.
+  // Status-based inactive records are already excluded from current-truth sections,
+  // and age-based/manual staleness belongs in the future audit/staleness phase.
+  return null;
 }
 
 function renderRefs(refs: { files?: string[]; commits?: string[]; branches?: string[] }): string {
@@ -569,7 +549,7 @@ function renderRefs(refs: { files?: string[]; commits?: string[]; branches?: str
 
 function formatTimestamp(iso: string): string {
   const d = new Date(iso);
-  return isNaN(d.getTime()) ? iso : d.toLocaleString();
+  return isNaN(d.getTime()) ? iso : d.toISOString();
 }
 
 // -----------------------------------------------------------------------------
@@ -624,6 +604,12 @@ function fitToBudget(sections: RenderedSection[], maxSize: number): string {
     "## Omitted context notice",
     `Lower-priority sections were dropped to stay within the ${maxSize}-character budget: ${omitted.join(", ")}.`,
   ].join("\n");
+
+  // Never let the notice itself push the payload past the budget. If mandatory
+  // content already exceeds the budget, return the body as-is rather than adding noise.
+  if (body.length + notice.length + 2 > maxSize) {
+    return body;
+  }
 
   return [body, notice].join("\n\n");
 }
