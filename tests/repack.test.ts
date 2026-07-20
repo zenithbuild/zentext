@@ -63,17 +63,17 @@ describe("Zentext repack engine", () => {
     store.close();
   });
 
-  it("selects the most recently updated active or blocked task", async () => {
+  it("selects active task over blocked task even if blocked is newer", async () => {
     const store = openStore();
     const meta = await store.openProjectStore(tempProject);
-    store.createRecord({
+    const active = store.createRecord({
       type: "task",
       title: "Old active task",
       goal: "Old goal",
       author: "user:test",
     });
     await delay(50);
-    const blocked = store.createRecord({
+    store.createRecord({
       type: "task",
       title: "Recent blocked task",
       goal: "New goal",
@@ -82,10 +82,12 @@ describe("Zentext repack engine", () => {
     });
 
     const result = repack(store, meta);
-    expect(result.markdown).toContain("## Active task");
-    expect(result.markdown).toContain("Recent blocked task");
+    // An active task must remain primary over a blocked task regardless of timestamp.
+    const activeTaskSection = result.markdown.split("## Other active tasks")[0] ?? result.markdown;
+    expect(activeTaskSection).toContain("Old active task");
+    expect(activeTaskSection).not.toContain("Recent blocked task");
     expect(result.markdown).toContain("## Other active tasks");
-    expect(result.markdown).toContain("Old active task");
+    expect(result.markdown).toContain("Recent blocked task");
     store.close();
   });
 

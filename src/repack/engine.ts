@@ -227,11 +227,11 @@ function statusRank(status: string): number {
   // Lower = more relevant / current.
   switch (status) {
     case "active":
-    case "blocked":
     case "latest":
     case "open":
     case "accepted":
       return 1;
+    case "blocked":
     case "proposed":
     case "passed":
     case "failed":
