@@ -1,19 +1,20 @@
 /**
- * CLI command handlers for Zentext Phase 2 read/inspect commands.
+ * CLI command handlers for Zentext Phase 2 read/inspect + Phase 3 repack commands.
  *
  * Each handler returns a string to print. Errors are thrown with a message
  * and an exitCode property so the entry point can exit cleanly.
  */
 
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import type { AnyRecord, RecordType } from "../types/records.js";
 import { RECORD_TYPES } from "../types/records.js";
 import { SqliteStore, StoreNotFoundError } from "../store/sqlite-store.js";
 import { deriveProjectId } from "../store/project-id.js";
 import { formatInit, formatStatus, formatRecord, formatList } from "./format.js";
+import { repack as repackEngine } from "../repack/engine.js";
 
 export class CliError extends Error {
   constructor(
@@ -180,6 +181,29 @@ export async function list(
   }
 }
 
+
+export async function repack(
+  cwd: string,
+  options: { focus?: string; maxSize?: number; out?: string },
+): Promise<{ output: string; exitCode: number }> {
+  const store = await openStore(cwd);
+  try {
+    const meta = await store.openProjectStore(cwd);
+    const result = repackEngine(store, meta, {
+      focus: options.focus,
+      maxSize: options.maxSize,
+    });
+
+    if (options.out) {
+      mkdirSync(dirname(options.out), { recursive: true });
+      writeFileSync(options.out, result.markdown, "utf8");
+    }
+
+    return { output: result.markdown, exitCode: 0 };
+  } finally {
+    store.close();
+  }
+}
 export function printUsage(): string {
   return `Zentext CLI — Phase 2 read/inspect commands
 
@@ -188,16 +212,21 @@ Usage:
   zentext status
   zentext show <id>
   zentext list [--type <type>] [--status <status>] [--limit <n>]
+  zentext repack [--focus <text>] [--max-size <chars>] [--out <path>]
 
 Commands:
   init    Initialize the local project store
   status  Show a concise overview of the project memory
   show    Display a single record by id
   list    List records, optionally filtered
+  repack  Generate a focused context payload from project memory
 
 Options:
   --type     Filter by record type (task, decision, blocker, ...)
   --status   Filter by record status
   --limit    Limit the number of records shown
+  --focus    Prioritize records matching this topic
+  --max-size Character budget for the output (default 12000)
+  --out      Write the payload to a file instead of stdout
 `;
 }

@@ -249,17 +249,17 @@ describe("Zentext CLI — Phase 2 read/inspect", () => {
   });
 
   it("CLI module does not expose write CLI commands", async () => {
-    // This test documents the Phase 2 boundary: the commands module only
-    // exports read/inspect functions. No add, handoff, edit, repack, audit.
+    // Phase 2 exports read/inspect commands; Phase 3 adds repack (a read/generate
+    // command). Write commands remain out of scope.
     const commands = await import("../src/cli/commands.js");
     expect(commands.init).toBeTypeOf("function");
     expect(commands.status).toBeTypeOf("function");
     expect(commands.show).toBeTypeOf("function");
     expect(commands.list).toBeTypeOf("function");
+    expect(commands.repack).toBeTypeOf("function");
     expect("add" in commands).toBe(false);
     expect("handoff" in commands).toBe(false);
     expect("edit" in commands).toBe(false);
-    expect("repack" in commands).toBe(false);
     expect("audit" in commands).toBe(false);
   });
 });
