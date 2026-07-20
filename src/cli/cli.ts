@@ -6,7 +6,7 @@
  *   init, status, show, list
  */
 
-import { CliError, init, list, printUsage, show, status } from "./commands.js";
+import { CliError, init, list, printUsage, repack, show, status } from "./commands.js";
 
 function parseArgs(argv: string[]): {
   command: string;
@@ -78,12 +78,24 @@ async function main(): Promise<void> {
         });
         break;
       }
+      case "repack": {
+        const maxSizeRaw = flags["max-size"];
+        if (maxSizeRaw !== undefined && typeof maxSizeRaw !== "number") {
+          throw new CliError("--max-size must be a positive number", 1);
+        }
+        result = await repack(cwd, {
+          focus: typeof flags.focus === "string" ? flags.focus : undefined,
+          maxSize: typeof maxSizeRaw === "number" ? maxSizeRaw : undefined,
+          out: typeof flags.out === "string" ? flags.out : undefined,
+        });
+        break;
+      }
       default: {
         throw new CliError(`Unknown command: ${command}\n\n${printUsage()}`, 1);
       }
     }
 
-    if (result.output) {
+    if (result.output && !flags.out) {
       console.log(result.output);
     }
     process.exit(result.exitCode);
