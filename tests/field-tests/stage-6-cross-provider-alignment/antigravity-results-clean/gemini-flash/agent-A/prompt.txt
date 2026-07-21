@@ -1,0 +1,13 @@
+Agent A: create the initial project state.
+
+You are starting a new SaaS dashboard authentication system. Use Zentext to create three records:
+1. An active task describing the implementation goal.
+2. An accepted decision describing the chosen approach.
+3. A handoff summarizing the current state and next step for the next agent.
+
+Return JSON in this exact shape:
+{
+  "task": { "type": "task", "title": "...", "goal": "...", "status": "active", "next": "...", "author": "agent:A" },
+  "decision": { "type": "decision", "title": "...", "decision": "...", "status": "accepted", "author": "agent:A" },
+  "handoff": { "type": "handoff", "title": "...", "from": "agent:A", "to": "agent:B", "context": "...", "state": "...", "next": "...", "author": "agent:A" }
+}

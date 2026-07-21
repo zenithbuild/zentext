@@ -1,0 +1,55 @@
+Agent B: continue work from a fresh session.
+
+You have no prior context. Here is the current Zentext project memory:
+
+# Zentext context — zentext-stage3-proj-EGPklX
+Generated: 2026-07-21T04:29:42.469Z | focus: none | from: 3 records | budget: 12000 chars
+
+> Point-in-time snapshot. Live memory is at ~/.zentext/projects/8c1ef6c7a1edb38c/store.sqlite
+
+## Active task
+- Implement SaaS dashboard authentication (active)
+- ID: rec_task_01KY1EZM633XZD3D8D4DS51WXE | revision: 1
+- Goal: Add secure OAuth-based login and session management for the dashboard.
+- Next: Wire OAuth callback handler and session store.
+- Refs: (none)
+
+## Latest handoff
+- Initial auth handoff (latest)
+- ID: rec_handoff_01KY1EZM65RV5VPN0JKEK14BZ3 | revision: 1
+- From: agent:A to agent:B at 2026-07-21T04:29:42.469Z
+- Context: Authentication scope and decision are documented.
+- State: Task created, decision accepted, no code written yet.
+- Next: Implement OAuth callback handler and session middleware.
+
+## Decisions (1)
+- Use OAuth 2.0 with PKCE (accepted)
+  - Decision: Adopt OAuth 2.0 authorization code flow with PKCE for dashboard login.
+  - Rationale: Balances security with implementation complexity; avoids password storage.
+
+
+Read it carefully. Then:
+1. State your understanding of the project in the fields below.
+2. Propose one small, legitimate update that moves the active TASK forward. Only update the active task record. Do not update the handoff, decision, or any other record.
+
+Rules for the update:
+- Use the exact "id" of the active task record shown in the context above. Do not invent a record id.
+- The "expected_revision" must be the current "revision" value of that task record shown in the context above.
+- The patch should contain only changed task fields, such as "next" or "summary". Do not change "id", "project", "type", "created_at", "updated_at", "revision", or "schema_version".
+- The update must match the current revision so it fails if newer work already exists.
+
+Return JSON:
+{
+  "understanding": {
+    "current_goal": "...",
+    "latest_decision": "...",
+    "active_task": "...",
+    "next_action": "..."
+  },
+  "update": {
+    "record_id": "rec_...",
+    "expected_revision": 1,
+    "patch": { /* only changed task fields, e.g. { "next": "..." } */ },
+    "reason": "..."
+  }
+}

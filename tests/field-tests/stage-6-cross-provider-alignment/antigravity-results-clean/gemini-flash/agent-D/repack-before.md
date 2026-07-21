@@ -1,0 +1,24 @@
+# Zentext context — zentext-stage3-proj-EGPklX
+Generated: 2026-07-21T04:29:51.061Z | focus: none | from: 3 records | budget: 12000 chars
+
+> Point-in-time snapshot. Live memory is at ~/.zentext/projects/8c1ef6c7a1edb38c/store.sqlite
+
+## Active task
+- Implement SaaS dashboard authentication (active)
+- ID: rec_task_01KY1EZM633XZD3D8D4DS51WXE | revision: 2
+- Goal: Add secure OAuth-based login and session management for the dashboard.
+- Next: Implement OAuth 2.0 callback handler with PKCE verification and session middleware.
+- Refs: (none)
+
+## Latest handoff
+- Initial auth handoff (latest)
+- ID: rec_handoff_01KY1EZM65RV5VPN0JKEK14BZ3 | revision: 1
+- From: agent:A to agent:B at 2026-07-21T04:29:42.469Z
+- Context: Authentication scope and decision are documented.
+- State: Task created, decision accepted, no code written yet.
+- Next: Implement OAuth callback handler and session middleware.
+
+## Decisions (1)
+- Use OAuth 2.0 with PKCE (accepted)
+  - Decision: Adopt OAuth 2.0 authorization code flow with PKCE for dashboard login.
+  - Rationale: Balances security with implementation complexity; avoids password storage.

@@ -1,0 +1,6 @@
+{
+  "models": [
+    { "name": "gemini-flash", "provider": "antigravity-cli", "model": "gemini-3.5-flash-medium" },
+    { "name": "gemini-pro", "provider": "antigravity-cli", "model": "gemini-3.1-pro-high" }
+  ]
+}
