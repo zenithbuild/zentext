@@ -1,0 +1,10 @@
+{
+  "update": {
+    "record_id": "rec_task_01KY184PE1SHR6PFAPDYARZT0C",
+    "expected_revision": 1,
+    "patch": {
+      "next": "Implement OAuth 2.0 authorization code flow with PKCE callback handler and set up session middleware for dashboard routes."
+    },
+    "reason": "Based on the stale context, the task appears to be at the initial stage with the OAuth 2.0 + PKCE decision accepted but no code written yet; the next step is to implement the OAuth callback handler and session middleware."
+  }
+}

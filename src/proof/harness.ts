@@ -62,6 +62,44 @@ export interface ProofReport {
   models: ModelRun[];
 }
 
+export interface RoundResult {
+  round: number;
+  role: string;
+  repackBefore: string;
+  prompt: string;
+  response: string;
+  parsed: unknown;
+  mutation?: {
+    attempted: boolean;
+    applied: boolean;
+    conflict: boolean;
+    error?: string;
+  };
+  error?: string;
+}
+
+export interface ExpandedModelRun {
+  name: string;
+  provider: string;
+  model: string;
+  available: boolean;
+  skipReason?: string;
+  rounds: RoundResult[];
+}
+
+export interface ExpandedProofReport {
+  projectId: string;
+  projectName: string;
+  seededAt: string;
+  models: ExpandedModelRun[];
+  finalState: {
+    task: AnyRecord | null;
+    decision: AnyRecord | null;
+    handoff: AnyRecord | null;
+    allRecords: AnyRecord[];
+  };
+}
+
 export interface RunProofOptions {
   adapters: ModelAdapter[];
   /** Models that were skipped due to unavailability, included in artifacts for transparency. */
@@ -71,6 +109,16 @@ export interface RunProofOptions {
   /** If provided, use this directory as HOME. Otherwise a temp dir is created. */
   homePath?: string;
   /** If provided, write the artifact package here. */
+  outputDir?: string;
+}
+
+export interface RunExpandedProofOptions {
+  adapters: ModelAdapter[];
+  skippedModels?: Array<{ name: string; provider: string; model: string; reason: string }>;
+  /** Number of continuation rounds per model after Agent A. Minimum 1. */
+  rounds?: number;
+  projectPath?: string;
+  homePath?: string;
   outputDir?: string;
 }
 
@@ -129,6 +177,67 @@ export async function runProof(options: RunProofOptions): Promise<ProofReport> {
 
   if (options.outputDir) {
     writeArtifactPackage(options.outputDir, report);
+  }
+
+  return report;
+}
+
+export async function runExpandedProof(options: RunExpandedProofOptions): Promise<ExpandedProofReport> {
+  const totalRounds = Math.max(1, options.rounds ?? 3);
+  const home = options.homePath ?? mkdtempSync(join(tmpdir(), "zentext-stage5-"));
+  const project = options.projectPath ?? mkdtempSync(join(tmpdir(), "zentext-stage5-proj-"));
+
+  const originalHome = process.env.HOME ?? "";
+  process.env.HOME = home;
+
+  const store = new SqliteStore();
+  const meta = await store.initProjectStore(project);
+  const writer = createMemoryWriter(store);
+
+  const seed = await seedProject(writer);
+
+  const modelRuns: ExpandedModelRun[] = [];
+
+  for (const adapter of options.adapters) {
+    const run = await runModelExpanded(adapter, store, writer, seed, meta, totalRounds);
+    modelRuns.push(run);
+  }
+
+  // Capture final state from the still-open store before cleanup.
+  const finalTask = store.getRecord(seed.task.id);
+  const finalDecision = store.getRecord(seed.decision.id);
+  const finalHandoff = store.getRecord(seed.handoff.id);
+  const allRecords = store.listRecords();
+
+  store.close();
+  process.env.HOME = originalHome;
+  if (!options.homePath) rmSync(home, { recursive: true, force: true });
+  if (!options.projectPath) rmSync(project, { recursive: true, force: true });
+
+  const skipped = (options.skippedModels ?? []).map((m) => ({
+    name: m.name,
+    provider: m.provider,
+    model: m.model,
+    available: false,
+    skipReason: m.reason,
+    rounds: [],
+  }));
+
+  const report: ExpandedProofReport = {
+    projectId: meta.projectId,
+    projectName: meta.projectName,
+    seededAt: new Date().toISOString(),
+    models: [...modelRuns, ...skipped],
+    finalState: {
+      task: finalTask,
+      decision: finalDecision,
+      handoff: finalHandoff,
+      allRecords,
+    },
+  };
+
+  if (options.outputDir) {
+    writeExpandedArtifactPackage(options.outputDir, report);
   }
 
   return report;
@@ -331,6 +440,168 @@ async function runModel(
 // Artifact package
 // ---------------------------------------------------------------------------
 
+async function runModelExpanded(
+  adapter: ModelAdapter,
+  store: SqliteStore,
+  writer: ReturnType<typeof createMemoryWriter>,
+  seed: AgentASeed,
+  meta: { projectName: string; projectId: string },
+  totalRounds: number,
+): Promise<ExpandedModelRun> {
+  const run: ExpandedModelRun = {
+    name: adapter.name,
+    provider: adapter.provider,
+    model: adapter.model,
+    available: true,
+    rounds: [],
+  };
+
+  // Capture Agent A seed as round 0 for traceability.
+  run.rounds.push({
+    round: 0,
+    role: "A",
+    repackBefore: "",
+    prompt: agentACreatePrompt(),
+    response: JSON.stringify({ task: seed.task, decision: seed.decision, handoff: seed.handoff }, null, 2),
+    parsed: { task: seed.task, decision: seed.decision, handoff: seed.handoff },
+  });
+
+  let currentTaskRevision = seed.task.revision;
+
+  for (let round = 1; round <= totalRounds; round++) {
+    const context = repack(store, meta).markdown;
+    const currentTask = store.getRecord(seed.task.id);
+    currentTaskRevision = currentTask?.revision ?? currentTaskRevision;
+
+    const roundResult: RoundResult = {
+      round,
+      role: "B",
+      repackBefore: context,
+      prompt: agentBContinuePrompt(context),
+      response: "",
+      parsed: {},
+    };
+    run.rounds.push(roundResult);
+
+    try {
+      const raw = await adapter.send(sharedSystem, roundResult.prompt);
+      const contextualized = raw.replace(/rec_task_PLACEHOLDER/g, seed.task.id);
+      roundResult.response = contextualized;
+      roundResult.parsed = extractJson(contextualized);
+
+      const parsed = roundResult.parsed as {
+        understanding?: unknown;
+        update?: {
+          record_id?: string;
+          expected_revision?: number;
+          patch?: Record<string, unknown>;
+        };
+      };
+
+      roundResult.mutation = { attempted: false, applied: false, conflict: false };
+
+      if (
+        parsed.update?.record_id &&
+        typeof parsed.update.expected_revision === "number" &&
+        parsed.update.patch
+      ) {
+        roundResult.mutation.attempted = true;
+        try {
+          writer.updateRecord(parsed.update.record_id, parsed.update.patch, {
+            expectedRevision: parsed.update.expected_revision,
+            author: `${adapter.name}:round${round}`,
+          });
+          roundResult.mutation.applied = true;
+        } catch (err) {
+          if (err instanceof MemoryWriterConflictError) {
+            roundResult.mutation.conflict = true;
+          } else {
+            roundResult.mutation.error = err instanceof Error ? err.message : String(err);
+          }
+        }
+      }
+    } catch (err) {
+      roundResult.error = err instanceof Error ? err.message : String(err);
+    }
+  }
+
+  // One stale-attempt round using the repack state captured BEFORE round 1.
+  const staleContext = run.rounds[1]?.repackBefore ?? "";
+  const staleRevision = seed.task.revision;
+
+  const staleRound: RoundResult = {
+    round: totalRounds + 1,
+    role: "C",
+    repackBefore: staleContext,
+    prompt: agentCStalePrompt(staleContext, staleRevision),
+    response: "",
+    parsed: {},
+  };
+  run.rounds.push(staleRound);
+
+  try {
+    const raw = await adapter.send(sharedSystem, staleRound.prompt);
+    const contextualized = raw.replace(/rec_task_PLACEHOLDER/g, seed.task.id);
+    staleRound.response = contextualized;
+    staleRound.parsed = extractJson(contextualized);
+
+    const parsed = staleRound.parsed as {
+      update?: {
+        record_id?: string;
+        expected_revision?: number;
+        patch?: Record<string, unknown>;
+      };
+    };
+
+    staleRound.mutation = { attempted: false, applied: false, conflict: false };
+
+    if (
+      parsed.update?.record_id &&
+      typeof parsed.update.expected_revision === "number" &&
+      parsed.update.patch
+    ) {
+      staleRound.mutation.attempted = true;
+      try {
+        writer.updateRecord(parsed.update.record_id, parsed.update.patch, {
+          expectedRevision: parsed.update.expected_revision,
+          author: `${adapter.name}:stale`,
+        });
+        staleRound.mutation.applied = true;
+      } catch (err) {
+        if (err instanceof MemoryWriterConflictError) {
+          staleRound.mutation.conflict = true;
+        } else {
+          staleRound.mutation.error = err instanceof Error ? err.message : String(err);
+        }
+      }
+    }
+  } catch (err) {
+    staleRound.error = err instanceof Error ? err.message : String(err);
+  }
+
+  // Final summary round.
+  const finalContext = repack(store, meta).markdown;
+  const summaryRound: RoundResult = {
+    round: totalRounds + 2,
+    role: "D",
+    repackBefore: finalContext,
+    prompt: agentDSummarizePrompt(finalContext),
+    response: "",
+    parsed: {},
+  };
+  run.rounds.push(summaryRound);
+
+  try {
+    const raw = await adapter.send(sharedSystem, summaryRound.prompt);
+    summaryRound.response = raw;
+    summaryRound.parsed = extractJson(raw);
+  } catch (err) {
+    summaryRound.error = err instanceof Error ? err.message : String(err);
+  }
+
+  return run;
+}
+
 export function writeArtifactPackage(outputDir: string, report: ProofReport): void {
   mkdirSync(outputDir, { recursive: true });
 
@@ -405,6 +676,136 @@ function renderReadme(report: ProofReport): string {
   for (const model of report.models) {
     lines.push(`- **${model.name}** (${model.provider}/${model.model}) — ${model.available ? "available" : "unavailable: " + (model.skipReason ?? "not found")}`);
   }
+  return lines.join("\n");
+}
+
+export function writeExpandedArtifactPackage(outputDir: string, report: ExpandedProofReport): void {
+  mkdirSync(outputDir, { recursive: true });
+
+  writeFileSync(
+    join(outputDir, "README.md"),
+    renderExpandedReadme(report),
+    "utf8",
+  );
+
+  writeFileSync(
+    join(outputDir, "comparison.md"),
+    renderExpandedComparison(report),
+    "utf8",
+  );
+
+  writeFileSync(
+    join(outputDir, "final-state.json"),
+    JSON.stringify(report.finalState, null, 2),
+    "utf8",
+  );
+
+  for (const model of report.models) {
+    const modelDir = join(outputDir, model.name);
+    mkdirSync(modelDir, { recursive: true });
+
+    if (!model.available) {
+      writeFileSync(
+        join(modelDir, "UNAVAILABLE.md"),
+        `# ${model.name}\n\nUnavailable: ${model.skipReason ?? "model not found in Ollama"}\n`,
+        "utf8",
+      );
+      continue;
+    }
+
+    for (const round of model.rounds) {
+      const roundDir = join(modelDir, `round-${round.round}-agent-${round.role}`);
+      mkdirSync(roundDir, { recursive: true });
+
+      writeFileSync(join(roundDir, "prompt.txt"), round.prompt, "utf8");
+      writeFileSync(join(roundDir, "response.txt"), round.response, "utf8");
+      writeFileSync(join(roundDir, "parsed.json"), JSON.stringify(round.parsed, null, 2), "utf8");
+
+      if (round.repackBefore) {
+        writeFileSync(join(roundDir, "repack-before.md"), round.repackBefore, "utf8");
+      }
+      if (round.mutation) {
+        writeFileSync(join(roundDir, "mutation.json"), JSON.stringify(round.mutation, null, 2), "utf8");
+      }
+      if (round.error) {
+        writeFileSync(join(roundDir, "error.txt"), round.error, "utf8");
+      }
+    }
+  }
+}
+
+function renderExpandedReadme(report: ExpandedProofReport): string {
+  const lines: string[] = [
+    "# Stage 5 Expanded Multi-Round Continuation Proof",
+    "",
+    `Project: ${report.projectName}`,
+    `Project ID: ${report.projectId}`,
+    `Seeded at: ${report.seededAt}`,
+    "",
+    "This package contains raw execution artifacts for an expanded continuation proof using Zentext.",
+    "Each model ran multiple continuation rounds (Agent B) against the same evolving project state,",
+    "followed by a single stale-attempt round (Agent C) and a final summary round (Agent D).",
+    "",
+    "`comparison.md` organizes the evidence for review.",
+    "`final-state.json` contains the canonical Zentext state after all rounds.",
+    "",
+    "## Models evaluated",
+    "",
+  ];
+  for (const model of report.models) {
+    lines.push(`- **${model.name}** (${model.provider}/${model.model}) — ${model.available ? "available" : "unavailable: " + (model.skipReason ?? "not found")}`);
+  }
+  return lines.join("\n");
+}
+
+function renderExpandedComparison(report: ExpandedProofReport): string {
+  const lines: string[] = [
+    "# Stage 5 Expanded Evidence Comparison",
+    "",
+    "This document collects the evidence required to evaluate multi-round continuation.",
+    "Do not treat it as a scorecard.",
+    "",
+    "## Models",
+    "",
+  ];
+
+  for (const model of report.models) {
+    lines.push(`### ${model.name}`, "");
+    if (!model.available) {
+      lines.push(`Skipped: ${model.skipReason ?? "model not found in Ollama"}`);
+      lines.push("");
+      continue;
+    }
+    for (const round of model.rounds) {
+      const hasMutation = round.mutation && (round.mutation.attempted || round.mutation.applied || round.mutation.conflict);
+      lines.push(`- **Round ${round.round} / Agent ${round.role}**: ${round.error ? "error — " + round.error : hasMutation ? `mutation attempted=${round.mutation!.attempted} applied=${round.mutation!.applied} conflict=${round.mutation!.conflict}` : "completed"}`);
+    }
+    lines.push("");
+  }
+
+  lines.push(
+    "## Manual review questions",
+    "",
+    "1. Can a fresh model continue the task across multiple independent rounds without overwriting prior work?",
+    "   - Review each round's `mutation.json`. Expected: `applied: true` and revision increments sequentially.",
+    "",
+    "2. Do revisions stay contiguous and free of gaps or regressions?",
+    "   - Inspect `final-state.json` and compare task revisions across rounds.",
+    "",
+    "3. Are updates meaningfully advancing the task rather than restating it?",
+    "   - Compare each round's `parsed.json` patch to the previous round's task state.",
+    "",
+    "4. Do stale-attempt rounds fail consistently?",
+    "   - Review the Agent C round `mutation.json`. Expected: `applied: false` and `conflict: true`.",
+    "",
+    "5. Does the final summary accurately describe the completed chain of work?",
+    "   - Compare the final Agent D `parsed.json` to `final-state.json`.",
+    "",
+    "6. What is the smallest improvement required before Developer Preview?",
+    "   - Identify one change to prompts, repack output, or schema documentation that would reduce round failures.",
+    "",
+  );
+
   return lines.join("\n");
 }
 

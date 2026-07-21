@@ -103,3 +103,17 @@ first real multi-model run using locally available Ollama models. See
 
 No code changes are required. Add an entry to `proof.config.json` with the
 provider, model name, and optional `baseURL`.
+
+## Expanded multi-round proof
+
+The harness also supports an expanded mode that runs multiple independent continuation rounds per model to test serial collaboration:
+
+```bash
+node /absolute/path/to/dist/proof/run.js \
+  --config proof.config.json \
+  --expanded \
+  --rounds 3 \
+  --output proof-results-expanded
+```
+
+This runs Agent B three times in sequence per model, then a stale-attempt round and a final summary round. Artifacts are committed under `expanded/proof-results/`.

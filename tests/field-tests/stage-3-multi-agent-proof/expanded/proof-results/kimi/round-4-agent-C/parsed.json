@@ -1,0 +1,10 @@
+{
+  "update": {
+    "record_id": "rec_task_01KY184PE1SHR6PFAPDYARZT0C",
+    "expected_revision": 1,
+    "patch": {
+      "next": "Wire OAuth callback handler and session store; then add session middleware to dashboard routes."
+    },
+    "reason": "Stale context shows task at revision 1 with handoff indicating no code written yet and next step to implement the OAuth callback handler and session middleware. Proposing to update the task next step accordingly."
+  }
+}
