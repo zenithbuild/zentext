@@ -1,0 +1,19 @@
+{
+  "task": {
+    "id": "rec_task_01KY14EA6E1ES7GVY475MQ7NQT",
+    "project": "936083c56e0ab56e",
+    "type": "task",
+    "title": "Implement SaaS dashboard authentication",
+    "status": "active",
+    "summary": "SaaS dashboard authentication via OAuth 2.0 + PKCE. Callback handler and token exchange are the immediate focus; session middleware and tests follow.",
+    "created_at": "2026-07-21T01:25:29.422Z",
+    "updated_at": "2026-07-21T01:26:05.057Z",
+    "revision": 4,
+    "author": "minimax",
+    "tags": [],
+    "refs": {},
+    "schema_version": 1,
+    "goal": "Add secure OAuth-based login and session management for the dashboard.",
+    "next": "Start implementation with the OAuth callback handler and authorization code-to-token exchange (PKCE verifier validation, token storage); once tokens are issued, build session middleware that validates the issued token on each protected dashboard request, and then add integration tests covering the OAuth callback and session lifecycle."
+  }
+}

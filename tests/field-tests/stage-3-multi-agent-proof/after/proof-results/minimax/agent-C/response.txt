@@ -1,0 +1,13 @@
+```json
+{
+  "update": {
+    "record_id": "rec_task_01KY14EA6E1ES7GVY475MQ7NQT",
+    "expected_revision": 3,
+    "patch": {
+      "next": "Implement the OAuth callback handler to receive the authorization code, then perform the token exchange with the identity provider to obtain access and refresh tokens. Persist the token set securely for the session before moving on to session middleware.",
+      "summary": "SaaS dashboard authentication via OAuth 2.0 + PKCE. The OAuth callback handler and token exchange are still the immediate focus and have not yet been completed; session middleware and integration tests will follow once token exchange is working."
+    },
+    "reason": "Based on the stale context at revision 3, the summary indicates that the OAuth callback handler and token exchange are the immediate focus and not yet done, so I am shifting the next step back to those items rather than advancing to session middleware and tests (which my outdated view assumes have not started)."
+  }
+}
+```

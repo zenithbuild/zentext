@@ -419,6 +419,7 @@ function renderPrimaryTask(record: AnyRecord): string {
   const lines: string[] = [
     "## Active task",
     `- ${record.title} (${record.status})`,
+    `- ID: ${record.id} | revision: ${record.revision}`,
   ];
   if (r.goal) lines.push(`- Goal: ${r.goal}`);
   if (r.next) lines.push(`- Next: ${r.next}`);
@@ -433,6 +434,7 @@ function renderBlockers(records: AnyRecord[]): string {
     const r = record as unknown as Record<string, unknown>;
     const severity = r.severity ? `[${r.severity}] ` : "";
     lines.push(`- ${severity}${record.title} — ${record.summary ?? "no summary"}`);
+    lines.push(`  - ID: ${record.id} | revision: ${record.revision}`);
     if (r.workaround) {
       lines.push(`  - Workaround: ${r.workaround}`);
     }
@@ -459,7 +461,8 @@ function renderLatestHandoff(record: AnyRecord): string {
   const r = record as unknown as Record<string, unknown>;
   const lines: string[] = [
     "## Latest handoff",
-    `- ${record.title} (${record.status}) — ${record.id}`,
+    `- ${record.title} (${record.status})`,
+    `- ID: ${record.id} | revision: ${record.revision}`,
     `- From: ${r.from ?? "unknown"} to ${r.to ?? "unknown"} at ${formatTimestamp(record.updated_at)}`,
   ];
   if (r.context) lines.push(`- Context: ${r.context}`);

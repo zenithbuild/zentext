@@ -1,0 +1,8 @@
+{
+  "models": [
+    { "name": "qwen3", "provider": "ollama", "model": "qwen3:latest" },
+    { "name": "kimi", "provider": "ollama", "model": "kimi-k2.7-code:cloud" },
+    { "name": "glm", "provider": "ollama", "model": "glm-5.2:cloud" },
+    { "name": "minimax", "provider": "ollama", "model": "minimax-m3:cloud" }
+  ]
+}

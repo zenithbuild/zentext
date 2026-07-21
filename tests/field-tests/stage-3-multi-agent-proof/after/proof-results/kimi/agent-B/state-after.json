@@ -1,0 +1,18 @@
+{
+  "task": {
+    "id": "rec_task_01KY14EA6E1ES7GVY475MQ7NQT",
+    "project": "936083c56e0ab56e",
+    "type": "task",
+    "title": "Implement SaaS dashboard authentication",
+    "status": "active",
+    "created_at": "2026-07-21T01:25:29.422Z",
+    "updated_at": "2026-07-21T01:25:33.862Z",
+    "revision": 2,
+    "author": "kimi",
+    "tags": [],
+    "refs": {},
+    "schema_version": 1,
+    "goal": "Add secure OAuth-based login and session management for the dashboard.",
+    "next": "Implement OAuth callback route handler that verifies the PKCE code and exchanges the authorization code for tokens."
+  }
+}

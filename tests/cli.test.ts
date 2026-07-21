@@ -150,7 +150,7 @@ describe("Zentext CLI — Phase 2 read/inspect", () => {
     expect(result.exitCode).toBe(0);
     expect(result.output).toContain("T1");
     expect(result.output).toContain("T2");
-    expect(result.output).not.toContain("D1");
+    expect(result.output).not.toContain("rec_decision_");
     store.close();
   });
 

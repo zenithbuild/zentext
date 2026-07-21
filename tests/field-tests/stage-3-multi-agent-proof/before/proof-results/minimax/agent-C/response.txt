@@ -1,0 +1,14 @@
+```json
+{
+  "update": {
+    "record_id": "rec_handoff_01KY12XJ5R4VF1D4QATM7B0NW1",
+    "expected_revision": 1,
+    "patch": {
+      "state": "Agent B has scaffolded /auth/callback; now selecting session storage backend.",
+      "next": "Decide between server-side session store (Redis) vs. signed encrypted cookie for session token. Then wire session middleware to attach user to requests and add /auth/logout.",
+      "progress_note": "OAuth callback handler validates state, exchanges code+PKCE for tokens, and creates session record. Token exchange tested with mock IdP."
+    },
+    "reason": "Continuing from revision 1: the /auth/callback implementation is in progress and the natural next blocker is choosing the session storage strategy, which warrants a decision before middleware can be finalized."
+  }
+}
+```
