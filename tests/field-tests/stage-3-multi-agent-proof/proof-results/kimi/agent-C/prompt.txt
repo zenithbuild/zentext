@@ -1,0 +1,44 @@
+Agent C: attempt to continue from outdated information.
+
+You were handed the following OLD context and told the active task is still at revision 1. You do not know a newer agent has already updated it.
+
+# Zentext context — zentext-stage3-proj-Ynuubn
+Generated: 2026-07-21T01:01:35.394Z | focus: none | from: 3 records | budget: 12000 chars
+
+> Point-in-time snapshot. Live memory is at ~/.zentext/projects/86db4a81fc4dc17a/store.sqlite
+
+## Active task
+- Implement SaaS dashboard authentication (active)
+- Goal: Add secure OAuth-based login and session management for the dashboard.
+- Next: Wire OAuth callback handler and session store.
+- Refs: (none)
+
+## Latest handoff
+- Initial auth handoff (latest) — rec_handoff_01KY131B57W1F8HRZNEC9N1J0P
+- From: agent:A to agent:B at 2026-07-21T01:00:55.847Z
+- Context: Authentication scope and decision are documented.
+- State: Task created, decision accepted, no code written yet.
+- Next: Implement OAuth callback handler and session middleware.
+
+## Decisions (1)
+- Use OAuth 2.0 with PKCE (accepted)
+  - Decision: Adopt OAuth 2.0 authorization code flow with PKCE for dashboard login.
+  - Rationale: Balances security with implementation complexity; avoids password storage.
+
+
+Propose an update to the active task based only on this stale context.
+
+Rules for the update:
+- Use the exact "id" of the active task record shown in the old context above.
+- The "expected_revision" must be 1, the revision from the old context.
+- The patch should contain only changed task fields, such as "next" or "summary".
+
+Return JSON:
+{
+  "update": {
+    "record_id": "rec_...",
+    "expected_revision": 1,
+    "patch": { /* outdated change */ },
+    "reason": "..."
+  }
+}

@@ -35,7 +35,13 @@ ${context}
 
 Read it carefully. Then:
 1. State your understanding of the project in the fields below.
-2. Propose one small, legitimate update that moves the active task forward. The update must match the current revision of the target record to avoid overwriting newer work.
+2. Propose one small, legitimate update that moves the active TASK forward. Only update the active task record. Do not update the handoff, decision, or any other record.
+
+Rules for the update:
+- Use the exact \"id\" of the active task record shown in the context above. Do not invent a record id.
+- The \"expected_revision\" must be the current \"revision\" value of that task record shown in the context above.
+- The patch should contain only changed task fields, such as \"next\" or \"summary\". Do not change \"id\", \"project\", \"type\", \"created_at\", \"updated_at\", \"revision\", or \"schema_version\".
+- The update must match the current revision so it fails if newer work already exists.
 
 Return JSON:
 {
@@ -48,7 +54,7 @@ Return JSON:
   "update": {
     "record_id": "rec_...",
     "expected_revision": 1,
-    "patch": { /* only changed fields, e.g. { "next": "..." } */ },
+    "patch": { /* only changed task fields, e.g. { "next": "..." } */ },
     "reason": "..."
   }
 }`;
@@ -61,7 +67,14 @@ You were handed the following OLD context and told the active task is still at r
 
 ${staleContext}
 
-Propose an update based only on this stale context. Return JSON:
+Propose an update to the active task based only on this stale context.
+
+Rules for the update:
+- Use the exact \"id\" of the active task record shown in the old context above.
+- The \"expected_revision\" must be ${staleRevision}, the revision from the old context.
+- The patch should contain only changed task fields, such as \"next\" or \"summary\".
+
+Return JSON:
 {
   "update": {
     "record_id": "rec_...",

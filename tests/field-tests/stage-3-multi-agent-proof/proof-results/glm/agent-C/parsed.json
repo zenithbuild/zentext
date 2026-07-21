@@ -1,0 +1,10 @@
+{
+  "update": {
+    "record_id": "rec_task_active",
+    "expected_revision": 1,
+    "patch": {
+      "next": "Implement session middleware and integrate with existing dashboard route guards."
+    },
+    "reason": "Based on the stale context, the OAuth callback handler and session store are the immediate next step; once wired, session middleware integration would follow."
+  }
+}

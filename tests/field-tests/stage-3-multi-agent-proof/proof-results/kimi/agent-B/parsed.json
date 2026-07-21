@@ -1,0 +1,16 @@
+{
+  "understanding": {
+    "current_goal": "Add secure OAuth-based login and session management for the SaaS dashboard.",
+    "latest_decision": "Adopt OAuth 2.0 authorization code flow with PKCE for dashboard login to avoid password storage and balance security with implementation complexity.",
+    "active_task": "Implement SaaS dashboard authentication (active).",
+    "next_action": "Wire the OAuth callback handler and session store."
+  },
+  "update": {
+    "record_id": null,
+    "expected_revision": null,
+    "patch": {
+      "next": "Implement the /auth/callback route handler that exchanges the authorization code for tokens and establishes a server-side session."
+    },
+    "reason": "This narrows the next step to a concrete, verifiable implementation task directly advancing the authentication work. The active task record id and current revision are not shown in the provided context snapshot, so I cannot submit a revision-matched update without inventing an id."
+  }
+}

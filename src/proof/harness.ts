@@ -1,12 +1,12 @@
 /**
- * Stage 3 multi-agent collaboration proof harness.
+ * Stage 3/4 multi-agent collaboration proof harness.
  *
  * Execution-only: orchestrates model interactions, captures prompts,
  * responses, and Zentext state, then produces a report.
  * Evaluation and scoring are performed by a separate reviewer.
  */
 
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -50,6 +50,8 @@ export interface ModelRun {
   name: string;
   provider: string;
   model: string;
+  available: boolean;
+  skipReason?: string;
   runs: AgentRun[];
 }
 
@@ -62,12 +64,14 @@ export interface ProofReport {
 
 export interface RunProofOptions {
   adapters: ModelAdapter[];
+  /** Models that were skipped due to unavailability, included in artifacts for transparency. */
+  skippedModels?: Array<{ name: string; provider: string; model: string; reason: string }>;
   /** If provided, use this directory as the project root. Otherwise a temp dir is created. */
   projectPath?: string;
   /** If provided, use this directory as HOME. Otherwise a temp dir is created. */
   homePath?: string;
-  /** If provided, write the markdown report here. */
-  reportPath?: string;
+  /** If provided, write the artifact package here. */
+  outputDir?: string;
 }
 
 interface AgentASeed {
@@ -94,7 +98,6 @@ export async function runProof(options: RunProofOptions): Promise<ProofReport> {
   const modelRuns: ModelRun[] = [];
 
   try {
-    // Agent A seed (same for all models to keep evaluation comparable)
     const seed = await seedProject(writer);
 
     for (const adapter of options.adapters) {
@@ -108,15 +111,24 @@ export async function runProof(options: RunProofOptions): Promise<ProofReport> {
     if (!options.projectPath) rmSync(project, { recursive: true, force: true });
   }
 
+  const skipped = (options.skippedModels ?? []).map((m) => ({
+    name: m.name,
+    provider: m.provider,
+    model: m.model,
+    available: false,
+    skipReason: m.reason,
+    runs: [],
+  }));
+
   const report: ProofReport = {
     projectId: meta.projectId,
     projectName: meta.projectName,
     seededAt: new Date().toISOString(),
-    models: modelRuns,
+    models: [...modelRuns, ...skipped],
   };
 
-  if (options.reportPath) {
-    writeFileSync(options.reportPath, renderReport(report), "utf8");
+  if (options.outputDir) {
+    writeArtifactPackage(options.outputDir, report);
   }
 
   return report;
@@ -166,6 +178,7 @@ async function runModel(
     name: adapter.name,
     provider: adapter.provider,
     model: adapter.model,
+    available: true,
     runs: [],
   };
 
@@ -201,8 +214,6 @@ async function runModel(
     agentB.response = contextualizedB;
     agentB.parsed = extractJson(contextualizedB);
 
-    // Capture stale context BEFORE applying Agent B's update so Agent C sees
-    // genuinely outdated information.
     staleContext = repack(store, meta).markdown;
     taskBeforeC = store.getRecord(seed.task.id)!;
 
@@ -317,100 +328,136 @@ async function runModel(
 }
 
 // ---------------------------------------------------------------------------
-// Report rendering
+// Artifact package
 // ---------------------------------------------------------------------------
 
-export function renderReport(report: ProofReport): string {
+export function writeArtifactPackage(outputDir: string, report: ProofReport): void {
+  mkdirSync(outputDir, { recursive: true });
+
+  writeFileSync(
+    join(outputDir, "README.md"),
+    renderReadme(report),
+    "utf8",
+  );
+
+  writeFileSync(
+    join(outputDir, "comparison.md"),
+    renderComparison(report),
+    "utf8",
+  );
+
+  for (const model of report.models) {
+    const modelDir = join(outputDir, model.name);
+    mkdirSync(modelDir, { recursive: true });
+
+    if (!model.available) {
+      writeFileSync(
+        join(modelDir, "UNAVAILABLE.md"),
+        `# ${model.name}\n\nUnavailable: ${model.skipReason ?? "model not found in Ollama"}\n`,
+        "utf8",
+      );
+      continue;
+    }
+
+    for (const run of model.runs) {
+      const roleDir = join(modelDir, `agent-${run.role}`);
+      mkdirSync(roleDir, { recursive: true });
+
+      writeFileSync(join(roleDir, "system.txt"), run.system, "utf8");
+      writeFileSync(join(roleDir, "prompt.txt"), run.prompt, "utf8");
+      writeFileSync(join(roleDir, "response.txt"), run.response, "utf8");
+      writeFileSync(join(roleDir, "parsed.json"), JSON.stringify(run.parsed, null, 2), "utf8");
+
+      if (run.stateBefore) {
+        writeFileSync(join(roleDir, "repack-before.md"), run.stateBefore, "utf8");
+      }
+      if (run.stateAfter) {
+        writeFileSync(join(roleDir, "state-after.json"), JSON.stringify(run.stateAfter, null, 2), "utf8");
+      }
+      if (run.mutation) {
+        writeFileSync(join(roleDir, "mutation.json"), JSON.stringify(run.mutation, null, 2), "utf8");
+      }
+      if (run.error) {
+        writeFileSync(join(roleDir, "error.txt"), run.error, "utf8");
+      }
+    }
+  }
+}
+
+function renderReadme(report: ProofReport): string {
   const lines: string[] = [
-    "# Stage 3 Multi-Agent Collaboration Proof",
+    "# Stage 4 Multi-Model System Proof",
     "",
     `Project: ${report.projectName}`,
     `Project ID: ${report.projectId}`,
     `Seeded at: ${report.seededAt}`,
     "",
-    "## Overview",
+    "This package contains raw execution artifacts for a multi-model collaboration proof using Zentext.",
     "",
-    "This report contains only raw execution artifacts: prompts sent to each model, raw responses, parsed responses, and Zentext state snapshots before and after each mutation attempt.",
+    "Each model has its own directory containing Agent A/B/C/D prompts, raw responses, parsed responses,",
+    "repack outputs, and mutation outcomes.",
     "",
-    "Evaluation, scoring, and the final six-question verdict must be performed by a separate human or model reviewer.",
+    "`comparison.md` organizes the evidence for human review but does not assign scores.",
+    "",
+    "## Models evaluated",
+    "",
+  ];
+  for (const model of report.models) {
+    lines.push(`- **${model.name}** (${model.provider}/${model.model}) — ${model.available ? "available" : "unavailable: " + (model.skipReason ?? "not found")}`);
+  }
+  return lines.join("\n");
+}
+
+function renderComparison(report: ProofReport): string {
+  const lines: string[] = [
+    "# Stage 4 Evidence Comparison",
+    "",
+    "This document collects the evidence required to answer the six manual review questions.",
+    "Do not treat it as a scorecard. It is an organized view of the raw artifacts.",
+    "",
+    "## Models",
     "",
   ];
 
   for (const model of report.models) {
-    lines.push(`## Model: ${model.name}`, "");
-    lines.push(`- Provider: ${model.provider}`);
-    lines.push(`- Model: ${model.model}`);
-    lines.push("");
-
-    for (const run of model.runs) {
-      lines.push(`### Agent ${run.role}`, "");
-
-      if (run.error) {
-        lines.push(`**Error:** ${run.error}`);
-        lines.push("");
-        continue;
-      }
-
-      if (run.mutation) {
-        lines.push(`- Mutation attempted: ${run.mutation.attempted}`);
-        lines.push(`- Mutation applied: ${run.mutation.applied}`);
-        lines.push(`- Conflict detected: ${run.mutation.conflict}`);
-        if (run.mutation.error) {
-          lines.push(`- Mutation error: ${run.mutation.error}`);
-        }
-        lines.push("");
-      }
-
-      if (run.stateBefore) {
-        lines.push("<details>");
-        lines.push("<summary>Zentext context before this agent</summary>");
-        lines.push("");
-        lines.push("```markdown");
-        lines.push(run.stateBefore);
-        lines.push("```");
-        lines.push("</details>");
-        lines.push("");
-      }
-
-      lines.push("<details>");
-      lines.push("<summary>Prompt</summary>");
+    lines.push(`### ${model.name}`, "");
+    if (!model.available) {
+      lines.push(`Skipped: ${model.skipReason ?? "model not found in Ollama"}`);
       lines.push("");
-      lines.push("```text");
-      lines.push(run.prompt);
-      lines.push("```");
-      lines.push("</details>");
-      lines.push("");
-
-      lines.push("<details>");
-      lines.push("<summary>Raw response</summary>");
-      lines.push("");
-      lines.push("```text");
-      lines.push(run.response);
-      lines.push("```");
-      lines.push("</details>");
-      lines.push("");
-
-      lines.push("<details>");
-      lines.push("<summary>Parsed response</summary>");
-      lines.push("");
-      lines.push("```json");
-      lines.push(JSON.stringify(run.parsed, null, 2));
-      lines.push("```");
-      lines.push("</details>");
-      lines.push("");
-
-      if (run.stateAfter) {
-        lines.push("<details>");
-        lines.push("<summary>Zentext state after this agent</summary>");
-        lines.push("");
-        lines.push("```json");
-        lines.push(JSON.stringify(run.stateAfter, null, 2));
-        lines.push("```");
-        lines.push("</details>");
-        lines.push("");
-      }
+      continue;
     }
+    lines.push(`- Provider/model: ${model.provider}/${model.model}`);
+    for (const run of model.runs) {
+      const hasMutation = run.mutation && (run.mutation.attempted || run.mutation.applied || run.mutation.conflict);
+      lines.push(`- **Agent ${run.role}**: ${run.error ? "error — " + run.error : hasMutation ? `mutation attempted=${run.mutation!.attempted} applied=${run.mutation!.applied} conflict=${run.mutation!.conflict}` : "completed"}`);
+    }
+    lines.push("");
   }
+
+  lines.push(
+    "## Manual review questions",
+    "",
+    "Answer these questions by inspecting the per-model artifact directories.",
+    "",
+    "1. Did Zentext preserve enough context?",
+    "   - Review each Agent B `parsed.json`. Does it correctly identify the current goal, latest decision, active task, and next action?",
+    "",
+    "2. Could a completely fresh model continue work?",
+    "   - Review each Agent B `mutation.json`. Was a valid update attempted and applied?",
+    "",
+    "3. Did stale information remain rejected?",
+    "   - Review each Agent C `mutation.json`. Was the stale update rejected with `applied: false` and `conflict: true`?",
+    "",
+    "4. Did the models generally reach the same understanding?",
+    "   - Compare the Agent B `parsed.json` files across models. Look for agreement on goal, decision, task, and next action.",
+    "",
+    "5. What information was consistently missing?",
+    "   - Identify fields or concepts that most models omitted or misunderstood.",
+    "",
+    "6. What is the smallest improvement that would increase continuation quality?",
+    "   - Identify one change to prompts, repack output, or schema documentation that would reduce disagreement or omission.",
+    "",
+  );
 
   return lines.join("\n");
 }

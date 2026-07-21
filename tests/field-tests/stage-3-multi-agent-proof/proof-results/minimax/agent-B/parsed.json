@@ -1,0 +1,16 @@
+{
+  "understanding": {
+    "current_goal": "Add secure OAuth-based login and session management to the SaaS dashboard, replacing any password-based flow with a delegated identity provider.",
+    "latest_decision": "Adopt the OAuth 2.0 authorization code flow with PKCE for dashboard login — chosen for its security posture (no password storage) balanced against implementation complexity.",
+    "active_task": "Implement SaaS dashboard authentication. The task is created and the approach (OAuth 2.0 + PKCE) is accepted, but no implementation code has been written yet — the handoff explicitly notes 'no code written yet'.",
+    "next_action": "Wire the OAuth callback handler that exchanges the authorization code (with PKCE code_verifier) for tokens, and stand up the session store that persists authenticated sessions (and tracks the state->verifier mapping for CSRF protection)."
+  },
+  "update": {
+    "record_id": "NOT_VISIBLE_IN_CONTEXT",
+    "expected_revision": null,
+    "patch": {
+      "next": "Define session record schema (user_id, access_token, refresh_token, expires_at, provider, created_at) and implement PKCE state->verifier mapping before wiring the OAuth callback handler."
+    },
+    "reason": "The provided Zentext context snapshot renders the active task's goal/next/refs but does not surface the underlying record id or current revision number — only the handoff record id (rec_handoff_01KY131B57W1F8HRZNEC9N1J0P) and decision id are visible. Per the rules I must not invent a record id, and I cannot supply a correct expected_revision without seeing the current value, so the update is intentionally not committable in this form. The proposed patch is a small, legitimate forward step: it narrows the existing 'next' (which currently lumps callback wiring and session store together) by front-loading the schema/state-store work, which is a sensible sequencing decision now that PKCE is the chosen flow and helps the next agent avoid mixing token exchange with session persistence concerns."
+  }
+}

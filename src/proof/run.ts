@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * CLI entry point for the Stage 3 multi-agent proof.
+ * CLI entry point for the Stage 3/4 multi-agent proof.
  *
  * Usage:
- *   # Default: use built-in Ollama model list
+ *   # Default: use built-in Ollama model list, verify availability, run proof
  *   ollama serve
  *   node dist/proof/run.js
  *
@@ -28,7 +28,7 @@
 import { readFileSync, existsSync } from "node:fs";
 import { runProof } from "./harness.js";
 import { createAdapter, StubAdapter } from "./model-adapter.js";
-import type { ProviderConfig } from "./model-adapter.js";
+import type { ProviderConfig, ModelAdapter } from "./model-adapter.js";
 
 const DEFAULT_CONFIG: { models: ProviderConfig[] } = {
   models: [
@@ -39,11 +39,14 @@ const DEFAULT_CONFIG: { models: ProviderConfig[] } = {
   ],
 };
 
+const OLLAMA_BASE_URL = "http://localhost:11434";
+
 function parseArgs(): {
   configPath?: string;
   provider?: string;
   model?: string;
   stub?: boolean;
+  outputDir?: string;
 } {
   const args = process.argv.slice(2);
   const result: ReturnType<typeof parseArgs> = {};
@@ -57,6 +60,9 @@ function parseArgs(): {
       i++;
     } else if (arg === "--model" && args[i + 1]) {
       result.model = args[i + 1];
+      i++;
+    } else if (arg === "--output" && args[i + 1]) {
+      result.outputDir = args[i + 1];
       i++;
     } else if (arg === "--stub") {
       result.stub = true;
@@ -97,7 +103,33 @@ function loadConfig(args: ReturnType<typeof parseArgs>): { models: ProviderConfi
   return DEFAULT_CONFIG;
 }
 
-function buildAdapters(config: { models: ProviderConfig[] }, forceStub: boolean) {
+async function checkOllamaRunning(): Promise<boolean> {
+  try {
+    const res = await fetch(`${OLLAMA_BASE_URL}/api/tags`, { method: "GET" });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function listOllamaModels(): Promise<Set<string>> {
+  try {
+    const res = await fetch(`${OLLAMA_BASE_URL}/api/tags`, { method: "GET" });
+    if (!res.ok) return new Set();
+    const data = (await res.json()) as {
+      models?: Array<{ model?: string; name?: string }>;
+    };
+    return new Set(
+      (data.models ?? [])
+        .map((m) => m.model ?? m.name ?? "")
+        .filter((m): m is string => Boolean(m)),
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+function buildAdapters(config: { models: ProviderConfig[] }, forceStub: boolean): ModelAdapter[] {
   if (forceStub || config.models.length === 0) {
     console.error("No models configured or --stub requested. Running stub dry-run.");
     return [
@@ -165,16 +197,47 @@ function buildAdapters(config: { models: ProviderConfig[] }, forceStub: boolean)
 
 async function main() {
   const args = parseArgs();
+
+  if (!args.stub) {
+    const running = await checkOllamaRunning();
+    if (!running) {
+      console.error("Ollama does not appear to be running at http://localhost:11434.");
+      console.error("Start it with: ollama serve");
+      process.exit(1);
+    }
+    console.log("Ollama is running.");
+  }
+
   const config = loadConfig(args);
-  const adapters = buildAdapters(config, args.stub ?? false);
-  const report = await runProof({
-    adapters,
-    reportPath: "tests/field-tests/stage-3-multi-agent-proof/stage-3-proof-report.md",
-  });
-  console.log(`Proof complete. ${report.models.length} model(s) evaluated.`);
-  console.log(
-    `Report: tests/field-tests/stage-3-multi-agent-proof/stage-3-proof-report.md`,
-  );
+  let adapters = buildAdapters(config, args.stub ?? false);
+
+  const skippedModels: Array<{ name: string; provider: string; model: string; reason: string }> = [];
+
+  if (!args.stub) {
+    const availableModels = await listOllamaModels();
+    const availableAdapters: typeof adapters = [];
+    for (const adapter of adapters) {
+      if (adapter.provider === "ollama" && !availableModels.has(adapter.model)) {
+        console.warn(`Model ${adapter.model} is not available locally. It will be skipped.`);
+        skippedModels.push({
+          name: adapter.name,
+          provider: adapter.provider,
+          model: adapter.model,
+          reason: `Model ${adapter.model} not found in Ollama`,
+        });
+      } else {
+        availableAdapters.push(adapter);
+      }
+    }
+    adapters = availableAdapters;
+  }
+
+  const outputDir = args.outputDir ?? "proof-results";
+  const report = await runProof({ adapters, skippedModels, outputDir });
+
+  const availableCount = report.models.filter((m) => m.available).length;
+  console.log(`Proof complete. ${availableCount}/${report.models.length} model(s) evaluated.`);
+  console.log(`Artifacts: ${outputDir}/`);
 }
 
 main().catch((err) => {
