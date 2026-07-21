@@ -1,0 +1,16 @@
+{
+  "understanding": {
+    "current_goal": "Add secure OAuth-based login and session management for the SaaS dashboard.",
+    "latest_decision": "Adopt OAuth 2.0 authorization code flow with PKCE for dashboard login — chosen for its security/complexity balance and because it avoids storing passwords.",
+    "active_task": "Implement SaaS dashboard authentication; current sub-focus is wiring the OAuth callback handler and the session store/middleware.",
+    "next_action": "Implement the /auth/callback route: validate the `state` parameter against the value stored at login start, exchange the authorization code + PKCE verifier for tokens at the token endpoint, create a server-side session record, set a secure session cookie, and redirect to /dashboard; then add session-verification middleware."
+  },
+  "update": {
+    "record_id": "rec_handoff_01KY12XJ5R4VF1D4QATM7B0NW1",
+    "expected_revision": 1,
+    "patch": {
+      "next": "Implementing /auth/callback in ordered steps: (1) validate the `state` query param against the value stored when /auth/login started; on mismatch, abort and 400. (2) POST the authorization code + code_verifier (PKCE) to the IdP token endpoint and parse access_token, refresh_token, and id_token. (3) Verify id_token signature/claims, upsert the user record, and create a server-side session row keyed by an opaque session id (with user id, expiry, and refresh token reference). (4) Set an HttpOnly + Secure + SameSite=Lax cookie carrying the session id and 302 to /dashboard. Immediately after: add session middleware that resolves the cookie to a user, attaches it to req, enforces expiry, and supports sliding renewal. Out of scope for this handoff: logout, CSRF beyond the OAuth `state` check, and refresh-token rotation policy."
+    },
+    "reason": "Refine the handoff's `next` field into a concrete, ordered implementation plan for the OAuth callback handler and the session middleware that must follow it. This keeps the active task moving forward, preserves the original decision and context, and gives the next agent (or reviewer) an unambiguous checklist without overwriting any newer work."
+  }
+}

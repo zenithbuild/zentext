@@ -1,0 +1,11 @@
+{
+  "update": {
+    "record_id": "rec_handoff_01KY12XJ5R4VF1D4QATM7B0NW1",
+    "expected_revision": 1,
+    "patch": {
+      "state": "OAuth callback handler and session middleware implemented; wiring PKCE verifier exchange against provider token endpoint and creating signed session cookies on success.",
+      "next": "Add session validation middleware to protected dashboard routes and write integration tests for the OAuth callback flow."
+    },
+    "reason": "Stale context indicates the next step is wiring the OAuth callback handler and session store; proposing to advance the handoff state to reflect that implementation work, unaware that a newer revision already exists."
+  }
+}

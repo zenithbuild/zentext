@@ -1,0 +1,38 @@
+Agent D: summarize the current state from a fresh session.
+
+You have no prior context. Here is the current Zentext project memory:
+
+# Zentext context — zentext-stage3-proj-cyp3tj
+Generated: 2026-07-21T01:25:52.302Z | focus: none | from: 3 records | budget: 12000 chars
+
+> Point-in-time snapshot. Live memory is at ~/.zentext/projects/936083c56e0ab56e/store.sqlite
+
+## Active task
+- Implement SaaS dashboard authentication (active)
+- ID: rec_task_01KY14EA6E1ES7GVY475MQ7NQT | revision: 3
+- Goal: Add secure OAuth-based login and session management for the dashboard.
+- Next: Build session middleware that validates issued tokens on each protected dashboard request; then add integration tests covering the OAuth callback and session lifecycle.
+- Summary: SaaS dashboard authentication via OAuth 2.0 + PKCE. Callback handler and token exchange are the immediate focus; session middleware and tests follow.
+- Refs: (none)
+
+## Latest handoff
+- Initial auth handoff (latest)
+- ID: rec_handoff_01KY14EA6FZKMKCNXHSXKVPN5K | revision: 1
+- From: agent:A to agent:B at 2026-07-21T01:25:29.423Z
+- Context: Authentication scope and decision are documented.
+- State: Task created, decision accepted, no code written yet.
+- Next: Implement OAuth callback handler and session middleware.
+
+## Decisions (1)
+- Use OAuth 2.0 with PKCE (accepted)
+  - Decision: Adopt OAuth 2.0 authorization code flow with PKCE for dashboard login.
+  - Rationale: Balances security with implementation complexity; avoids password storage.
+
+
+Return JSON:
+{
+  "current_state": "one-sentence summary",
+  "completed_work": "what has been done",
+  "rejected_stale_work": "what was attempted but rejected due to stale information",
+  "next_implementation_step": "the immediate next action"
+}
