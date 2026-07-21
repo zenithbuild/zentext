@@ -79,6 +79,19 @@ function validateProjectId(projectId: string): void {
   }
 }
 
+
+// ---------------------------------------------------------------------------
+// Transaction helper
+// ---------------------------------------------------------------------------
+
+export interface TransactionScope {
+  /**
+   * Execute a callback inside a single SQLite transaction.
+   * If the callback throws, the transaction rolls back and the error is rethrown.
+   */
+  withTransaction<T>(callback: () => T): T;
+}
+
 function generateId(type: RecordType): string {
   return `rec_${type}_${ulid()}`;
 }
@@ -662,6 +675,16 @@ export class SqliteStore implements Store {
     tx();
 
     return updatedRecord;
+  }
+
+
+  // ------------------------------------------------------------------
+  // transaction boundary
+  // ------------------------------------------------------------------
+
+  withTransaction<T>(callback: () => T): T {
+    this.ensureOpen();
+    return this.db!.transaction(callback)();
   }
 
   // ------------------------------------------------------------------
