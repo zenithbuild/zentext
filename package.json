@@ -38,6 +38,7 @@
   "files": [
     "dist",
     "README.md",
-    "docs/mcp.md"
+    "docs/mcp.md",
+    "!dist/proof"
   ]
 }
