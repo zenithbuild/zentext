@@ -1,0 +1,18 @@
+```json
+{
+  "understanding": {
+    "current_goal": "Add secure OAuth-based login and session management for the SaaS dashboard.",
+    "latest_decision": "Adopt OAuth 2.0 authorization code flow with PKCE for dashboard login, because it balances security with implementation complexity and avoids storing passwords.",
+    "active_task": "Task rec_task_01KY184PE1SHR6PFAPDYARZT0C (revision 7): OAuth 2.0 + PKCE dashboard auth implementation is in progress. The OAuth callback handler is scoped, the encrypted session middleware is implemented and wired into dashboard route guards, and integration test scaffolding has been started for cookie validation and unauthenticated-redirect scenarios. Remaining work is session-expiry test cases and full-suite verification against guarded dashboard routes.",
+    "next_action": "Complete the integration test suite: finish the cookie validation and unauthenticated-redirect test cases for guarded dashboard routes, add session-expiry test cases (expired and missing session cookies), then run the full integration suite to confirm route guards correctly reject expired or missing session cookies."
+  },
+  "update": {
+    "record_id": "rec_task_01KY184PE1SHR6PFAPDYARZT0C",
+    "expected_revision": 7,
+    "patch": {
+      "next": "Finalize the cookie validation and unauthenticated-redirect integration tests on guarded dashboard routes; then add session-expiry test cases covering both expired and missing session cookies; finally run the full integration suite and verify all dashboard route guards correctly reject expired or missing session cookies."
+    },
+    "reason": "Refines the 'next' field into a concrete, ordered checklist of the remaining integration test work, making the final stretch of the auth task easier to track and execute step by step without altering any other task metadata."
+  }
+}
+```

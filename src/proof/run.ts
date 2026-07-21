@@ -26,7 +26,7 @@
  */
 
 import { readFileSync, existsSync } from "node:fs";
-import { runProof } from "./harness.js";
+import { runProof, runExpandedProof } from "./harness.js";
 import { createAdapter, StubAdapter } from "./model-adapter.js";
 import type { ProviderConfig, ModelAdapter } from "./model-adapter.js";
 
@@ -47,6 +47,8 @@ function parseArgs(): {
   model?: string;
   stub?: boolean;
   outputDir?: string;
+  expanded?: boolean;
+  rounds?: number;
 } {
   const args = process.argv.slice(2);
   const result: ReturnType<typeof parseArgs> = {};
@@ -63,6 +65,12 @@ function parseArgs(): {
       i++;
     } else if (arg === "--output" && args[i + 1]) {
       result.outputDir = args[i + 1];
+      i++;
+    } else if (arg === "--expanded") {
+      result.expanded = true;
+    } else if (arg === "--rounds" && args[i + 1]) {
+      const n = Number(args[i + 1]);
+      result.rounds = isNaN(n) ? undefined : n;
       i++;
     } else if (arg === "--stub") {
       result.stub = true;
@@ -233,11 +241,18 @@ async function main() {
   }
 
   const outputDir = args.outputDir ?? "proof-results";
-  const report = await runProof({ adapters, skippedModels, outputDir });
 
-  const availableCount = report.models.filter((m) => m.available).length;
-  console.log(`Proof complete. ${availableCount}/${report.models.length} model(s) evaluated.`);
-  console.log(`Artifacts: ${outputDir}/`);
+  if (args.expanded) {
+    const report = await runExpandedProof({ adapters, skippedModels, rounds: args.rounds, outputDir });
+    const availableCount = report.models.filter((m) => m.available).length;
+    console.log(`Expanded proof complete. ${availableCount}/${report.models.length} model(s) evaluated.`);
+    console.log(`Artifacts: ${outputDir}/`);
+  } else {
+    const report = await runProof({ adapters, skippedModels, outputDir });
+    const availableCount = report.models.filter((m) => m.available).length;
+    console.log(`Proof complete. ${availableCount}/${report.models.length} model(s) evaluated.`);
+    console.log(`Artifacts: ${outputDir}/`);
+  }
 }
 
 main().catch((err) => {
