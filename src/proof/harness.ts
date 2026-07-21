@@ -1,9 +1,9 @@
 /**
  * Stage 3 multi-agent collaboration proof harness.
  *
- * Uses the existing Zentext write domain and repack engine. No new Zentext
- * behavior is added here; this file only orchestrates model interactions and
- * evaluates their outputs.
+ * Execution-only: orchestrates model interactions, captures prompts,
+ * responses, and Zentext state, then produces a report.
+ * Evaluation and scoring are performed by a separate reviewer.
  */
 
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -18,6 +18,7 @@ import type { AnyRecord, CreateRecordInput } from "../types/records.js";
 import type { ModelAdapter } from "./model-adapter.js";
 import {
   sharedSystem,
+  agentACreatePrompt,
   agentBContinuePrompt,
   agentCStalePrompt,
   agentDSummarizePrompt,
@@ -28,77 +29,45 @@ import {
 // Types
 // ---------------------------------------------------------------------------
 
-export interface AgentAOutput {
-  task: CreateRecordInput;
-  decision: CreateRecordInput;
-  handoff: CreateRecordInput;
-}
-
-export interface Understanding {
-  current_goal?: string;
-  latest_decision?: string;
-  active_task?: string;
-  next_action?: string;
-}
-
-export interface ProposedUpdate {
-  record_id?: string;
-  expected_revision?: number;
-  patch?: Record<string, unknown>;
-  reason?: string;
-}
-
-export interface AgentBOutput {
-  understanding: Understanding;
-  update: ProposedUpdate;
-}
-
-export interface AgentCOutput {
-  update: ProposedUpdate;
-}
-
-export interface AgentDOutput {
-  current_state?: string;
-  completed_work?: string;
-  rejected_stale_work?: string;
-  next_implementation_step?: string;
-}
-
-export interface PerModelResult {
-  name: string;
-  agentA: { success: boolean; error?: string; records?: AgentASeed };
-  agentB: {
-    success: boolean;
-    error?: string;
-    understanding?: Understanding;
-    update?: ProposedUpdate;
+export interface AgentRun {
+  role: "A" | "B" | "C" | "D";
+  system: string;
+  prompt: string;
+  response: string;
+  parsed: unknown;
+  stateBefore?: string;
+  stateAfter?: unknown;
+  mutation?: {
+    attempted: boolean;
     applied: boolean;
-    conflict?: boolean;
-  };
-  agentC: {
-    success: boolean;
-    error?: string;
-    update?: ProposedUpdate;
     conflict: boolean;
-    mutationOccurred: boolean;
+    error?: string;
   };
-  agentD: { success: boolean; error?: string; summary?: AgentDOutput };
+  error?: string;
+}
+
+export interface ModelRun {
+  name: string;
+  provider: string;
+  model: string;
+  runs: AgentRun[];
 }
 
 export interface ProofReport {
   projectId: string;
-  models: PerModelResult[];
-  agreement: {
-    currentGoal: string[];
-    latestDecision: string[];
-    activeTask: string[];
-  };
-  verdict: {
-    preservedEnoughContext: boolean;
-    freshAgentsCouldContinue: boolean;
-    staleInformationIsolated: boolean;
-    modelsAgreed: boolean;
-  };
+  projectName: string;
+  seededAt: string;
+  models: ModelRun[];
+}
+
+export interface RunProofOptions {
+  adapters: ModelAdapter[];
+  /** If provided, use this directory as the project root. Otherwise a temp dir is created. */
+  projectPath?: string;
+  /** If provided, use this directory as HOME. Otherwise a temp dir is created. */
+  homePath?: string;
+  /** If provided, write the markdown report here. */
+  reportPath?: string;
 }
 
 interface AgentASeed {
@@ -111,16 +80,6 @@ interface AgentASeed {
 // Orchestration
 // ---------------------------------------------------------------------------
 
-export interface RunProofOptions {
-  adapters: ModelAdapter[];
-  /** If provided, use this directory as the project root. Otherwise a temp dir is created. */
-  projectPath?: string;
-  /** If provided, use this directory as HOME. Otherwise a temp dir is created. */
-  homePath?: string;
-  /** If provided, write the markdown report here. */
-  reportPath?: string;
-}
-
 export async function runProof(options: RunProofOptions): Promise<ProofReport> {
   const home = options.homePath ?? mkdtempSync(join(tmpdir(), "zentext-stage3-"));
   const project = options.projectPath ?? mkdtempSync(join(tmpdir(), "zentext-stage3-proj-"));
@@ -132,23 +91,15 @@ export async function runProof(options: RunProofOptions): Promise<ProofReport> {
   const meta = await store.initProjectStore(project);
   const writer = createMemoryWriter(store);
 
-  const modelResults: PerModelResult[] = [];
-  const understandings: Record<string, Understanding> = {};
-  const summaries: Record<string, AgentDOutput> = {};
+  const modelRuns: ModelRun[] = [];
 
   try {
     // Agent A seed (same for all models to keep evaluation comparable)
     const seed = await seedProject(writer);
 
     for (const adapter of options.adapters) {
-      const result = await runModel(adapter, store, writer, seed, meta);
-      modelResults.push(result);
-      if (result.agentB.understanding) {
-        understandings[adapter.name] = result.agentB.understanding;
-      }
-      if (result.agentD.summary) {
-        summaries[adapter.name] = result.agentD.summary;
-      }
+      const run = await runModel(adapter, store, writer, seed, meta);
+      modelRuns.push(run);
     }
   } finally {
     store.close();
@@ -159,9 +110,9 @@ export async function runProof(options: RunProofOptions): Promise<ProofReport> {
 
   const report: ProofReport = {
     projectId: meta.projectId,
-    models: modelResults,
-    agreement: computeAgreement(understandings),
-    verdict: computeVerdict(modelResults, understandings),
+    projectName: meta.projectName,
+    seededAt: new Date().toISOString(),
+    models: modelRuns,
   };
 
   if (options.reportPath) {
@@ -210,156 +161,159 @@ async function runModel(
   writer: ReturnType<typeof createMemoryWriter>,
   seed: AgentASeed,
   meta: { projectName: string; projectId: string },
-): Promise<PerModelResult> {
-  const result: PerModelResult = {
+): Promise<ModelRun> {
+  const run: ModelRun = {
     name: adapter.name,
-    agentA: { success: false, records: seed },
-    agentB: { success: false, applied: false },
-    agentC: { success: false, conflict: false, mutationOccurred: true },
-    agentD: { success: false },
+    provider: adapter.provider,
+    model: adapter.model,
+    runs: [],
   };
 
-  // Agent A is seeded deterministically so every model is evaluated against the same project state.
-  result.agentA.success = true;
+  // Agent A — deterministic seed, captured as an artifact for traceability.
+  const agentA: AgentRun = {
+    role: "A",
+    system: sharedSystem,
+    prompt: agentACreatePrompt(),
+    response: JSON.stringify({ task: seed.task, decision: seed.decision, handoff: seed.handoff }, null, 2),
+    parsed: { task: seed.task, decision: seed.decision, handoff: seed.handoff },
+    stateAfter: { task: seed.task, decision: seed.decision, handoff: seed.handoff },
+  };
+  run.runs.push(agentA);
 
+  // Agent B
+  const contextB = repack(store, meta).markdown;
   let staleContext = "";
   let taskBeforeC = seed.task;
 
-  // Agent B
-  try {
-    const contextB = repack(store, meta).markdown;
-    const rawB = await adapter.send(sharedSystem, agentBContinuePrompt(contextB));
-    const contextualizedB = rawB.replace(/rec_task_PLACEHOLDER/g, seed.task.id);
-    const parsedB = extractJson(contextualizedB) as AgentBOutput;
-    result.agentB.success = true;
-    result.agentB.understanding = parsedB.understanding;
-    result.agentB.update = parsedB.update;
+  const agentB: AgentRun = {
+    role: "B",
+    system: sharedSystem,
+    prompt: agentBContinuePrompt(contextB),
+    stateBefore: contextB,
+    response: "",
+    parsed: {},
+  };
+  run.runs.push(agentB);
 
-    // Capture stale context BEFORE applying Agent B's update so Agent C sees truly outdated information.
+  try {
+    const rawB = await adapter.send(sharedSystem, agentB.prompt);
+    const contextualizedB = rawB.replace(/rec_task_PLACEHOLDER/g, seed.task.id);
+    agentB.response = contextualizedB;
+    agentB.parsed = extractJson(contextualizedB);
+
+    // Capture stale context BEFORE applying Agent B's update so Agent C sees
+    // genuinely outdated information.
     staleContext = repack(store, meta).markdown;
     taskBeforeC = store.getRecord(seed.task.id)!;
+
+    const parsedB = agentB.parsed as {
+      understanding?: unknown;
+      update?: {
+        record_id?: string;
+        expected_revision?: number;
+        patch?: Record<string, unknown>;
+      };
+    };
+
+    agentB.mutation = { attempted: false, applied: false, conflict: false };
 
     if (
       parsedB.update?.record_id &&
       typeof parsedB.update.expected_revision === "number" &&
       parsedB.update.patch
     ) {
+      agentB.mutation.attempted = true;
       try {
         writer.updateRecord(parsedB.update.record_id, parsedB.update.patch, {
           expectedRevision: parsedB.update.expected_revision,
           author: adapter.name,
         });
-        result.agentB.applied = true;
+        agentB.mutation.applied = true;
+        agentB.stateAfter = { task: store.getRecord(seed.task.id) };
       } catch (err) {
         if (err instanceof MemoryWriterConflictError) {
-          result.agentB.conflict = true;
+          agentB.mutation.conflict = true;
         } else {
-          result.agentB.error = err instanceof Error ? err.message : String(err);
+          agentB.mutation.error = err instanceof Error ? err.message : String(err);
         }
       }
     }
   } catch (err) {
-    result.agentB.error = err instanceof Error ? err.message : String(err);
+    agentB.error = err instanceof Error ? err.message : String(err);
   }
 
   // Agent C
+  const agentC: AgentRun = {
+    role: "C",
+    system: sharedSystem,
+    prompt: agentCStalePrompt(staleContext, taskBeforeC.revision),
+    stateBefore: staleContext,
+    response: "",
+    parsed: {},
+  };
+  run.runs.push(agentC);
+
   try {
-    const rawC = await adapter.send(
-      sharedSystem,
-      agentCStalePrompt(staleContext, taskBeforeC.revision),
-    );
+    const rawC = await adapter.send(sharedSystem, agentC.prompt);
     const contextualizedC = rawC.replace(/rec_task_PLACEHOLDER/g, seed.task.id);
-    const parsedC = extractJson(contextualizedC) as AgentCOutput;
-    result.agentC.success = true;
-    result.agentC.update = parsedC.update;
+    agentC.response = contextualizedC;
+    agentC.parsed = extractJson(contextualizedC);
+
+    const parsedC = agentC.parsed as {
+      update?: {
+        record_id?: string;
+        expected_revision?: number;
+        patch?: Record<string, unknown>;
+      };
+    };
+
+    agentC.mutation = { attempted: false, applied: false, conflict: false };
 
     if (
       parsedC.update?.record_id &&
       typeof parsedC.update.expected_revision === "number" &&
       parsedC.update.patch
     ) {
+      agentC.mutation.attempted = true;
       try {
         writer.updateRecord(parsedC.update.record_id, parsedC.update.patch, {
           expectedRevision: parsedC.update.expected_revision,
           author: `${adapter.name}:stale`,
         });
-        result.agentC.mutationOccurred = true;
+        agentC.mutation.applied = true;
       } catch (err) {
         if (err instanceof MemoryWriterConflictError) {
-          result.agentC.conflict = true;
-          result.agentC.mutationOccurred = false;
+          agentC.mutation.conflict = true;
         } else {
-          result.agentC.error = err instanceof Error ? err.message : String(err);
+          agentC.mutation.error = err instanceof Error ? err.message : String(err);
         }
       }
     }
   } catch (err) {
-    result.agentC.error = err instanceof Error ? err.message : String(err);
+    agentC.error = err instanceof Error ? err.message : String(err);
   }
 
   // Agent D
+  const contextD = repack(store, meta).markdown;
+  const agentD: AgentRun = {
+    role: "D",
+    system: sharedSystem,
+    prompt: agentDSummarizePrompt(contextD),
+    stateBefore: contextD,
+    response: "",
+    parsed: {},
+  };
+  run.runs.push(agentD);
+
   try {
-    const contextD = repack(store, meta).markdown;
-    const rawD = await adapter.send(sharedSystem, agentDSummarizePrompt(contextD));
-    const parsedD = extractJson(rawD) as AgentDOutput;
-    result.agentD.success = true;
-    result.agentD.summary = parsedD;
+    const rawD = await adapter.send(sharedSystem, agentD.prompt);
+    agentD.response = rawD;
+    agentD.parsed = extractJson(rawD);
   } catch (err) {
-    result.agentD.error = err instanceof Error ? err.message : String(err);
+    agentD.error = err instanceof Error ? err.message : String(err);
   }
 
-  return result;
-}
-
-// ---------------------------------------------------------------------------
-// Evaluation helpers
-// ---------------------------------------------------------------------------
-
-function computeAgreement(understandings: Record<string, Understanding>): ProofReport["agreement"] {
-  const goals = Object.values(understandings)
-    .map((u) => u.current_goal?.toLowerCase().trim())
-    .filter((g): g is string => Boolean(g));
-  const decisions = Object.values(understandings)
-    .map((u) => u.latest_decision?.toLowerCase().trim())
-    .filter((d): d is string => Boolean(d));
-  const tasks = Object.values(understandings)
-    .map((u) => u.active_task?.toLowerCase().trim())
-    .filter((t): t is string => Boolean(t));
-
-  return {
-    currentGoal: [...new Set(goals)],
-    latestDecision: [...new Set(decisions)],
-    activeTask: [...new Set(tasks)],
-  };
-}
-
-function computeVerdict(
-  models: PerModelResult[],
-  understandings: Record<string, Understanding>,
-): ProofReport["verdict"] {
-  const understandingCount = Object.keys(understandings).length;
-  const allUnderstood = understandingCount === models.length;
-
-  const continuation = models.every(
-    (m) => m.agentB.success && m.agentB.applied,
-  );
-
-  const staleIsolated = models.every(
-    (m) => m.agentC.success && !m.agentC.mutationOccurred,
-  );
-
-  const agreement = computeAgreement(understandings);
-  const modelsAgreed =
-    agreement.currentGoal.length <= 2 &&
-    agreement.latestDecision.length <= 2 &&
-    agreement.activeTask.length <= 2;
-
-  return {
-    preservedEnoughContext: allUnderstood,
-    freshAgentsCouldContinue: continuation,
-    staleInformationIsolated: staleIsolated,
-    modelsAgreed,
-  };
+  return run;
 }
 
 // ---------------------------------------------------------------------------
@@ -370,65 +324,93 @@ export function renderReport(report: ProofReport): string {
   const lines: string[] = [
     "# Stage 3 Multi-Agent Collaboration Proof",
     "",
+    `Project: ${report.projectName}`,
     `Project ID: ${report.projectId}`,
+    `Seeded at: ${report.seededAt}`,
     "",
-    "## Verdict",
+    "## Overview",
     "",
-    `| Question | Answer |`,
-    `|---|---|`,
-    `| Did Zentext preserve enough context? | ${report.verdict.preservedEnoughContext ? "Yes" : "No"} |`,
-    `| Could fresh agents continue work? | ${report.verdict.freshAgentsCouldContinue ? "Yes" : "No"} |`,
-    `| Was stale information isolated? | ${report.verdict.staleInformationIsolated ? "Yes" : "No"} |`,
-    `| Did models reach approximately the same understanding? | ${report.verdict.modelsAgreed ? "Yes" : "No"} |`,
+    "This report contains only raw execution artifacts: prompts sent to each model, raw responses, parsed responses, and Zentext state snapshots before and after each mutation attempt.",
     "",
-    "## Agreement",
-    "",
-    `- Current goal variants: ${report.agreement.currentGoal.length}`,
-    `- Latest decision variants: ${report.agreement.latestDecision.length}`,
-    `- Active task variants: ${report.agreement.activeTask.length}`,
+    "Evaluation, scoring, and the final six-question verdict must be performed by a separate human or model reviewer.",
     "",
   ];
 
-  for (const m of report.models) {
-    lines.push(`## Model: ${m.name}`, "");
-    lines.push("### Agent B — continuation");
-    if (m.agentB.success) {
-      lines.push(`- understanding: ${JSON.stringify(m.agentB.understanding)}`);
-      lines.push(`- update applied: ${m.agentB.applied}`);
-      lines.push(`- conflict: ${m.agentB.conflict ?? false}`);
-    } else {
-      lines.push(`- error: ${m.agentB.error}`);
-    }
+  for (const model of report.models) {
+    lines.push(`## Model: ${model.name}`, "");
+    lines.push(`- Provider: ${model.provider}`);
+    lines.push(`- Model: ${model.model}`);
     lines.push("");
-    lines.push("### Agent C — stale attempt");
-    if (m.agentC.success) {
-      lines.push(`- conflict detected: ${m.agentC.conflict}`);
-      lines.push(`- mutation occurred: ${m.agentC.mutationOccurred}`);
-    } else {
-      lines.push(`- error: ${m.agentC.error}`);
-    }
-    lines.push("");
-    lines.push("### Agent D — fresh summary");
-    if (m.agentD.success) {
-      lines.push(`- summary: ${JSON.stringify(m.agentD.summary)}`);
-    } else {
-      lines.push(`- error: ${m.agentD.error}`);
-    }
-    lines.push("");
-  }
 
-  lines.push(
-    "## Manual review required",
-    "",
-    "The automated verdict answers questions 1-4. Questions 5 and 6 require human review of the per-model evidence above.",
-    "",
-    "5. What information was consistently missing?",
-    "   - Compare each model's understanding and summary. Fields or concepts absent across most models indicate gaps in the repack output or in the models' ability to extract it.",
-    "",
-    "6. What is the minimum improvement required before the next phase?",
-    "   - Identify the smallest change that would turn any failing or ambiguous verdict into a pass, or the smallest documentation/schema change that would reduce cross-model disagreement.",
-    "",
-  );
+    for (const run of model.runs) {
+      lines.push(`### Agent ${run.role}`, "");
+
+      if (run.error) {
+        lines.push(`**Error:** ${run.error}`);
+        lines.push("");
+        continue;
+      }
+
+      if (run.mutation) {
+        lines.push(`- Mutation attempted: ${run.mutation.attempted}`);
+        lines.push(`- Mutation applied: ${run.mutation.applied}`);
+        lines.push(`- Conflict detected: ${run.mutation.conflict}`);
+        if (run.mutation.error) {
+          lines.push(`- Mutation error: ${run.mutation.error}`);
+        }
+        lines.push("");
+      }
+
+      if (run.stateBefore) {
+        lines.push("<details>");
+        lines.push("<summary>Zentext context before this agent</summary>");
+        lines.push("");
+        lines.push("```markdown");
+        lines.push(run.stateBefore);
+        lines.push("```");
+        lines.push("</details>");
+        lines.push("");
+      }
+
+      lines.push("<details>");
+      lines.push("<summary>Prompt</summary>");
+      lines.push("");
+      lines.push("```text");
+      lines.push(run.prompt);
+      lines.push("```");
+      lines.push("</details>");
+      lines.push("");
+
+      lines.push("<details>");
+      lines.push("<summary>Raw response</summary>");
+      lines.push("");
+      lines.push("```text");
+      lines.push(run.response);
+      lines.push("```");
+      lines.push("</details>");
+      lines.push("");
+
+      lines.push("<details>");
+      lines.push("<summary>Parsed response</summary>");
+      lines.push("");
+      lines.push("```json");
+      lines.push(JSON.stringify(run.parsed, null, 2));
+      lines.push("```");
+      lines.push("</details>");
+      lines.push("");
+
+      if (run.stateAfter) {
+        lines.push("<details>");
+        lines.push("<summary>Zentext state after this agent</summary>");
+        lines.push("");
+        lines.push("```json");
+        lines.push(JSON.stringify(run.stateAfter, null, 2));
+        lines.push("```");
+        lines.push("</details>");
+        lines.push("");
+      }
+    }
+  }
 
   return lines.join("\n");
 }

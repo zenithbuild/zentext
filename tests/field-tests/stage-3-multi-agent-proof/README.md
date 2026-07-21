@@ -4,12 +4,31 @@ This directory contains a reproducible field test that evaluates whether
 Zentext enables multiple independent models to collaborate on the same project
 without shared conversation history.
 
+## Design
+
+This proof is **execution-only**. The harness:
+
+1. Seeds a realistic project state (Agent A).
+2. Runs each configured model through Agent B, C, and D in fresh sessions.
+3. Captures every prompt, raw response, parsed response, and Zentext state snapshot.
+4. Writes a Markdown report with all artifacts.
+
+**Evaluation and scoring are intentionally separate.** A reviewer (human or model)
+reads the report and answers the six verdict questions. The harness itself does
+not judge model outputs.
+
 ## Scope
 
 - No new Zentext features.
 - No new CLI or MCP tools.
 - Uses only the existing write domain, read paths, and repack engine.
 - A thin model-adapter harness provides the evaluation plumbing.
+
+## Providers
+
+Ollama is the default provider. The harness also supports any OpenAI-compatible
+endpoint via the `openai` provider, but no API-key-specific branching is built
+in.
 
 ## How to run
 
@@ -18,38 +37,69 @@ without shared conversation history.
    npm run build
    ```
 
-2. Run with real models by setting API keys:
+2. Start Ollama:
    ```bash
-   GLM_API_KEY=... KIMI_API_KEY=... MINIMAX_API_KEY=... QWEN_API_KEY=... \
-     node /absolute/path/to/dist/proof/run.js
+   ollama serve
    ```
 
-   Adapters use the OpenAI-compatible chat-completions endpoint for each
-   provider. Model names and endpoints are configured in `src/proof/run.ts`.
-
-3. Run the stub dry-run when no keys are available:
+3. Run with the default model list:
    ```bash
    node /absolute/path/to/dist/proof/run.js
    ```
-   This verifies the harness and scoring logic but does not call external APIs.
+
+   The default list is:
+   - `qwen3:latest`
+   - `kimi-k2`
+   - `glm4`
+   - `minimax-m1`
+
+   You only need the models you want to test to be available locally.
+
+4. Run with a custom JSON config:
+   ```bash
+   node /absolute/path/to/dist/proof/run.js --config proof.config.json
+   ```
+
+   Example `proof.config.json`:
+   ```json
+   {
+     "models": [
+       { "name": "qwen3", "provider": "ollama", "model": "qwen3:latest" },
+       { "name": "kimi", "provider": "ollama", "model": "kimi-k2" },
+       { "name": "glm", "provider": "ollama", "model": "glm4" },
+       { "name": "minimax", "provider": "ollama", "model": "minimax-m1" }
+     ]
+   }
+   ```
+
+5. Run a single model quickly:
+   ```bash
+   node /absolute/path/to/dist/proof/run.js --provider ollama --model qwen3:latest
+   ```
+
+6. Run the stub dry-run when no models are available:
+   ```bash
+   node /absolute/path/to/dist/proof/run.js --stub
+   ```
+   This verifies the harness and artifact collection but does not call external APIs.
 
 ## What it measures
 
 For each configured model:
 
-- Agent B: can it recover the current goal, latest decision, active task, and
-  propose a valid continuation?
-- Agent C: does an outdated update get rejected by optimistic concurrency with
-  zero mutation?
-- Agent D: can it summarize current state, completed work, rejected stale work,
-  and the next step?
+- **Agent A:** deterministic seed of an active task, accepted decision, and latest handoff.
+- **Agent B:** can it recover the current goal, latest decision, active task, and propose a valid continuation?
+- **Agent C:** does an outdated update get rejected by optimistic concurrency with zero mutation?
+- **Agent D:** can it summarize current state, completed work, rejected stale work, and the next step?
 
 ## Output
 
-The harness prints a verdict object and writes `stage-3-proof-report.md` in the
-working directory.
+The harness prints the number of models evaluated and writes
+`stage-3-proof-report.md` in the working directory. The report contains the raw
+artifacts only; a reviewer produces the final verdict.
 
-## Extending to new models
+## Adding models
 
-Add a new `OpenAICompatibleAdapter` in `src/proof/run.ts` with the provider's
-base URL, model name, and environment variable key.
+No code changes are required. Add an entry to `proof.config.json` (or the
+default config in `src/proof/run.ts`) with the provider, model name, and
+optional `baseURL`.

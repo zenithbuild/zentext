@@ -1,7 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { extractJson } from "../src/proof/prompts.js";
+import { mkdtempSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 
-describe("proof harness — JSON extraction", () => {
+import { extractJson } from "../src/proof/prompts.js";
+import { runProof } from "../src/proof/harness.js";
+import { StubAdapter } from "../src/proof/model-adapter.js";
+
+describe("proof harness - JSON extraction", () => {
   it("parses raw JSON", () => {
     const out = extractJson(`{"a":1}`);
     expect(out).toEqual({ a: 1 });
@@ -22,14 +28,8 @@ describe("proof harness — JSON extraction", () => {
   });
 });
 
-import { mkdtempSync, rmSync } from "node:fs";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
-import { runProof } from "../src/proof/harness.js";
-import { StubAdapter } from "../src/proof/model-adapter.js";
-
-describe("proof harness — stub dry-run", () => {
-  it("runs the full multi-agent proof with a stub model", async () => {
+describe("proof harness - stub dry-run", () => {
+  it("runs the full multi-agent proof and captures all artifacts", async () => {
     const home = mkdtempSync(join(tmpdir(), "zentext-proof-harness-"));
     const originalHome = process.env.HOME ?? "";
     process.env.HOME = home;
@@ -92,11 +92,26 @@ describe("proof harness — stub dry-run", () => {
     });
 
     const report = await runProof({ adapters: [stub] });
-    expect(report.verdict.preservedEnoughContext).toBe(true);
-    expect(report.verdict.freshAgentsCouldContinue).toBe(true);
-    expect(report.verdict.staleInformationIsolated).toBe(true);
-    expect(report.models[0].agentB.applied).toBe(true);
-    expect(report.models[0].agentC.conflict).toBe(true);
+    expect(report.models).toHaveLength(1);
+    expect(report.models[0].provider).toBe("stub");
+    expect(report.models[0].model).toBe("stub");
+    expect(report.models[0].runs).toHaveLength(4);
+
+    const [agentA, agentB, agentC, agentD] = report.models[0].runs;
+    expect(agentA.role).toBe("A");
+    expect(agentA.parsed).toBeDefined();
+
+    expect(agentB.role).toBe("B");
+    expect(agentB.mutation?.attempted).toBe(true);
+    expect(agentB.mutation?.applied).toBe(true);
+
+    expect(agentC.role).toBe("C");
+    expect(agentC.mutation?.attempted).toBe(true);
+    expect(agentC.mutation?.applied).toBe(false);
+    expect(agentC.mutation?.conflict).toBe(true);
+
+    expect(agentD.role).toBe("D");
+    expect(agentD.parsed).toBeDefined();
 
     process.env.HOME = originalHome;
     rmSync(home, { recursive: true, force: true });

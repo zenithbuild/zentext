@@ -3,72 +3,104 @@
  * CLI entry point for the Stage 3 multi-agent proof.
  *
  * Usage:
- *   GLM_API_KEY=... KIMI_API_KEY=... MINIMAX_API_KEY=... QWEN_API_KEY=... node dist/proof/run.js
+ *   # Default: use built-in Ollama model list
+ *   ollama serve
+ *   node dist/proof/run.js
  *
- * If no API keys are provided, the harness runs in stub mode as a dry-run.
+ *   # Custom model list via JSON config
+ *   node dist/proof/run.js --config proof.config.json
+ *
+ *   # Single Ollama model
+ *   node dist/proof/run.js --provider ollama --model qwen3:latest
+ *
+ *   # Stub dry-run (no model calls)
+ *   node dist/proof/run.js --stub
+ *
+ * Config file shape (JSON):
+ *   {
+ *     "models": [
+ *       { "name": "qwen3", "provider": "ollama", "model": "qwen3:latest" },
+ *       { "name": "kimi", "provider": "ollama", "model": "kimi-k2" }
+ *     ]
+ *   }
  */
 
+import { readFileSync, existsSync } from "node:fs";
 import { runProof } from "./harness.js";
-import { OpenAICompatibleAdapter, StubAdapter } from "./model-adapter.js";
+import { createAdapter, StubAdapter } from "./model-adapter.js";
+import type { ProviderConfig } from "./model-adapter.js";
 
-function env(key: string): string | undefined {
-  return process.env[key];
+const DEFAULT_CONFIG: { models: ProviderConfig[] } = {
+  models: [
+    { name: "qwen3", provider: "ollama", model: "qwen3:latest" },
+    { name: "kimi", provider: "ollama", model: "kimi-k2" },
+    { name: "glm", provider: "ollama", model: "glm4" },
+    { name: "minimax", provider: "ollama", model: "minimax-m1" },
+  ],
+};
+
+function parseArgs(): {
+  configPath?: string;
+  provider?: string;
+  model?: string;
+  stub?: boolean;
+} {
+  const args = process.argv.slice(2);
+  const result: ReturnType<typeof parseArgs> = {};
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === "--config" && args[i + 1]) {
+      result.configPath = args[i + 1];
+      i++;
+    } else if (arg === "--provider" && args[i + 1]) {
+      result.provider = args[i + 1];
+      i++;
+    } else if (arg === "--model" && args[i + 1]) {
+      result.model = args[i + 1];
+      i++;
+    } else if (arg === "--stub") {
+      result.stub = true;
+    }
+  }
+  return result;
 }
 
-function buildAdapters() {
-  const adapters = [];
-
-  if (env("GLM_API_KEY")) {
-    adapters.push(
-      new OpenAICompatibleAdapter({
-        name: "GLM",
-        apiKey: env("GLM_API_KEY")!,
-        baseURL: "https://open.bigmodel.cn/api/paas/v4",
-        model: "glm-4-flash",
-        jsonMode: true,
-      }),
-    );
+function loadConfig(args: ReturnType<typeof parseArgs>): { models: ProviderConfig[] } {
+  if (args.provider && args.model) {
+    return {
+      models: [
+        {
+          name: args.model,
+          provider: args.provider as "ollama" | "openai",
+          model: args.model,
+        },
+      ],
+    };
   }
-
-  if (env("KIMI_API_KEY")) {
-    adapters.push(
-      new OpenAICompatibleAdapter({
-        name: "Kimi",
-        apiKey: env("KIMI_API_KEY")!,
-        baseURL: "https://api.moonshot.cn/v1",
-        model: "moonshot-v1-8k",
-        jsonMode: true,
-      }),
-    );
+  if (args.configPath) {
+    const raw = readFileSync(args.configPath, "utf8");
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed.models)) {
+      throw new Error("Config file must contain a 'models' array");
+    }
+    return parsed;
   }
-
-  if (env("MINIMAX_API_KEY")) {
-    adapters.push(
-      new OpenAICompatibleAdapter({
-        name: "MiniMax",
-        apiKey: env("MINIMAX_API_KEY")!,
-        baseURL: "https://api.minimax.chat/v1",
-        model: "abab6.5-chat",
-        jsonMode: true,
-      }),
-    );
+  const cwdDefault = "proof.config.json";
+  if (existsSync(cwdDefault)) {
+    const raw = readFileSync(cwdDefault, "utf8");
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed.models)) {
+      throw new Error("Config file must contain a 'models' array");
+    }
+    return parsed;
   }
+  return DEFAULT_CONFIG;
+}
 
-  if (env("QWEN_API_KEY")) {
-    adapters.push(
-      new OpenAICompatibleAdapter({
-        name: "Qwen",
-        apiKey: env("QWEN_API_KEY")!,
-        baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1",
-        model: "qwen-turbo",
-        jsonMode: true,
-      }),
-    );
-  }
-
-  if (adapters.length === 0) {
-    console.error("No API keys found. Running stub dry-run.");
-    adapters.push(
+function buildAdapters(config: { models: ProviderConfig[] }, forceStub: boolean) {
+  if (forceStub || config.models.length === 0) {
+    console.error("No models configured or --stub requested. Running stub dry-run.");
+    return [
       new StubAdapter("Stub", {
         agentA: JSON.stringify({
           task: {
@@ -126,16 +158,23 @@ function buildAdapters() {
           next_implementation_step: "Wire OAuth callback handler and session store.",
         }),
       }),
-    );
+    ];
   }
-
-  return adapters;
+  return config.models.map(createAdapter);
 }
 
 async function main() {
-  const adapters = buildAdapters();
-  const report = await runProof({ adapters, reportPath: "tests/field-tests/stage-3-multi-agent-proof/stage-3-proof-report.md" });
-  console.log(report.verdict);
+  const args = parseArgs();
+  const config = loadConfig(args);
+  const adapters = buildAdapters(config, args.stub ?? false);
+  const report = await runProof({
+    adapters,
+    reportPath: "tests/field-tests/stage-3-multi-agent-proof/stage-3-proof-report.md",
+  });
+  console.log(`Proof complete. ${report.models.length} model(s) evaluated.`);
+  console.log(
+    `Report: tests/field-tests/stage-3-multi-agent-proof/stage-3-proof-report.md`,
+  );
 }
 
 main().catch((err) => {
