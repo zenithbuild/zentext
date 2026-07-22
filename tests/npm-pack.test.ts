@@ -90,7 +90,7 @@ describe("npm package validation", () => {
 
   it("produces a tarball from npm pack", () => {
     expect(existsSync(tarballPath)).toBe(true);
-    expect(basename(tarballPath)).toMatch(/^zentext-\d+\.\d+\.\d+\.tgz$/);
+    expect(basename(tarballPath)).toMatch(/^zentext-\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?\.tgz$/);
   });
 
   it("tarball does not include dist/proof", () => {

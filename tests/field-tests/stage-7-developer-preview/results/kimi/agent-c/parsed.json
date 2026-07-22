@@ -1,22 +1,22 @@
 {
   "understanding": {
-    "current_goal": "Trace Zenith CSS determinism contract claims to implementation",
-    "latest_decision": "Compiler pre-sorts CSS blocks by dependency depth before process_css is called (accepted)",
-    "active_task": "rec_task_01KY3JQXBE2YZJKV7JXVA2HGV0 (revision 3)",
-    "next_action": "Obtain read access to packages/compiler source files, then inspect CSS block emission, CRLF normalization, and duplicate validation"
+    "current_goal": "Trace Zenith CSS determinism contract to implementation, specifically the origin/population of compiled.style_blocks and graph-wide CSS collection.",
+    "latest_decision": "CSS blocks are ordered by dependency depth via compiler topological sort (accepted).",
+    "active_task": "Verify CSS determinism contract — rec_task_01KY3Y896HCXNDZFBHWXQFHV2N, revision 3",
+    "next_action": "Trace how compiled.style_blocks is populated and how the CSS cache / loader collect graph-wide style blocks, using only files listed in the repository evidence."
   },
   "review": {
     "repeated_work": false,
     "invented_work": false,
     "zenith_files_modified": false,
     "scope_drift": false,
-    "notes": "Agent B only acknowledged the handoff and recorded the file-access blocker. No source inspection was performed, no Zenith files were changed, and no out-of-scope work was added. The accepted compiler pre-sort decision remains aligned with the determinism verification goal."
+    "notes": "The previous agent’s finding is supported: DETERMINISM.md §1.3 mandates a hard fail when the ZENITH_STYLES_ANCHOR is missing/multiple/malformed, but the listed implementation files contain fallback paths that contradict it. In bundler_html_emit.rs, inject_stylesheet_link_once permits zero anchors when exactly one existing stylesheet link is present and injects the link into <head>. In bundle.rs, the process_css error branch for missing anchors is caught when graph style blocks exist but the entry page had none; it then emits CSS using a synthetic anchor while returning the original, anchor-less HTML. No source files were modified in the listed evidence. The remaining gap is the next action: the provided files do not show compiled.style_blocks being populated by the compiler/loader or the CSS cache collecting graph-wide blocks. zenith_loader.rs stores compiled outputs and reads from CssCache but does not implement collection; bundle.rs falls back to extracting <style> blocks directly from raw .zen source files via regex and orders them with a DFS post-order over source imports. That is an observation, not an invented conclusion."
   },
   "stale_attempt": {
-    "record_id": "rec_task_01KY3JQXBE2YZJKV7JXVA2HGV0",
-    "expected_revision": 1,
+    "record_id": "rec_task_01KY3Y896HCXNDZFBHWXQFHV2N",
+    "expected_revision": 2,
     "patch": {
-      "next": "Inspect CSS block emission before confirming the compiler pre-sort ordering decision"
+      "next": "Assess strict anchor enforcement against bundle.rs and bundler_html_emit.rs (completed; contradiction with DETERMINISM.md §1.3 confirmed)"
     }
   }
 }

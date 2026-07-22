@@ -21,27 +21,45 @@ import {
 } from "../handoff.js";
 import { OllamaAdapter } from "./model-adapter.js";
 import { extractJson } from "./prompts.js";
+function parseResponse(response: string, fallbackPath?: string): Record<string, unknown> {
+  try {
+    return extractJson(response) as Record<string, unknown>;
+  } catch (err) {
+    if (fallbackPath) {
+      try {
+        const fromDisk = readFileSync(fallbackPath, "utf8");
+        return extractJson(fromDisk) as Record<string, unknown>;
+      } catch {
+        // fall through to original error
+      }
+    }
+    throw err;
+  }
+}
+
+
+
+const REPOSITORY_FILES = [
+  "contracts/DETERMINISM.md",
+  "packages/bundler/src/utils.rs",
+  "packages/bundler/src/bundler_html_emit.rs",
+  "packages/bundler/tests/css_determinism.rs",
+  "packages/bundler/src/plugin/zenith_loader.rs",
+  "packages/bundler/src/bundle.rs",
+  "AGENTS.md",
+];
 
 const SHARED_SYSTEM = `You are an AI coding agent using Zentext to continue work across sessions.
 You are investigating the Zenith Framework repository.
 You must not modify any source file unless explicitly asked to continue implementation.
 When you need to update Zentext state, respond with JSON matching the requested schema.
 Do not invent completed work.
-Use the exact task id and revision shown in the Zentext repack output.
-`;
+Use the exact task id and revision shown in the Zentext context.
+Read only the files listed under "Repository evidence" below. Do not assume any file exists beyond those listed.`;
 
-function readZenithFiles(repo: string): string {
-  const files = [
-    "contracts/DETERMINISM.md",
-    "packages/bundler/src/utils.rs",
-    "packages/bundler/src/bundler_html_emit.rs",
-    "packages/bundler/tests/css_determinism.rs",
-    "packages/bundler/src/plugin/zenith_loader.rs",
-    "packages/bundler/src/bundle.rs",
-    "AGENTS.md",
-  ];
+function buildRepositoryContext(repo: string): string {
   const parts: string[] = [];
-  for (const file of files) {
+  for (const file of REPOSITORY_FILES) {
     try {
       const content = readFileSync(join(repo, file), "utf8");
       parts.push(`--- ${file} ---\n${content}`);
@@ -52,18 +70,23 @@ function readZenithFiles(repo: string): string {
   return parts.join("\n\n");
 }
 
-const AGENT_A_USER = `Agent A: Verify the Zenith CSS determinism contract.
+function buildAgentPrompt(options: {
+  zentextContext: string;
+  repoContext: string;
+  instructions: string;
+}): string {
+  return `${options.zentextContext}\n\n--- Repository evidence ---\n\n${options.repoContext}\n\n--- Agent instructions ---\n\n${options.instructions}`;
+}
 
-Read only the files listed under "Repository files" below. Trace each claim in contracts/DETERMINISM.md to the code that implements it. For each claim, record:
+const AGENT_A_INSTRUCTIONS = `Agent A: Verify the Zenith CSS determinism contract.
+
+Trace each claim in contracts/DETERMINISM.md to the code that implements it. For each claim, record:
 - the claim text
 - the implementation file and function
 - whether the claim is satisfied, partially satisfied, or contradicted
 - any open questions
 
 Stop at a clear boundary before the next verification step. Do not propose code changes.
-
-Repository files:
-{FILES}
 
 Return JSON with this shape:
 {
@@ -77,8 +100,8 @@ Return JSON with this shape:
     { "claim": "...", "location": "...", "assessment": "satisfied|partial|contradicted", "notes": "..." }
   ],
   "update": {
-    "record_id": "<task id from repack>",
-    "expected_revision": <task revision from repack>,
+    "record_id": "<task id from Zentext context>",
+    "expected_revision": <task revision from Zentext context>,
     "patch": {
       "next": "<one concrete next verification step>"
     },
@@ -86,12 +109,13 @@ Return JSON with this shape:
   },
   "stopping_point": "exact boundary where you stopped",
   "completed": ["completed item 1", "completed item 2"]
-}
-`;
+}`;
 
-const AGENT_B_USER = `Agent B: Continue the Zenith CSS determinism verification.
+const AGENT_B_INSTRUCTIONS = `Agent B: Continue the Zenith CSS determinism verification from a fresh session.
 
-Respond first with exactly:
+You have no prior conversation. Use only the Zentext context and repository evidence above.
+
+First, respond with exactly this acknowledgement:
 
 Zentext context loaded.
 
@@ -106,7 +130,9 @@ Blockers: <none or list>
 
 I will continue from this stopping point without restarting completed work.
 
-Then perform exactly one next step: inspect the specific implementation detail identified by the previous agent and add one new finding.
+Then perform exactly one next step: inspect the specific implementation detail identified by the previous agent, using the repository evidence above, and add one new finding.
+
+Do not repeat work already listed in the Zentext handoff. Do not invent completed work.
 
 Return JSON with this shape:
 {
@@ -120,8 +146,8 @@ Return JSON with this shape:
     { "claim": "...", "location": "...", "assessment": "satisfied|partial|contradicted", "notes": "..." }
   ],
   "update": {
-    "record_id": "<task id from repack>",
-    "expected_revision": <task revision from repack>,
+    "record_id": "<task id from Zentext context>",
+    "expected_revision": <task revision from Zentext context>,
     "patch": {
       "next": "<one concrete next verification step>"
     },
@@ -129,12 +155,17 @@ Return JSON with this shape:
   },
   "stopping_point": "exact boundary where you stopped",
   "completed": ["new completed item"]
-}
-`;
+}`;
 
-const AGENT_C_USER = `Agent C: Review the Zenith CSS determinism verification.
+const AGENT_C_INSTRUCTIONS = `Agent C: Review the Zenith CSS determinism verification from a fresh session.
 
-Confirm the updated stopping point, review the previous agent's work for scope and architecture drift, and check that no Zenith source files were modified.
+You have no prior conversation. Use only the Zentext context and repository evidence above.
+
+Review Agent A and Agent B's work:
+- Confirm the updated stopping point.
+- Check that the previous agent's new finding is supported by the repository evidence.
+- Check for repeated work, invented work, scope drift, and unsupported conclusions.
+- Confirm no Zenith source files were modified.
 
 Return JSON with this shape:
 {
@@ -152,12 +183,11 @@ Return JSON with this shape:
     "notes": "..."
   },
   "stale_attempt": {
-    "record_id": "<task id from repack>",
+    "record_id": "<task id from Zentext context>",
     "expected_revision": <an earlier revision>,
     "patch": { "next": "outdated step" }
   }
-}
-`;
+}`;
 
 export interface Stage7Config {
   zenithRepo: string;
@@ -167,40 +197,49 @@ export interface Stage7Config {
 }
 
 export async function runStage7(config: Stage7Config): Promise<void> {
-  process.env.HOME = config.tempHome;
-  mkdirSync(config.outputDir, { recursive: true });
+  const adapter = new OllamaAdapter({
+    name: config.model,
+    model: config.model,
+  });
 
+  // Isolated HOME and project store
+  process.env.HOME = config.tempHome;
   const store = new SqliteStore();
   const meta = await store.initProjectStore(config.zenithRepo);
+
   const writer = createMemoryWriter(store);
 
-  const task = writer.createRecord({
+  // Seed the canonical project state
+  const task = store.createRecord({
     type: "task",
-    title: "Verify Zenith CSS determinism contract",
-    goal: "Trace Zenith CSS determinism contract claims to implementation",
+    title: "Verify CSS determinism contract",
+    goal: "Trace Zenith CSS determinism contract to implementation",
     status: "active",
+    next: "Read contracts/DETERMINISM.md and map claims to code",
     author: "agent:A",
   });
 
-  writer.createRecord({
+  store.createRecord({
     type: "decision",
-    title: "Compiler pre-sorts CSS blocks",
-    decision: "CSS blocks are ordered by dependency depth via compiler pre-sort before process_css is called",
+    title: "Use topological sort for CSS",
+    decision: "CSS blocks are ordered by dependency depth via compiler sort",
     status: "accepted",
     author: "agent:A",
   });
 
-  const adapter = new OllamaAdapter({ name: config.model, model: config.model });
-  const filesContent = readZenithFiles(config.zenithRepo);
+  const repoContext = buildRepositoryContext(config.zenithRepo);
 
   // Agent A
   const repackA = repack(store, meta, { focus: "CSS determinism" });
-  const promptA = `${repackA.markdown}\n\nRepository files:\n${filesContent}\n\n${AGENT_A_USER}`;
+  const promptA = buildAgentPrompt({
+    zentextContext: repackA.markdown,
+    repoContext,
+    instructions: AGENT_A_INSTRUCTIONS,
+  });
   const responseA = await adapter.send(SHARED_SYSTEM, promptA);
-  const parsedA = extractJson(responseA) as Record<string, unknown>;
-
   writeArtifact(config.outputDir, "agent-a", "prompt.txt", promptA);
   writeArtifact(config.outputDir, "agent-a", "response.txt", responseA);
+  const parsedA = parseResponse(responseA, join(config.outputDir, "agent-a", "response.txt")) as Record<string, unknown>;
   writeArtifact(config.outputDir, "agent-a", "parsed.json", JSON.stringify(parsedA, null, 2));
 
   const updateA = parsedA.update as Record<string, unknown>;
@@ -220,12 +259,15 @@ export async function runStage7(config: Stage7Config): Promise<void> {
 
   // Agent B
   const repackB = repack(store, meta, { focus: "CSS determinism" });
-  const promptB = `${repackB.markdown}\n\n${AGENT_B_USER}`;
+  const promptB = buildAgentPrompt({
+    zentextContext: repackB.markdown,
+    repoContext,
+    instructions: AGENT_B_INSTRUCTIONS,
+  });
   const responseB = await adapter.send(SHARED_SYSTEM, promptB);
-  const parsedB = extractJson(responseB) as Record<string, unknown>;
-
   writeArtifact(config.outputDir, "agent-b", "prompt.txt", promptB);
   writeArtifact(config.outputDir, "agent-b", "response.txt", responseB);
+  const parsedB = parseResponse(responseB, join(config.outputDir, "agent-b", "response.txt")) as Record<string, unknown>;
   writeArtifact(config.outputDir, "agent-b", "parsed.json", JSON.stringify(parsedB, null, 2));
 
   const updateB = parsedB.update as Record<string, unknown>;
@@ -245,12 +287,15 @@ export async function runStage7(config: Stage7Config): Promise<void> {
 
   // Agent C + stale attempt
   const repackC = repack(store, meta, { focus: "CSS determinism" });
-  const promptC = `${repackC.markdown}\n\n${AGENT_C_USER}`;
+  const promptC = buildAgentPrompt({
+    zentextContext: repackC.markdown,
+    repoContext,
+    instructions: AGENT_C_INSTRUCTIONS,
+  });
   const responseC = await adapter.send(SHARED_SYSTEM, promptC);
-  const parsedC = extractJson(responseC) as Record<string, unknown>;
-
   writeArtifact(config.outputDir, "agent-c", "prompt.txt", promptC);
   writeArtifact(config.outputDir, "agent-c", "response.txt", responseC);
+  const parsedC = parseResponse(responseC, join(config.outputDir, "agent-c", "response.txt")) as Record<string, unknown>;
   writeArtifact(config.outputDir, "agent-c", "parsed.json", JSON.stringify(parsedC, null, 2));
 
   const staleAttempt = parsedC.stale_attempt as Record<string, unknown>;
@@ -309,7 +354,7 @@ function writeArtifact(
 ): void {
   const dir = subdir ? join(outputDir, subdir) : outputDir;
   mkdirSync(dir, { recursive: true });
-  writeFileSync(join(dir, filename), content, "utf8");
+  writeFileSync(join(dir, filename), content, { encoding: "utf8", flush: true });
 }
 
 async function main(): Promise<void> {

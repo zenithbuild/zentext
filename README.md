@@ -8,74 +8,77 @@ into useful context so that when you switch from one AI coding agent to another,
 the next agent picks up where the last one left off without you re-explaining the
 project from scratch.
 
-## Repo state
+## Developer Preview install
 
-This repository is **planning/docs only.**
+Requires Node.js >= 20.
 
-- No implementation exists yet.
-- No MCP server is built.
-- No CLI is built.
-- No UI exists.
-- No cloud service exists.
+```bash
+# Try without installing
+npx zentext@next init
 
-The documents in [`docs/`](./docs) are the source of truth for product direction,
-MVP scope, monetization, cloud boundary, self-hosting model, risks, and open
-decisions. Future implementation work should be driven from these docs, and any
-drift from them should be a conscious, recorded decision.
+# Or install globally
+npm install -g zentext@next
+zentext init
+```
 
-Before product code starts, Zentext has a manual Stage 0.5 field-test gate:
-validate the agent handoff workflow with a temporary `AGENT_SYNC.md` in a real
-project, then patch the planning contracts if the workflow exposes a bad
-assumption. See
-[`docs/field-tests/agent-sync-field-test.md`](./docs/field-tests/agent-sync-field-test.md).
+## Quick start
 
-## MVP target
+```bash
+# In a project directory
+zentext init
+zentext status
 
-The MVP is a **local MCP memory layer + thin CLI.**
+# Create a handoff when switching agents
+zentext handoff create \
+  --from "codex" \
+  --stopping-point "Implemented login route; need password hashing next." \
+  --next-action "Add bcrypt password hashing to /api/login."
 
-- The MCP server is the agent interface (agents read and write project memory).
-- The CLI is the human/fallback interface (inspect, edit, hand off, repack context).
-- The local memory store is the product core.
+# A fresh agent can load the handoff
+zentext handoff acknowledge
 
-The MVP is **not** an app, a dashboard, a cloud service, an editor plugin, an
-agent runner, or a universal chat UI.
+# Validate it is still current
+zentext handoff validate
+```
 
-## Important: Zentext is separate from Zenith Framework
+## What Zentext is
 
-Zentext is a **standalone product repo** and is not part of the Zenith Framework
-repository (`zenithbuild/framework`). Do not modify Zenith Framework files for
-Zentext work.
+- A local SQLite memory store tied to a project.
+- A deterministic repack engine that turns memory into agent context.
+- A thin read-only MCP adapter (`memory.read`, `memory.list`, `memory.query`, `memory.repack`).
+- A CLI for humans and fallback use.
+- Structured handoffs with revision-safe stale detection.
 
-The Zenith Framework may eventually be used to build a future UI for Zentext, but
-UI is explicitly out of scope for the current phase. See
-[`docs/staged-roadmap.md`](./docs/staged-roadmap.md).
+## What Zentext is not
 
-## Critical constraint
+- A chat UI or app.
+- A model provider or agent runner.
+- Cloud-first or dependent on network sync.
+- A way to transfer hidden model state between agents.
+- Part of the Zenith Framework.
 
-Zentext **cannot** transfer hidden model state from one AI system to another. It
-can only preserve *external* project memory and repack that memory into useful
-context for another agent. This limitation is permanent and must be stated honestly
-in all documentation and messaging.
+## Developer Preview limitations
 
-## Docs index
+- General-purpose write tools (`zentext add`, `zentext edit`) and MCP write tools are not in this preview; only structured handoff creation is exposed via `zentext handoff create`. The full transactional write domain exists internally and will surface in a later release.
+- Multi-agent handoffs are validated against local Ollama models; provider flakiness may affect some models.
+- Enterprise features (cloud, sync, auth, vector search) are out of scope for this release.
 
-| Document | Purpose |
-|----------|---------|
-| [docs/product-overview.md](./docs/product-overview.md) | What Zentext is, the problem, what it is not, target users |
-| [docs/mvp-specification.md](./docs/mvp-specification.md) | MVP definition, scope, success/failure criteria, demo flow |
-| [docs/memory-schema.md](./docs/memory-schema.md) | Baseline structured memory record types |
-| [docs/mcp-tools.md](./docs/mcp-tools.md) | Proposed MCP tool surface |
-| [docs/cli-reference.md](./docs/cli-reference.md) | Thin CLI commands and non-MCP fallback |
-| [docs/context-repacking.md](./docs/context-repacking.md) | How memory becomes agent-ready context |
-| [docs/cloud-boundary.md](./docs/cloud-boundary.md) | What cloud may and may not host |
-| [docs/monetization.md](./docs/monetization.md) | Pricing model and pricing units |
-| [docs/self-hosting.md](./docs/self-hosting.md) | Open-source and enterprise self-hosting |
-| [docs/staged-roadmap.md](./docs/staged-roadmap.md) | Four-stage plan and triggers |
-| [docs/field-tests/agent-sync-field-test.md](./docs/field-tests/agent-sync-field-test.md) | Manual pre-coding field test for agent handoff behavior |
-| [docs/risks-and-antipatterns.md](./docs/risks-and-antipatterns.md) | Risks and anti-patterns to avoid |
-| [docs/open-decisions.md](./docs/open-decisions.md) | Decision registry for accepted Stage 1 decisions and unresolved later gates |
+## Documentation
 
-## Status
+- [docs/handoffs.md](./docs/handoffs.md) — structured agent handoffs
+- [docs/switching-agents.md](./docs/switching-agents.md) — how to hand off between agents
+- [docs/tester-onboarding.md](./docs/tester-onboarding.md) — full tester workflow
+- [docs/mcp.md](./docs/mcp.md) — MCP adapter usage
 
-Planning. Docs only. See [`docs/staged-roadmap.md`](./docs/staged-roadmap.md) for
-the path from here to implementation.
+## Report problems
+
+Open an issue at https://github.com/zenithbuild/zentext/issues and include:
+
+- `zentext --version` output
+- Node version (`node --version`)
+- The command you ran
+- What you expected and what happened
+
+## License
+
+MIT — see [LICENSE](./LICENSE).

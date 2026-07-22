@@ -1,14 +1,39 @@
 # Zentext context — zenithbuild/framework
-Generated: 2026-07-22T03:35:03.635Z | focus: CSS determinism | from: 2 records | budget: 12000 chars
+Generated: 2026-07-22T03:45:16.495Z | focus: CSS determinism | from: 3 records | budget: 12000 chars
 
 > Point-in-time snapshot. Live memory is at ~/.zentext/projects/b1391d80609491d9/store.sqlite
 
 ## Active task
 - Verify CSS determinism contract (active)
-- ID: rec_task_01KY3Y896HCXNDZFBHWXQFHV2N | revision: 1
+- ID: rec_task_01KY3YSQ8AY0422AMXAE1ZMZKG | revision: 2
 - Goal: Trace Zenith CSS determinism contract to implementation
-- Next: Read contracts/DETERMINISM.md and map claims to code
+- Next: Read compiler-side style block extraction (zenith_compiler::script::ExtractedStyleBlock and compile_structured_with_source) to verify upstream LF normalization, module ID canonicalization, and whether duplicate (module_id, order) identity is enforced at the compiler layer
 - Refs: (none)
+
+## Latest handoff
+- Handoff from agent:A (latest)
+- ID: rec_handoff_01KY3YTZPET08K26F5TNVC46P1 | revision: 1
+- From: agent:A to next-agent at 2026-07-22T03:45:16.494Z
+- Context: Use topological sort for CSS: CSS blocks are ordered by dependency depth via compiler sort
+- State: {
+  "completed": [
+    "Read contracts/DETERMINISM.md and enumerated all CSS and compiler determinism claims",
+    "Traced topological ordering to bundle.rs::collect_graph_style_blocks (DFS post-order)",
+    "Traced anchor enforcement to utils.rs::process_css (count check only)",
+    "Traced LF normalization to upstream callers (compile_zen_source, extract_style_blocks_from_html)",
+    "Identified missing duplicate (module_id, order) hard-fail check in bundler layer",
+    "Identified missing forward-slash normalization in CSS collection path (clean_path unused)",
+    "Traced virtual module sealing to reject_external_zenith_import",
+    "Confirmed runtime parity via single execute_bundle entry point",
+    "Identified bundle hash order-independence as potential cache-staleness risk"
+  ],
+  "stopping_point": "Stopped after tracing all DETERMINISM.md claims to the five provided bundler files. Did not read compiler source files (zenith_compiler crate) which are not listed in repository evidence and may implement upstream normalization and duplicate identity enforcement.",
+  "next_action": "Read compiler-side style block extraction (zenith_compiler::script::ExtractedStyleBlock and compile_structured_with_source) to verify upstream LF normalization, module ID canonicalization, and whether duplicate (module_id, order) identity is enforced at the compiler layer",
+  "blockers": [],
+  "files_changed": [],
+  "verification": []
+}
+- Next: Read compiler-side style block extraction (zenith_compiler::script::ExtractedStyleBlock and compile_structured_with_source) to verify upstream LF normalization, module ID canonicalization, and whether duplicate (module_id, order) identity is enforced at the compiler layer
 
 ## Decisions (1)
 - Use topological sort for CSS (accepted)
@@ -1721,15 +1746,28 @@ Use it to install or copy the canonical rules into any Zenith project. See `pack
 
 --- Agent instructions ---
 
-Agent A: Verify the Zenith CSS determinism contract.
+Agent B: Continue the Zenith CSS determinism verification from a fresh session.
 
-Trace each claim in contracts/DETERMINISM.md to the code that implements it. For each claim, record:
-- the claim text
-- the implementation file and function
-- whether the claim is satisfied, partially satisfied, or contradicted
-- any open questions
+You have no prior conversation. Use only the Zentext context and repository evidence above.
 
-Stop at a clear boundary before the next verification step. Do not propose code changes.
+First, respond with exactly this acknowledgement:
+
+Zentext context loaded.
+
+Active task: <title>
+Task ID: <id>
+Task revision: <revision>
+Previous agent: <agent>
+Completed: <verified summary>
+Stopping point: <exact previous boundary>
+Next action: <first unfinished action>
+Blockers: <none or list>
+
+I will continue from this stopping point without restarting completed work.
+
+Then perform exactly one next step: inspect the specific implementation detail identified by the previous agent, using the repository evidence above, and add one new finding.
+
+Do not repeat work already listed in the Zentext handoff. Do not invent completed work.
 
 Return JSON with this shape:
 {
@@ -1751,5 +1789,5 @@ Return JSON with this shape:
     "reason": "..."
   },
   "stopping_point": "exact boundary where you stopped",
-  "completed": ["completed item 1", "completed item 2"]
+  "completed": ["new completed item"]
 }

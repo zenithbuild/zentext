@@ -1,69 +1,112 @@
-# Zentext Tester Onboarding
+# Zentext Developer Preview — Tester Onboarding
 
-Install Zentext from a locally packed tarball and run the core commands without any repository-specific knowledge.
+## Install
 
-## Install from tarball
-
-```bash
-npm pack
-mkdir /tmp/zentext-consumer
-cd /tmp/zentext-consumer
-cat > package.json <<'JSON'
-{
-  "name": "zentext-consumer",
-  "version": "1.0.0",
-  "type": "module",
-  "private": true,
-  "allowScripts": {
-    "better-sqlite3": true,
-    "esbuild": true,
-    "fsevents": true
-  }
-}
-JSON
-npm install --save /path/to/zentext-0.1.0.tgz
-```
-
-## First commands
+Requires Node.js >= 20.
 
 ```bash
-# See available commands
-npx zentext --help
+# Try once without installing
+npx zentext@next init
 
-# Initialize Zentext for the current project
-npx zentext init
-
-# View current project memory
-npx zentext status
-
-# Generate a focused context payload
-npx zentext repack
-
-# Inspect a handoff
-npx zentext handoff acknowledge
+# Or install globally
+npm install -g zentext@next
+zentext init
 ```
 
-## Report back
-
-When testing Zentext, report:
-
-- installation failures
-- unclear commands
-- incorrect context
-- repeated work
-- invented work
-- wrong stopping point
-- stale-write handling
-- package-boundary drift
-- confusing errors
-- uninstall or cleanup problems
-
-Do not report whether you "like" the product. Report where it breaks or misleads.
-
-## Cleanup
-
-Zentext stores data under `~/.zentext/projects/`. To remove a project:
+## Verify the install
 
 ```bash
-rm -rf ~/.zentext/projects/<project-id>
+zentext --help
+zentext init
+zentext status
 ```
+
+## Basic workflow
+
+### 1. Initialize a project
+
+In the root of any project you want agents to share:
+
+```bash
+zentext init
+```
+
+This creates a local SQLite store under `~/.zentext/projects/`.
+
+### 2. Inspect context
+
+```bash
+zentext status
+zentext repack
+zentext repack --focus "authentication"
+```
+
+### 3. Create a handoff before switching agents
+
+When you are done with one agent session, record the stopping point:
+
+```bash
+zentext handoff create \
+  --from "codex" \
+  --stopping-point "Implemented login route; need password hashing next." \
+  --next-action "Add bcrypt password hashing to /api/login." \
+  --completed "Scaffolded auth routes" \
+  --completed "Added /api/login POST handler"
+```
+
+### 4. Fresh agent loads the handoff
+
+In a new agent session, run:
+
+```bash
+zentext handoff acknowledge
+```
+
+If the handoff is current, you will see the active task, stopping point, and next action.
+If the task has been updated in the meantime, the command exits nonzero and tells you the handoff is stale.
+
+### 5. Validate before trusting a handoff
+
+```bash
+zentext handoff validate
+zentext handoff show --json
+```
+
+### 6. Stale handoff behavior
+
+If another agent updated the task after the handoff was created, `handoff acknowledge` rejects it:
+
+```
+Handoff rejected: the recorded handoff is stale and must be regenerated.
+Reason: active_task revision changed
+Task ID: rec_task_...
+Handoff revision: 1
+Live revision: 2
+```
+
+Regenerate with `zentext handoff create` before continuing.
+
+## Uninstall
+
+```bash
+npm uninstall -g zentext
+```
+
+The local project store remains under `~/.zentext/projects/` if you want to keep it.
+
+## Limitations
+
+- This is a Developer Preview. Breaking changes are likely before 1.0.
+- `npx zentext@next` installs a prerelease tagged `next`, not the stable `latest`.
+- General write commands (`zentext add`, `zentext edit`) are not in this preview.
+- MCP write tools are not in this preview.
+- Cloud, sync, auth, UI, and vector search are not in this preview.
+
+## Reporting problems
+
+Open an issue at https://github.com/zenithbuild/zentext/issues with:
+
+- `zentext --version`
+- `node --version`
+- The exact command
+- Expected vs actual behavior

@@ -1,6 +1,6 @@
 {
   "name": "zentext",
-  "version": "0.1.0",
+  "version": "0.1.0-dev.0",
   "description": "A local-first shared context and memory layer for AI coding agents.",
   "type": "module",
   "main": "dist/index.js",
@@ -12,8 +12,7 @@
     "typecheck": "tsc --noEmit",
     "typecheck:test": "tsc --noEmit -p tsconfig.test.json"
   },
-  "license": "UNLICENSED",
-  "private": true,
+  "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "better-sqlite3": "^12.2.0",
@@ -39,6 +38,43 @@
     "dist",
     "README.md",
     "docs/mcp.md",
+    "docs/handoffs.md",
+    "docs/switching-agents.md",
+    "docs/tester-onboarding.md",
+    "LICENSE",
     "!dist/proof"
-  ]
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zenithbuild/zentext.git"
+  },
+  "homepage": "https://github.com/zenithbuild/zentext#readme",
+  "bugs": {
+    "url": "https://github.com/zenithbuild/zentext/issues"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "context",
+    "memory",
+    "mcp",
+    "local-first",
+    "handoff",
+    "zentext"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "tag": "next"
+  }
 }
