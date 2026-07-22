@@ -1,5 +1,11 @@
 # Zentext 0.1.0-dev.2 Fix Report
 
+> **Publication update — 2026-07-22:** This report is retained as correction and
+> validation evidence. `zentext@0.1.0-dev.2` is now published, and both npm
+> `latest` and `next` resolve to it. The publish and dist-tag commands below are
+> historical procedure, not actions for the M0 portability batch. See
+> [`docs/continuation.md`](./docs/continuation.md) for current state.
+
 ## 1. Transaction root cause
 
 `zentext handoff create` failed with `cannot start a transaction within a transaction` when the `node:sqlite` fallback was active.

@@ -10,9 +10,12 @@ project from scratch.
 
 ## Developer Preview install
 
-Requires Node.js 22.13+, 24.x, or 26.x (26.x is experimental).
+Officially supported on Node.js `>=22.13 <25` (Node 22.13+ and Node 24.x).
+Node 26 is experimentally tolerated but emits `EBADENGINE`; Node 20 and earlier
+are unsupported for this Developer Preview.
 
-If better-sqlite3 install scripts are blocked, Node 22+ falls back to the built-in `node:sqlite` module. Node 20 requires a working better-sqlite3 binding.
+If better-sqlite3 install scripts are blocked, supported Node releases fall back
+to the built-in `node:sqlite` module.
 
 ```bash
 # Try without installing
@@ -79,6 +82,8 @@ zentext handoff validate
 - [docs/switching-agents.md](./docs/switching-agents.md) — how to hand off between agents
 - [docs/tester-onboarding.md](./docs/tester-onboarding.md) — full tester workflow
 - [docs/mcp.md](./docs/mcp.md) — MCP adapter usage
+- [docs/continuation.md](./docs/continuation.md) — current architecture, release
+  state, limitations, and continuation commands
 
 ## Troubleshooting
 

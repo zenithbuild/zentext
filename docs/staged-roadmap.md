@@ -1,5 +1,10 @@
 # Staged Roadmap
 
+> **Historical roadmap:** This document preserves the original staged product
+> reasoning. Several Stage 1 surfaces are now implemented and a Developer
+> Preview is published. Use [`continuation.md`](./continuation.md) and the active
+> GitHub roadmap for current implementation and milestone status.
+
 Zentext is built in four stages, with one manual field-test gate before Stage 1
 coding. Each stage has a clear purpose, deliverables,
 acceptance criteria, non-goals, and a trigger to move to the next stage. Do not

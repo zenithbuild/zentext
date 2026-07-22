@@ -1,5 +1,10 @@
 # MVP Specification
 
+> **Historical specification:** This document records the MVP design target.
+> The implemented Developer Preview and current limitations are summarized in
+> [`continuation.md`](./continuation.md); retain this file for product reasoning,
+> not as a claim that implementation has not started.
+
 ## MVP definition
 
 The Zentext MVP is a **local MCP memory layer + thin CLI.**

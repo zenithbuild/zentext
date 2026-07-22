@@ -1,5 +1,10 @@
 # Zentext Developer Preview Release Report
 
+> **Publication update — 2026-07-22:** This is preserved as pre-publication
+> readiness evidence. `zentext@0.1.0-dev.2` has since been published, and both
+> the npm `latest` and `next` dist-tags resolve to `0.1.0-dev.2`. Current state
+> is documented in [`docs/continuation.md`](./docs/continuation.md).
+
 ## 0.1.0-dev.1 correction
 
 This release corrects a post-0.1.0-dev.0 blocker:
