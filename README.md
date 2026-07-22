@@ -30,14 +30,22 @@ zentext init
 zentext init
 zentext status
 
+# Start a task before recording a handoff
+zentext task create --title "Implement login route" --goal "Add password-based authentication"
+
 # Create a handoff when switching agents
 zentext handoff create \
   --from "codex" \
   --stopping-point "Implemented login route; need password hashing next." \
-  --next-action "Add bcrypt password hashing to /api/login."
+  --next-action "Add bcrypt password hashing to /api/login." \
+  --completed "Scaffolded auth routes" \
+  --files-changed "src/routes/login.ts"
 
 # A fresh agent can load the handoff
 zentext handoff acknowledge
+
+# Update the task as work progresses
+zentext task update --summary "Password hashing implemented" --next-action "Wire login into UI"
 
 # Validate it is still current
 zentext handoff validate
@@ -61,7 +69,7 @@ zentext handoff validate
 
 ## Developer Preview limitations
 
-- General-purpose write tools (`zentext add`, `zentext edit`) and MCP write tools are not in this preview; only structured handoff creation is exposed via `zentext handoff create`. The full transactional write domain exists internally and will surface in a later release.
+- General-purpose write tools (`zentext add`, `zentext edit`) and MCP write tools are not in this preview. The Developer Preview exposes `zentext task create`, `zentext task show`, `zentext task update`, and `zentext handoff create` so a normal user can record and continue work without importing the store module directly.
 - Multi-agent handoffs are validated against local Ollama models; provider flakiness may affect some models.
 - Enterprise features (cloud, sync, auth, vector search) are out of scope for this release.
 

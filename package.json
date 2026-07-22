@@ -1,6 +1,6 @@
 {
   "name": "zentext",
-  "version": "0.1.0-dev.1",
+  "version": "0.1.0-dev.2",
   "description": "A local-first shared context and memory layer for AI coding agents.",
   "type": "module",
   "main": "dist/index.js",

@@ -50,6 +50,16 @@ Rules:
 - A handoff must reference the live task revision.
 - A stale handoff (revision mismatch) is detected by `zentext handoff validate` and `zentext handoff show`.
 
+## Before creating a handoff
+
+A handoff requires an active or blocked task in the store. If none exists, create one first:
+
+```bash
+zentext task create --title "Verify CSS determinism contract" --goal "Confirm ordering and hashing behavior"
+```
+
+Without a current task, `zentext handoff create` will explain how to create one.
+
 ## CLI commands
 
 ```bash

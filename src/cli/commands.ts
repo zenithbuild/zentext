@@ -362,6 +362,140 @@ export async function handoffValidate(
   }
 }
 
+export async function taskCreate(
+  cwd: string,
+  options: {
+    title: string;
+    goal?: string;
+    summary?: string;
+    status?: string;
+    author?: string;
+  },
+): Promise<{ output: string; exitCode: number }> {
+  const store = await openStore(cwd);
+  let writer: ReturnType<typeof createMemoryWriter> | undefined;
+  try {
+    await store.openProjectStore(cwd);
+    writer = createMemoryWriter(store);
+    const status = options.status ?? "active";
+    if (!["active", "blocked", "done", "canceled"].includes(status)) {
+      throw new CliError(
+        `Invalid task status '${status}'. Allowed: active, blocked, done, canceled.`,
+        1,
+      );
+    }
+    const record = writer.createRecord({
+      type: "task",
+      title: options.title,
+      summary: options.summary,
+      goal: options.goal ?? options.title,
+      status,
+      author: options.author ?? "unknown",
+    });
+    return {
+      output: `Created task ${record.id}
+Title: ${record.title}
+Status: ${record.status}`,
+      exitCode: 0,
+    };
+  } catch (err) {
+    if (err instanceof MemoryWriterConflictError) {
+      throw new CliError(`Conflict: ${err.message}`, 6);
+    }
+    throw err;
+  } finally {
+    store.close();
+  }
+}
+
+export async function taskShow(cwd: string): Promise<{ output: string; exitCode: number }> {
+  const store = await openStore(cwd);
+  try {
+    await store.openProjectStore(cwd);
+    const tasks = store.listRecords({ type: "task" });
+    if (tasks.length === 0) {
+      return {
+        output: [
+          "No tasks exist for this project.",
+          "Create one with:",
+          '  zentext task create --title "Describe the current task"',
+        ].join("\n"),
+        exitCode: 0,
+      };
+    }
+    const active = tasks
+      .filter((t) => t.status === "active")
+      .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime() || a.id.localeCompare(b.id))[0];
+    const target = active ?? tasks[0];
+    return { output: formatRecord(target), exitCode: 0 };
+  } finally {
+    store.close();
+  }
+}
+
+export async function taskUpdate(
+  cwd: string,
+  options: {
+    title?: string;
+    summary?: string;
+    status?: string;
+    note?: string;
+    nextAction?: string;
+  },
+): Promise<{ output: string; exitCode: number }> {
+  const store = await openStore(cwd);
+  let writer: ReturnType<typeof createMemoryWriter> | undefined;
+  try {
+    await store.openProjectStore(cwd);
+    const tasks = store.listRecords({ type: "task" });
+    const active = tasks
+      .filter((t) => t.status === "active")
+      .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime() || a.id.localeCompare(b.id))[0];
+    const target = active ?? tasks[0];
+    if (!target) {
+      return {
+        output: [
+          "No task exists to update.",
+          "Create one with:",
+          '  zentext task create --title "Describe the current task"',
+        ].join("\n"),
+        exitCode: 1,
+      };
+    }
+
+    if (options.status !== undefined) {
+      if (!["active", "blocked", "done", "canceled"].includes(options.status)) {
+        throw new CliError(
+          `Invalid task status '${options.status}'. Allowed: active, blocked, done, canceled.`,
+          1,
+        );
+      }
+    }
+
+    writer = createMemoryWriter(store);
+    const patch: Record<string, unknown> = {};
+    if (options.title !== undefined) patch.title = options.title;
+    if (options.summary !== undefined) patch.summary = options.summary;
+    if (options.status !== undefined) patch.status = options.status;
+    if (options.note !== undefined) patch.note = options.note;
+    if (options.nextAction !== undefined) patch.next_action = options.nextAction;
+
+    const record = writer.updateRecord(target.id, patch);
+    return {
+      output: `Updated task ${record.id} to revision ${record.revision}
+${formatRecord(record)}`,
+      exitCode: 0,
+    };
+  } catch (err) {
+    if (err instanceof MemoryWriterConflictError) {
+      throw new CliError(`Conflict: ${err.message}`, 6);
+    }
+    throw err;
+  } finally {
+    store.close();
+  }
+}
+
 export async function handoffCreate(
   cwd: string,
   options: {
@@ -399,7 +533,14 @@ export async function handoffCreate(
 Stored handoff record: ${record.id}`, exitCode: 0 };
   } catch (err) {
     if (err instanceof HandoffValidationError) {
-      throw new CliError(err.message, 1);
+      let message = err.message;
+      if (message.includes("no active or blocked task")) {
+        message = `${message}
+
+Create a task first:
+  zentext task create --title "Describe the current task"`;
+      }
+      throw new CliError(message, 1);
     }
     if (err instanceof MemoryWriterConflictError) {
       throw new CliError(`Conflict: ${err.message}`, 6);
@@ -416,6 +557,7 @@ export function printUsage(): string {
 Usage:
   zentext init
   zentext status
+  zentext task {create|show|update}
   zentext show <id>
   zentext list [--type <type>] [--status <status>] [--limit <n>]
   zentext repack [--focus <text>] [--max-size <chars>] [--out <path>]
@@ -423,10 +565,18 @@ Usage:
 Commands:
   init    Initialize the local project store
   status  Show a concise overview of the project memory
+  task    Create, show, or update the current task
   show    Display a single record by id
   list    List records, optionally filtered
   repack   Generate a focused context payload from project memory
   handoff  Structured handoff commands
+
+Task subcommands:
+  zentext task create --title <text> [--goal <text>] [--summary <text>]
+    [--status active|blocked|done|canceled]
+  zentext task show
+  zentext task update [--title <text>] [--summary <text>] [--status <status>]
+    [--note <text>] [--next-action <text>]
 
 Handoff subcommands:
   zentext handoff show [--json]

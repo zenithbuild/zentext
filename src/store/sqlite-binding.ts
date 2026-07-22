@@ -102,6 +102,8 @@ class BetterSqliteStatement implements SqliteStatement {
 }
 
 class BetterSqliteDatabase implements SqliteDatabase {
+  private txDepth = 0;
+
   constructor(private readonly db: BetterSqlite3Database) {}
 
   prepare(sql: string): SqliteStatement {
@@ -117,7 +119,44 @@ class BetterSqliteDatabase implements SqliteDatabase {
   }
 
   transaction<T extends (...args: unknown[]) => unknown>(fn: T): T {
-    return this.db.transaction(fn) as unknown as T;
+    const db = this.db;
+    const self = this;
+    return ((...args: unknown[]) => {
+      const depth = self.txDepth;
+      const savepoint = `zentext_tx_${depth}`;
+      if (depth === 0) {
+        db.exec("BEGIN");
+      } else {
+        db.exec(`SAVEPOINT ${savepoint}`);
+      }
+      self.txDepth += 1;
+      try {
+        const result = fn(...args);
+        if (depth === 0) {
+          db.exec("COMMIT");
+        } else {
+          db.exec(`RELEASE SAVEPOINT ${savepoint}`);
+        }
+        return result;
+      } catch (err) {
+        if (depth === 0) {
+          try {
+            db.exec("ROLLBACK");
+          } catch {
+            // Ignore rollback errors.
+          }
+        } else {
+          try {
+            db.exec(`ROLLBACK TO SAVEPOINT ${savepoint}`);
+          } catch {
+            // Ignore rollback errors.
+          }
+        }
+        throw err;
+      } finally {
+        self.txDepth -= 1;
+      }
+    }) as T;
   }
 
   close(): void {
@@ -228,21 +267,45 @@ class NodeSqliteDatabase implements SqliteDatabase {
     return row;
   }
 
+  private txDepth = 0;
+
   transaction<T extends (...args: unknown[]) => unknown>(fn: T): T {
     const db = this.db;
+    const self = this;
     return ((...args: unknown[]) => {
-      db.exec("BEGIN");
+      const depth = self.txDepth;
+      const savepoint = `zentext_tx_${depth}`;
+      if (depth === 0) {
+        db.exec("BEGIN");
+      } else {
+        db.exec(`SAVEPOINT ${savepoint}`);
+      }
+      self.txDepth += 1;
       try {
         const result = fn(...args);
-        db.exec("COMMIT");
+        if (depth === 0) {
+          db.exec("COMMIT");
+        } else {
+          db.exec(`RELEASE SAVEPOINT ${savepoint}`);
+        }
         return result;
       } catch (err) {
-        try {
-          db.exec("ROLLBACK");
-        } catch {
-          // Ignore rollback errors.
+        if (depth === 0) {
+          try {
+            db.exec("ROLLBACK");
+          } catch {
+            // Ignore rollback errors.
+          }
+        } else {
+          try {
+            db.exec(`ROLLBACK TO SAVEPOINT ${savepoint}`);
+          } catch {
+            // Ignore rollback errors.
+          }
         }
         throw err;
+      } finally {
+        self.txDepth -= 1;
       }
     }) as T;
   }

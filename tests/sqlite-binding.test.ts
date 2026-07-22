@@ -89,4 +89,57 @@ describe("node:sqlite backend", () => {
 
     db.close();
   });
+
+  it("supports nested transactions via savepoints", async () => {
+    if (!(await nodeSqliteAvailable())) return;
+    const dir = mkdtempSync(join(tmpdir(), "zt-sqlite-nested-"));
+    const db = tryNodeSqlite(join(dir, "test.db"));
+    if (!db) {
+      rmSync(dir, { recursive: true, force: true });
+      return;
+    }
+
+    db.exec("CREATE TABLE counters (name TEXT PRIMARY KEY, value INTEGER)");
+
+    const outer = db.transaction(() => {
+      db.prepare("INSERT INTO counters (name, value) VALUES (?, ?)").run("outer", 1);
+      const inner = db.transaction(() => {
+        db.prepare("INSERT INTO counters (name, value) VALUES (?, ?)").run("inner", 2);
+      });
+      inner();
+    });
+    outer();
+
+    const outerRow = db.prepare("SELECT value FROM counters WHERE name = ?").get("outer") as {
+      value: number;
+    };
+    const innerRow = db.prepare("SELECT value FROM counters WHERE name = ?").get("inner") as {
+      value: number;
+    };
+    expect(outerRow.value).toBe(1);
+    expect(innerRow.value).toBe(2);
+
+    // Verify rollback of nested transaction does not affect outer.
+    const outerThenFail = db.transaction(() => {
+      db.prepare("INSERT INTO counters (name, value) VALUES (?, ?)").run("rollback-test", 3);
+      const innerFail = db.transaction(() => {
+        db.prepare("INSERT INTO counters (name, value) VALUES (?, ?)").run("rollback-inner", 4);
+        throw new Error("force rollback");
+      });
+      expect(() => innerFail()).toThrow("force rollback");
+    });
+    outerThenFail();
+
+    const rollbackTest = db.prepare("SELECT value FROM counters WHERE name = ?").get("rollback-test") as
+      | { value: number }
+      | undefined;
+    const rollbackInner = db.prepare("SELECT value FROM counters WHERE name = ?").get("rollback-inner") as
+      | { value: number }
+      | undefined;
+    expect(rollbackTest?.value).toBe(3);
+    expect(rollbackInner).toBeUndefined();
+
+    db.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
 });

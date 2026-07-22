@@ -168,6 +168,13 @@ export function formatStatus(meta: {
   lines.push(`Open blockers: ${meta.openBlockers}`);
   lines.push(`Active tasks:  ${meta.activeTasks}`);
 
+  if (meta.activeTasks === 0) {
+    lines.push("");
+    lines.push("No active task recorded yet.");
+    lines.push("Start a task before creating a handoff:");
+    lines.push('  zentext task create --title "Describe the current task"');
+  }
+
   if (meta.latestHandoff) {
     lines.push("");
     lines.push(`Latest handoff: ${meta.latestHandoff.id} — ${meta.latestHandoff.title}`);

@@ -25,6 +25,20 @@ zentext status
 
 ## Basic workflow
 
+### 0. Start a task
+
+Every handoff depends on a current task. Create one first:
+
+```bash
+zentext task create --title "Describe the current engineering task" --goal "What this task should achieve"
+```
+
+Use `zentext task show` to inspect the current task and `zentext task update` to record progress:
+
+```bash
+zentext task update --summary "Where the work stopped" --next-action "What to do next" --note "Optional progress note"
+```
+
 ### 1. Initialize a project
 
 In the root of any project you want agents to share:
@@ -45,9 +59,11 @@ zentext repack --focus "authentication"
 
 ### 3. Create a handoff before switching agents
 
-When you are done with one agent session, record the stopping point:
+When you are done with one agent session, record the stopping point. A task must exist first:
 
 ```bash
+zentext task create --title "Implement login route" --goal "Add password-based authentication"
+
 zentext handoff create \
   --from "codex" \
   --stopping-point "Implemented login route; need password hashing next." \
