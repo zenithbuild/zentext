@@ -10,7 +10,9 @@ project from scratch.
 
 ## Developer Preview install
 
-Requires Node.js >= 20.
+Requires Node.js 22.13+, 24.x, or 26.x (26.x is experimental).
+
+If better-sqlite3 install scripts are blocked, Node 22+ falls back to the built-in `node:sqlite` module. Node 20 requires a working better-sqlite3 binding.
 
 ```bash
 # Try without installing
@@ -69,6 +71,34 @@ zentext handoff validate
 - [docs/switching-agents.md](./docs/switching-agents.md) — how to hand off between agents
 - [docs/tester-onboarding.md](./docs/tester-onboarding.md) — full tester workflow
 - [docs/mcp.md](./docs/mcp.md) — MCP adapter usage
+
+## Troubleshooting
+
+### "Could not locate the bindings file" or native binding errors
+
+better-sqlite3 needs its install script to download or compile a native binding.
+Some npm configurations (such as LavaMoat `allow-scripts`) block lifecycle scripts by default.
+
+Options:
+
+1. Allow better-sqlite3 scripts and reinstall:
+
+   ```bash
+   npm install-scripts approve better-sqlite3
+   npm install -g zentext@next
+   ```
+
+2. Override the restriction for a single npx run (Node 22+ only):
+
+   ```bash
+   npm_config_allow_scripts=better-sqlite3 npx zentext@next init
+   ```
+
+3. Use Node 22, 24, or 26 and allow the built-in `node:sqlite` fallback to activate by blocking scripts:
+
+   ```bash
+   npm_config_ignore_scripts=true npx zentext@next init
+   ```
 
 ## Report problems
 

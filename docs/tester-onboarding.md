@@ -2,7 +2,9 @@
 
 ## Install
 
-Requires Node.js >= 20.
+Requires Node.js 22.13+, 24.x, or 26.x (26.x is experimental).
+
+Node 22+ can fall back to the built-in `node:sqlite` module if better-sqlite3 install scripts are blocked. Node 22.13+ is the minimum supported version because node:sqlite is required for the install-script fallback.
 
 ```bash
 # Try once without installing
@@ -93,6 +95,33 @@ npm uninstall -g zentext
 ```
 
 The local project store remains under `~/.zentext/projects/` if you want to keep it.
+
+## Troubleshooting install errors
+
+### better-sqlite3 binding errors
+
+If you see an error such as `Could not locate the bindings file` or a message about `NODE_MODULE_VERSION`, better-sqlite3 did not install its native binding.
+
+Try one of the following:
+
+1. Allow better-sqlite3 scripts and reinstall:
+
+   ```bash
+   npm install-scripts approve better-sqlite3
+   npm install -g zentext@next
+   ```
+
+2. Override the restriction for one npx invocation (Node 22+ only):
+
+   ```bash
+   npm_config_allow_scripts=better-sqlite3 npx zentext@next init
+   ```
+
+3. Force the `node:sqlite` fallback on Node 22+ by skipping lifecycle scripts:
+
+   ```bash
+   npm_config_ignore_scripts=true npx zentext@next init
+   ```
 
 ## Limitations
 

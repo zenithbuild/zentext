@@ -5,7 +5,7 @@
  * depend on the Store interface, not this class directly.
  */
 
-import Database from "better-sqlite3";
+import { openDatabase, type SqliteDatabase } from "./sqlite-binding.js";
 import { ulid } from "ulid";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -255,7 +255,7 @@ function rowToRecord(row: RecordRow): AnyRecord {
 // ---------------------------------------------------------------------------
 
 export class SqliteStore implements Store {
-  private db: Database.Database | null = null;
+  private db: SqliteDatabase | null = null;
   private projectId: string | null = null;
 
   // ------------------------------------------------------------------
@@ -272,7 +272,7 @@ export class SqliteStore implements Store {
     mkdirSync(join(storePath, "exports"), { recursive: true });
 
     // Open or create the database
-    this.db = new Database(dbPath);
+    this.db = openDatabase(dbPath);
     this.db.pragma("journal_mode = WAL");
     this.db.pragma("busy_timeout = 5000");
 
@@ -314,7 +314,7 @@ export class SqliteStore implements Store {
       );
     }
 
-    this.db = new Database(dbPath);
+    this.db = openDatabase(dbPath);
     this.db.pragma("journal_mode = WAL");
     this.db.pragma("busy_timeout = 5000");
 
@@ -352,7 +352,7 @@ export class SqliteStore implements Store {
       throw new StoreNotFoundError("Project not found.");
     }
 
-    this.db = new Database(dbPath);
+    this.db = openDatabase(dbPath);
     this.db.pragma("journal_mode = WAL");
     this.db.pragma("busy_timeout = 5000");
 

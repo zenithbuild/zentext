@@ -1,12 +1,21 @@
 # Zentext Developer Preview Release Report
 
+## 0.1.0-dev.1 correction
+
+This release corrects a post-0.1.0-dev.0 blocker:
+
+- `better-sqlite3` requires install scripts to download/compile a native binding.
+- When scripts are blocked (e.g., LavaMoat `allow-scripts` or `npm_config_ignore_scripts=true`), the previous release crashed with `Could not locate the bindings file`.
+- `0.1.0-dev.1` adds `src/store/sqlite-binding.ts`, a unified driver that prefers `better-sqlite3` and falls back to Node's built-in `node:sqlite` on Node 22.13+.
+- The supported Node engine range is now restricted to `>=22.13 <25` so behavior is predictable. Node 26.x may work but is not officially supported.
+
 ## 1. Package name
 
 `zentext`
 
 ## 2. Prerelease version
 
-`0.1.0-dev.0`
+`0.1.0-dev.1`
 
 ## 3. npm account or scope
 
@@ -14,11 +23,11 @@ Unscoped public package. Registry availability verified: `npm view zentext` retu
 
 ## 4. Tarball filename
 
-`zentext-0.1.0-dev.0.tgz`
+`zentext-0.1.0-dev.1.tgz`
 
 ## 5. Tarball unpacked size
 
-~264 kB
+~284 kB
 
 ## 6. Included top-level paths
 
@@ -44,7 +53,7 @@ Only `package/`, containing:
 
 ## 8. Total passing tests
 
-211 tests passed across 10 test files.
+217 tests passed across 11 test files.
 
 ## 9. Installed CLI smoke results
 
@@ -58,6 +67,7 @@ Verified from the produced tarball in a completely fresh temporary directory:
 - `zentext handoff acknowledge` ✅
 - `zentext handoff validate` ✅
 - Stale handoff rejection ✅ (exit code 4, `acknowledged: false`)
+- better-sqlite3 scripts blocked + `node:sqlite` fallback ✅ (Node 22+, `npm_config_ignore_scripts=true`)
 
 ## 10. Deeper Stage 7 continuation results
 
@@ -77,7 +87,7 @@ Agent B and Agent C now receive the same read-only repository evidence as Agent 
 ## 12. Exact publish command
 
 ```bash
-npm publish ./zentext-0.1.0-dev.0.tgz --tag next
+npm publish ./zentext-0.1.0-dev.1.tgz --tag next
 ```
 
 For a scoped package, the command would include `--access public`. `zentext` is unscoped, so `--access public` is not required.
@@ -87,13 +97,13 @@ For a scoped package, the command would include `--access public`. `zentext` is 
 Deprecate the prerelease:
 
 ```bash
-npm deprecate zentext@0.1.0-dev.0 "Developer Preview deprecated; install a newer prerelease or wait for the stable release."
+npm deprecate zentext@0.1.0-dev.1 "Developer Preview deprecated; install a newer prerelease or wait for the stable release."
 ```
 
 Unpublish is possible within 24 hours:
 
 ```bash
-npm unpublish zentext@0.1.0-dev.0
+npm unpublish zentext@0.1.0-dev.1
 ```
 
 ## 14. Release classification

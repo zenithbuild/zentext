@@ -3,6 +3,9 @@ import { mkdtempSync, rmSync, existsSync, writeFileSync } from "node:fs";
 import { join, basename } from "node:path";
 import { tmpdir } from "node:os";
 import { execSync } from "node:child_process";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
 
 const REPO_ROOT = process.cwd();
 
@@ -199,4 +202,71 @@ store.close();
     rmSync(project, { recursive: true, force: true });
     rmSync(home, { recursive: true, force: true });
   });
+
+  it("installed zentext init works when better-sqlite3 scripts are blocked on Node 22+", () => {
+    const project = mkdtempSync(join(tmpdir(), "zentext-blocked-scripts-proj-"));
+    const home = mkdtempSync(join(tmpdir(), "zentext-blocked-scripts-home-"));
+    const blockedInstallDir = mkdtempSync(join(tmpdir(), "zentext-blocked-scripts-install-"));
+
+    // Determine whether node:sqlite fallback is available on this runtime.
+    let nodeSqliteAvailable = false;
+    try {
+      const mod = require("node:sqlite") as typeof import("node:sqlite");
+      nodeSqliteAvailable = !!mod.DatabaseSync;
+    } catch {
+      nodeSqliteAvailable = false;
+    }
+
+    if (!nodeSqliteAvailable) {
+      // No fallback exists below Node 22; skip this regression test.
+      rmSync(project, { recursive: true, force: true });
+      rmSync(home, { recursive: true, force: true });
+      rmSync(blockedInstallDir, { recursive: true, force: true });
+      return;
+    }
+
+    writeFileSync(
+      join(blockedInstallDir, "package.json"),
+      JSON.stringify({ name: "blocked-consumer", version: "1.0.0", type: "module", private: true }, null, 2),
+      "utf8",
+    );
+
+    const blockedEnv: Record<string, string> = {};
+    for (const [key, value] of Object.entries(process.env)) {
+      if (value !== undefined && !key.toLowerCase().startsWith("npm_config_")) {
+        blockedEnv[key] = value;
+      }
+    }
+    blockedEnv.HOME = home;
+    blockedEnv.npm_config_ignore_scripts = "true";
+
+    execSync(`npm install --save ${tarballPath}`, {
+      cwd: blockedInstallDir,
+      env: blockedEnv,
+      stdio: "pipe",
+      timeout: 120_000,
+    });
+
+    const bin = join(blockedInstallDir, "node_modules", ".bin", "zentext");
+    const initOut = execSync(`HOME=${home} node ${bin} init`, {
+      cwd: project,
+      env: blockedEnv,
+      encoding: "utf8",
+      stdio: "pipe",
+    });
+    expect(initOut).toContain("State:   created");
+
+    const statusOut = execSync(`HOME=${home} node ${bin} status`, {
+      cwd: project,
+      env: blockedEnv,
+      encoding: "utf8",
+      stdio: "pipe",
+    });
+    expect(statusOut).toContain("Project:");
+    expect(statusOut).toContain("Record counts:");
+
+    rmSync(project, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+    rmSync(blockedInstallDir, { recursive: true, force: true });
+  }, 180_000);
 });
