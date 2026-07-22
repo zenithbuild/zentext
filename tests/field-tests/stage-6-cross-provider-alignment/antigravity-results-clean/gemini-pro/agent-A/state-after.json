@@ -1,0 +1,53 @@
+{
+  "task": {
+    "id": "rec_task_01KY1F05ZS434DC2EZ004D71GF",
+    "project": "de4e25a940974ece",
+    "type": "task",
+    "title": "Implement SaaS dashboard authentication",
+    "status": "active",
+    "created_at": "2026-07-21T04:30:00.697Z",
+    "updated_at": "2026-07-21T04:30:00.697Z",
+    "revision": 1,
+    "author": "agent:A",
+    "tags": [],
+    "refs": {},
+    "schema_version": 1,
+    "goal": "Add secure OAuth-based login and session management for the dashboard.",
+    "next": "Wire OAuth callback handler and session store."
+  },
+  "decision": {
+    "id": "rec_decision_01KY1F05ZSC2YHJ1BJD8XP1YRJ",
+    "project": "de4e25a940974ece",
+    "type": "decision",
+    "title": "Use OAuth 2.0 with PKCE",
+    "status": "accepted",
+    "created_at": "2026-07-21T04:30:00.697Z",
+    "updated_at": "2026-07-21T04:30:00.697Z",
+    "revision": 1,
+    "author": "agent:A",
+    "tags": [],
+    "refs": {},
+    "schema_version": 1,
+    "decision": "Adopt OAuth 2.0 authorization code flow with PKCE for dashboard login.",
+    "rationale": "Balances security with implementation complexity; avoids password storage."
+  },
+  "handoff": {
+    "id": "rec_handoff_01KY1F05ZTVDYKS38JZ9TMEERB",
+    "project": "de4e25a940974ece",
+    "type": "handoff",
+    "title": "Initial auth handoff",
+    "status": "latest",
+    "created_at": "2026-07-21T04:30:00.698Z",
+    "updated_at": "2026-07-21T04:30:00.698Z",
+    "revision": 1,
+    "author": "agent:A",
+    "tags": [],
+    "refs": {},
+    "schema_version": 1,
+    "from": "agent:A",
+    "to": "agent:B",
+    "context": "Authentication scope and decision are documented.",
+    "state": "Task created, decision accepted, no code written yet.",
+    "next": "Implement OAuth callback handler and session middleware."
+  }
+}

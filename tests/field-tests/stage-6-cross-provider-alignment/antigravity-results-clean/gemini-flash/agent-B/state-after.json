@@ -1,0 +1,18 @@
+{
+  "task": {
+    "id": "rec_task_01KY1EZM633XZD3D8D4DS51WXE",
+    "project": "8c1ef6c7a1edb38c",
+    "type": "task",
+    "title": "Implement SaaS dashboard authentication",
+    "status": "active",
+    "created_at": "2026-07-21T04:29:42.468Z",
+    "updated_at": "2026-07-21T04:29:47.067Z",
+    "revision": 2,
+    "author": "gemini-flash",
+    "tags": [],
+    "refs": {},
+    "schema_version": 1,
+    "goal": "Add secure OAuth-based login and session management for the dashboard.",
+    "next": "Implement OAuth 2.0 callback handler with PKCE verification and session middleware."
+  }
+}

@@ -1,0 +1,83 @@
+{
+  "scenario": {
+    "goal": "Add secure OAuth-based login and session management for the dashboard.",
+    "accepted_decision": "Adopt OAuth 2.0 authorization code flow with PKCE for dashboard login.",
+    "active_task_title": "Implement SaaS dashboard authentication",
+    "initial_next": "Wire OAuth callback handler and session store.",
+    "blockers": [],
+    "handoff_next": "Implement OAuth callback handler and session middleware."
+  },
+  "ollama_consensus": {
+    "goal": "Add secure OAuth-based login and session management for the dashboard.",
+    "accepted_decision": "Adopt OAuth 2.0 authorization code flow with PKCE for dashboard login.",
+    "active_task_title": "Implement SaaS dashboard authentication",
+    "implementation_sequence": ["OAuth callback handler / token exchange", "session middleware", "integration tests"],
+    "selected_task_id": "correct",
+    "uses_live_revision": true,
+    "mutation_applied": true,
+    "stale_rejected": true,
+    "hallucinations": false
+  },
+  "antigravity_clean": {
+    "note": "Each model ran in an isolated temporary HOME with a freshly seeded project, so both observed revision 1.",
+    "gemini-flash": {
+      "status": "executed",
+      "goal": "Add secure OAuth-based login and session management for the dashboard.",
+      "accepted_decision": "Adopt OAuth 2.0 authorization code flow with PKCE for dashboard login.",
+      "active_task_title": "Implement SaaS dashboard authentication",
+      "next_action": "Wire OAuth callback handler and session store.",
+      "implementation_sequence": ["OAuth 2.0 callback handler with PKCE verification", "session middleware"],
+      "selected_task_id": "correct",
+      "expected_revision": 1,
+      "uses_live_revision": true,
+      "mutation_applied": true,
+      "stale_expected_revision": 1,
+      "stale_rejected": true,
+      "hallucinations": false,
+      "overall_alignment": "fully aligned"
+    },
+    "gemini-pro": {
+      "status": "executed",
+      "goal": "Add secure OAuth-based login and session management for the dashboard.",
+      "accepted_decision": "Adopt OAuth 2.0 authorization code flow with PKCE for dashboard login.",
+      "active_task_title": "Implement SaaS dashboard authentication",
+      "next_action": "Wire OAuth callback handler and session store.",
+      "implementation_sequence": ["PKCE auth URL generator", "OAuth callback handler"],
+      "selected_task_id": "correct",
+      "expected_revision": 1,
+      "uses_live_revision": true,
+      "mutation_applied": true,
+      "stale_expected_revision": 1,
+      "stale_rejected": true,
+      "hallucinations": false,
+      "overall_alignment": "fully aligned"
+    },
+    "claude-sonnet": {
+      "status": "unavailable",
+      "reason": "Antigravity individual quota reached"
+    },
+    "claude-opus": {
+      "status": "unavailable",
+      "reason": "Antigravity individual quota reached"
+    }
+  },
+  "antigravity_ordered": {
+    "note": "Original sequential run using one shared store. Order effects are expected; this is preserved as historical evidence only.",
+    "gemini-flash": {
+      "status": "executed",
+      "expected_revision": 1,
+      "uses_live_revision": true,
+      "mutation_applied": true,
+      "stale_rejected": true,
+      "hallucinations": false
+    },
+    "gemini-pro": {
+      "status": "executed",
+      "expected_revision": 2,
+      "uses_live_revision": true,
+      "mutation_applied": true,
+      "stale_rejected": true,
+      "hallucinations": false
+    }
+  }
+}
