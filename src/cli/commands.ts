@@ -13,7 +13,18 @@ import type { AnyRecord, RecordType } from "../types/records.js";
 import { RECORD_TYPES } from "../types/records.js";
 import { SqliteStore, StoreNotFoundError } from "../store/sqlite-store.js";
 import { deriveProjectId } from "../store/project-id.js";
-import { formatInit, formatStatus, formatRecord, formatList } from "./format.js";
+import { formatInit, formatStatus, formatRecord, formatList, formatHandoff } from "./format.js";
+import {
+  buildHandoff,
+  handoffToCreateInput,
+  isHandoffCurrent,
+  recordToHandoff,
+  renderAcknowledgement,
+  HandoffValidationError,
+
+  type StructuredHandoff,
+} from "../handoff.js";
+import { createMemoryWriter, MemoryWriterConflictError } from "../domain/memory-writer.js";
 import { repack as repackEngine } from "../repack/engine.js";
 
 export class CliError extends Error {
@@ -33,6 +44,24 @@ function getStoreDbPath(cwd: string): string {
 
 function storeExists(cwd: string): boolean {
   return existsSync(getStoreDbPath(cwd));
+}
+
+
+
+async function getLatestHandoffStructured(cwd: string): Promise<StructuredHandoff> {
+  const store = await openStore(cwd);
+  try {
+    const handoffs = store
+      .listRecords({ type: "handoff", status: "latest" })
+      .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime() || a.id.localeCompare(b.id));
+    const latest = handoffs[0];
+    if (!latest) {
+      throw new CliError("No latest handoff found. Create one with `zentext handoff create`.", 3);
+    }
+    return recordToHandoff(latest);
+  } finally {
+    store.close();
+  }
 }
 
 async function openStore(cwd: string): Promise<SqliteStore> {
@@ -208,6 +237,179 @@ export async function repack(
     store.close();
   }
 }
+
+
+export async function handoffShow(
+  cwd: string,
+  options: { json?: boolean } = {},
+): Promise<{ output: string; exitCode: number }> {
+  const handoff = await getLatestHandoffStructured(cwd);
+  const store = await openStore(cwd);
+  try {
+    const current = isHandoffCurrent(handoff, store);
+    if (!current.current) {
+      if (options.json) {
+        return {
+          output: formatHandoff(handoff as unknown as Record<string, unknown>, {
+            json: true,
+            current: false,
+            staleReason: current.reason,
+          }),
+          exitCode: 4,
+        };
+      }
+      return {
+        output: formatHandoff(handoff as unknown as Record<string, unknown>, {
+          current: false,
+          staleReason: current.reason,
+        }),
+        exitCode: 4,
+      };
+    }
+    return {
+      output: formatHandoff(handoff as unknown as Record<string, unknown>, { json: options.json }),
+      exitCode: 0,
+    };
+  } finally {
+    store.close();
+  }
+}
+
+export async function handoffAcknowledge(
+  cwd: string,
+  options: { json?: boolean } = {},
+): Promise<{ output: string; exitCode: number }> {
+  const store = await openStore(cwd);
+  try {
+    const handoffs = store
+      .listRecords({ type: "handoff", status: "latest" })
+      .sort(
+        (a, b) =>
+          new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime() ||
+          a.id.localeCompare(b.id),
+      );
+    const latest = handoffs[0];
+    if (!latest) {
+      throw new CliError(
+        "No latest handoff found. Create one with `zentext handoff create`.",
+        3,
+      );
+    }
+    const handoff = recordToHandoff(latest);
+    const current = isHandoffCurrent(handoff, store);
+    if (!current.current) {
+      const payload = {
+        acknowledged: false,
+        current: false,
+        reason: current.reason,
+        task_id: handoff.active_task.id,
+        handoff_revision: current.handoffRevision,
+        live_revision: current.liveRevision,
+      };
+      const output = options.json
+        ? JSON.stringify(payload, null, 2)
+        : [
+            "Handoff rejected: the recorded handoff is stale and must be regenerated.",
+            "",
+            `Reason: ${current.reason}`,
+            `Task ID: ${handoff.active_task.id}`,
+            `Handoff revision: ${current.handoffRevision}`,
+            `Live revision: ${current.liveRevision}`,
+            "",
+            "Run `zentext handoff create` to produce a current handoff before continuing.",
+          ].join("\n");
+      return { output, exitCode: 4 };
+    }
+
+    const ack = renderAcknowledgement(handoff, options.json ? "json" : "human");
+    const output = options.json ? JSON.stringify(ack, null, 2) : String(ack);
+    return { output, exitCode: 0 };
+  } finally {
+    store.close();
+  }
+}
+
+export async function handoffValidate(
+  cwd: string,
+  options: { json?: boolean } = {},
+): Promise<{ output: string; exitCode: number }> {
+  const handoff = await getLatestHandoffStructured(cwd);
+  const store = await openStore(cwd);
+  try {
+    const current = isHandoffCurrent(handoff, store);
+    if (current.current) {
+      const message = options.json
+        ? JSON.stringify({ current: true, task_id: handoff.active_task.id, task_revision: handoff.active_task.revision }, null, 2)
+        : `Handoff is current (task ${handoff.active_task.id} at revision ${handoff.active_task.revision}).`;
+      return { output: message, exitCode: 0 };
+    }
+    const message = options.json
+      ? JSON.stringify(
+          {
+            current: false,
+            reason: current.reason,
+            task_id: handoff.active_task.id,
+            handoff_revision: current.handoffRevision,
+            live_revision: current.liveRevision,
+          },
+          null,
+          2,
+        )
+      : `Handoff is stale: ${current.reason} (handoff revision ${current.handoffRevision}, live revision ${current.liveRevision}).`;
+    return { output: message, exitCode: 4 };
+  } finally {
+    store.close();
+  }
+}
+
+export async function handoffCreate(
+  cwd: string,
+  options: {
+    from: string;
+    stoppingPoint: string;
+    nextAction: string;
+    completed?: string[];
+    blockers?: string[];
+    filesChanged?: string[];
+    verification?: string[];
+    previousResponse?: string;
+  },
+): Promise<{ output: string; exitCode: number }> {
+  const store = await openStore(cwd);
+  let writer: ReturnType<typeof createMemoryWriter> | undefined;
+  try {
+    const meta = await store.openProjectStore(cwd);
+    const handoff = buildHandoff(store, meta, {
+      previous_agent: options.from,
+      stopping_point: options.stoppingPoint,
+      next_action: options.nextAction,
+      completed: options.completed,
+      blockers: options.blockers,
+      files_changed: options.filesChanged,
+      verification: options.verification,
+      previous_response: options.previousResponse,
+    });
+
+    writer = createMemoryWriter(store);
+    const input = handoffToCreateInput(handoff, options.from);
+    const record = writer.createHandoff(input);
+    const output = formatHandoff(handoff as unknown as Record<string, unknown>);
+    return { output: `${output}
+
+Stored handoff record: ${record.id}`, exitCode: 0 };
+  } catch (err) {
+    if (err instanceof HandoffValidationError) {
+      throw new CliError(err.message, 1);
+    }
+    if (err instanceof MemoryWriterConflictError) {
+      throw new CliError(`Conflict: ${err.message}`, 6);
+    }
+    throw err;
+  } finally {
+    store.close();
+  }
+}
+
 export function printUsage(): string {
   return `Zentext CLI — Phase 2 read/inspect commands
 
@@ -223,7 +425,16 @@ Commands:
   status  Show a concise overview of the project memory
   show    Display a single record by id
   list    List records, optionally filtered
-  repack  Generate a focused context payload from project memory
+  repack   Generate a focused context payload from project memory
+  handoff  Structured handoff commands
+
+Handoff subcommands:
+  zentext handoff show [--json]
+  zentext handoff acknowledge [--json]
+  zentext handoff validate [--json]
+  zentext handoff create --from <agent> --stopping-point <text> --next-action <text>
+    [--completed <text>] [--blockers <text>] [--files-changed <text>]
+    [--verification <text>] [--previous-response <text>]
 
 Options:
   --type     Filter by record type (task, decision, blocker, ...)
@@ -232,5 +443,6 @@ Options:
   --focus    Prioritize records matching this topic
   --max-size Character budget for the output (default 12000)
   --out      Write the payload to a file instead of stdout
+  --json     Output handoff commands as JSON
 `;
 }

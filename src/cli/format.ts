@@ -210,3 +210,96 @@ export function formatInit(meta: {
   ];
   return lines.join("\n");
 }
+
+// ---------------------------------------------------------------------------
+// Handoff formatting
+// ---------------------------------------------------------------------------
+
+export function formatHandoff(
+  handoff: Record<string, unknown>,
+  options: { json?: boolean; current?: boolean; staleReason?: string } = {},
+): string {
+  if (options.json) {
+    const payload: Record<string, unknown> = {
+      ...handoff,
+      current: options.current ?? true,
+    };
+    if (options.staleReason) {
+      payload.stale_reason = options.staleReason;
+      payload.current = false;
+    }
+    return JSON.stringify(payload, null, 2);
+  }
+
+  const lines: string[] = [];
+  lines.push(`Handoff: ${handoff.project_name ?? "unknown"}`);
+  lines.push(`Project ID: ${handoff.project_id ?? "unknown"}`);
+  lines.push(`Previous agent: ${handoff.previous_agent ?? "unknown"}`);
+  lines.push(`Created: ${handoff.created_at ?? "unknown"}`);
+  lines.push("");
+
+  const task = handoff.active_task as Record<string, unknown> | undefined;
+  if (task) {
+    lines.push(`Active task: ${task.title ?? "unknown"}`);
+    lines.push(`  Task ID:      ${task.id ?? "unknown"}`);
+    lines.push(`  Task revision: ${task.revision ?? "unknown"}`);
+    lines.push(`  Task status:   ${task.status ?? "unknown"}`);
+  }
+
+  if (options.current === false) {
+    lines.push("");
+    lines.push(`STALE: ${options.staleReason ?? "handoff is out of date"}`);
+  }
+
+  const accepted = handoff.accepted_decisions as string[] | undefined;
+  if (accepted && accepted.length > 0) {
+    lines.push("");
+    lines.push("Accepted decisions:");
+    for (const d of accepted) {
+      lines.push(`  - ${d}`);
+    }
+  }
+
+  const completed = handoff.completed as string[] | undefined;
+  if (completed && completed.length > 0) {
+    lines.push("");
+    lines.push("Completed work:");
+    for (const c of completed) {
+      lines.push(`  - ${c}`);
+    }
+  }
+
+  lines.push("");
+  lines.push(`Stopping point: ${handoff.stopping_point ?? "(not set)"}`);
+  lines.push(`Next action: ${handoff.next_action ?? "(not set)"}`);
+
+  const blockers = handoff.blockers as string[] | undefined;
+  lines.push("");
+  lines.push(`Blockers: ${blockers && blockers.length > 0 ? blockers.join("; ") : "none"}`);
+
+  const filesChanged = handoff.files_changed as string[] | undefined;
+  if (filesChanged && filesChanged.length > 0) {
+    lines.push("");
+    lines.push("Files changed:");
+    for (const f of filesChanged) {
+      lines.push(`  - ${f}`);
+    }
+  }
+
+  const verification = handoff.verification as string[] | undefined;
+  if (verification && verification.length > 0) {
+    lines.push("");
+    lines.push("Verification:");
+    for (const v of verification) {
+      lines.push(`  - ${v}`);
+    }
+  }
+
+  if (handoff.previous_response) {
+    lines.push("");
+    lines.push("Previous response (supporting context only):");
+    lines.push(String(handoff.previous_response));
+  }
+
+  return lines.join("\n");
+}

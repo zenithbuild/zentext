@@ -3,8 +3,19 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
-import { CliError, init, list, show, status } from "../src/cli/commands.js";
+import {
+  CliError,
+  handoffAcknowledge,
+  handoffCreate,
+  handoffShow,
+  handoffValidate,
+  init,
+  list,
+  show,
+  status,
+} from "../src/cli/commands.js";
 import { SqliteStore } from "../src/store/sqlite-store.js";
+import { createMemoryWriter } from "../src/domain/memory-writer.js";
 
 describe("Zentext CLI — Phase 2 read/inspect", () => {
   let tempHome: string;
@@ -248,17 +259,265 @@ describe("Zentext CLI — Phase 2 read/inspect", () => {
     expect(storeLine!.includes(expectedPrefix)).toBe(true);
   });
 
-  it("CLI module does not expose write CLI commands", async () => {
-    // Phase 2 exports read/inspect commands; Phase 3 adds repack (a read/generate
-    // command). Write commands remain out of scope.
+
+
+});
+
+describe("Zentext CLI — handoff commands", () => {
+  let tempHome: string;
+  let tempProject: string;
+  let originalHome: string;
+
+  beforeEach(() => {
+    tempHome = mkdtempSync(join(tmpdir(), "zentext-cli-handoff-test-"));
+    tempProject = mkdtempSync(join(tmpdir(), "zentext-cli-handoff-proj-"));
+    originalHome = process.env.HOME ?? "";
+    process.env.HOME = tempHome;
+  });
+
+  afterEach(() => {
+    process.env.HOME = originalHome;
+    rmSync(tempHome, { recursive: true, force: true });
+    rmSync(tempProject, { recursive: true, force: true });
+  });
+
+  it("handoff show reports no handoff when none exists", async () => {
+    await init(tempProject);
+    try {
+      await handoffShow(tempProject);
+      expect.fail("expected handoffShow to throw");
+    } catch (err) {
+      expect(err).toBeInstanceOf(CliError);
+      expect((err as CliError).exitCode).toBe(3);
+      expect((err as Error).message).toContain("No latest handoff found");
+    }
+  });
+
+  it("handoff create stores a structured handoff", async () => {
+    const store = new SqliteStore();
+    await store.initProjectStore(tempProject);
+    store.createRecord({
+      type: "task",
+      title: "Verify CSS determinism",
+      goal: "Trace contract",
+      status: "active",
+      author: "agent:A",
+    });
+
+    const result = await handoffCreate(tempProject, {
+      from: "agent:A",
+      stoppingPoint: "Read contract and implementation.",
+      nextAction: "Run fresh build and compare.",
+      completed: ["Read contract"],
+      blockers: ["Need build artifact"],
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.output).toContain("Previous agent: agent:A");
+    expect(result.output).toContain("Stopping point: Read contract and implementation.");
+    expect(result.output).toContain("Next action: Run fresh build and compare.");
+    expect(result.output).toContain("Completed work:");
+    expect(result.output).toContain("Blockers: Need build artifact");
+    store.close();
+  });
+
+  it("handoff show displays the latest handoff and detects current revision", async () => {
+    const store = new SqliteStore();
+    await store.initProjectStore(tempProject);
+    store.createRecord({
+      type: "task",
+      title: "Verify CSS determinism",
+      goal: "Trace contract",
+      status: "active",
+      author: "agent:A",
+    });
+
+    await handoffCreate(tempProject, {
+      from: "agent:A",
+      stoppingPoint: "Read contract.",
+      nextAction: "Compare build outputs.",
+    });
+
+    const result = await handoffShow(tempProject);
+    expect(result.exitCode).toBe(0);
+    expect(result.output).toContain("Verify CSS determinism");
+    expect(result.output).toContain("Task revision:");
+    store.close();
+  });
+
+  it("handoff show exits nonzero when handoff is stale", async () => {
+    const store = new SqliteStore();
+    await store.initProjectStore(tempProject);
+    const task = store.createRecord({
+      type: "task",
+      title: "Verify CSS determinism",
+      goal: "Trace contract",
+      status: "active",
+      author: "agent:A",
+    });
+
+    await handoffCreate(tempProject, {
+      from: "agent:A",
+      stoppingPoint: "Read contract.",
+      nextAction: "Compare build outputs.",
+    });
+
+    // Advance the task revision outside the handoff workflow.
+    const writer = createMemoryWriter(store);
+    writer.updateRecord(task.id, { next: "new step" }, { author: "agent:B" });
+
+    const result = await handoffShow(tempProject);
+    expect(result.exitCode).toBe(4);
+    expect(result.output).toContain("STALE");
+    store.close();
+  });
+
+  it("handoff acknowledge renders startup acknowledgement", async () => {
+    const store = new SqliteStore();
+    await store.initProjectStore(tempProject);
+    store.createRecord({
+      type: "task",
+      title: "Verify CSS determinism",
+      goal: "Trace contract",
+      status: "active",
+      author: "agent:A",
+    });
+
+    await handoffCreate(tempProject, {
+      from: "agent:A",
+      stoppingPoint: "Read contract.",
+      nextAction: "Compare build outputs.",
+      completed: ["Read contract"],
+    });
+
+    const result = await handoffAcknowledge(tempProject);
+    expect(result.exitCode).toBe(0);
+    expect(result.output).toContain("Zentext context loaded.");
+    expect(result.output).toContain("Active task: Verify CSS determinism");
+    expect(result.output).toContain("I will continue from this stopping point");
+    store.close();
+  });
+
+
+  it("handoff acknowledge rejects stale handoff and does not claim continuation", async () => {
+    const store = new SqliteStore();
+    await store.initProjectStore(tempProject);
+    const task = store.createRecord({
+      type: "task",
+      title: "Verify CSS determinism",
+      goal: "Trace contract",
+      status: "active",
+      author: "agent:A",
+    });
+
+    await handoffCreate(tempProject, {
+      from: "agent:A",
+      stoppingPoint: "Read contract.",
+      nextAction: "Compare build outputs.",
+      completed: ["Read contract"],
+    });
+
+    const writer = createMemoryWriter(store);
+    writer.updateRecord(task.id, { next: "new step" }, { author: "agent:B" });
+
+    const result = await handoffAcknowledge(tempProject);
+    expect(result.exitCode).toBe(4);
+    expect(result.output).toContain("Handoff rejected");
+    expect(result.output).not.toContain("Zentext context loaded.");
+    expect(result.output).not.toContain("I will continue from this stopping point");
+    expect(result.output).toContain("Live revision:");
+    store.close();
+  });
+
+  it("handoff acknowledge --json reports acknowledged false for stale handoff", async () => {
+    const store = new SqliteStore();
+    await store.initProjectStore(tempProject);
+    const task = store.createRecord({
+      type: "task",
+      title: "Verify CSS determinism",
+      goal: "Trace contract",
+      status: "active",
+      author: "agent:A",
+    });
+
+    await handoffCreate(tempProject, {
+      from: "agent:A",
+      stoppingPoint: "Read contract.",
+      nextAction: "Compare build outputs.",
+      completed: ["Read contract"],
+    });
+
+    const writer = createMemoryWriter(store);
+    writer.updateRecord(task.id, { next: "new step" }, { author: "agent:B" });
+
+    const result = await handoffAcknowledge(tempProject, { json: true });
+    expect(result.exitCode).toBe(4);
+    const parsed = JSON.parse(result.output);
+    expect(parsed.acknowledged).toBe(false);
+    expect(parsed.current).toBe(false);
+    expect(parsed.reason).toContain("active_task revision changed");
+    expect(parsed.handoff_revision).toBe(1);
+    expect(parsed.live_revision).toBe(2);
+    expect(parsed.task_id).toBe(task.id);
+    store.close();
+  });
+  it("handoff validate returns current for matching revision", async () => {
+    const store = new SqliteStore();
+    await store.initProjectStore(tempProject);
+    store.createRecord({
+      type: "task",
+      title: "Verify CSS determinism",
+      goal: "Trace contract",
+      status: "active",
+      author: "agent:A",
+    });
+
+    await handoffCreate(tempProject, {
+      from: "agent:A",
+      stoppingPoint: "Read contract.",
+      nextAction: "Compare build outputs.",
+    });
+
+    const result = await handoffValidate(tempProject);
+    expect(result.exitCode).toBe(0);
+    expect(result.output).toContain("current");
+    store.close();
+  });
+
+  it("handoff show --json returns structured JSON", async () => {
+    const store = new SqliteStore();
+    await store.initProjectStore(tempProject);
+    store.createRecord({
+      type: "task",
+      title: "Verify CSS determinism",
+      goal: "Trace contract",
+      status: "active",
+      author: "agent:A",
+    });
+
+    await handoffCreate(tempProject, {
+      from: "agent:A",
+      stoppingPoint: "Read contract.",
+      nextAction: "Compare build outputs.",
+    });
+
+    const result = await handoffShow(tempProject, { json: true });
+    expect(result.exitCode).toBe(0);
+    const parsed = JSON.parse(result.output);
+    expect(parsed.active_task.title).toBe("Verify CSS determinism");
+    expect(parsed.current).toBe(true);
+    store.close();
+  });
+  it("CLI module does not expose unapproved write CLI commands", async () => {
     const commands = await import("../src/cli/commands.js");
     expect(commands.init).toBeTypeOf("function");
     expect(commands.status).toBeTypeOf("function");
     expect(commands.show).toBeTypeOf("function");
     expect(commands.list).toBeTypeOf("function");
     expect(commands.repack).toBeTypeOf("function");
+    expect(commands.handoffShow).toBeTypeOf("function");
+    expect(commands.handoffCreate).toBeTypeOf("function");
     expect("add" in commands).toBe(false);
-    expect("handoff" in commands).toBe(false);
     expect("edit" in commands).toBe(false);
     expect("audit" in commands).toBe(false);
   });

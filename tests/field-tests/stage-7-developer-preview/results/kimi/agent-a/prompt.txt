@@ -1,0 +1,1754 @@
+# Zentext context — zenithbuild/framework
+Generated: 2026-07-22T00:13:52.881Z | focus: CSS determinism | from: 2 records | budget: 12000 chars
+
+> Point-in-time snapshot. Live memory is at ~/.zentext/projects/b1391d80609491d9/store.sqlite
+
+## Active task
+- Verify Zenith CSS determinism contract (active)
+- ID: rec_task_01KY3JQXBE2YZJKV7JXVA2HGV0 | revision: 1
+- Goal: Trace Zenith CSS determinism contract claims to implementation
+- Refs: (none)
+
+## Decisions (1)
+- Compiler pre-sorts CSS blocks (accepted)
+  - Decision: CSS blocks are ordered by dependency depth via compiler pre-sort before process_css is called
+
+
+Repository files:
+--- contracts/DETERMINISM.md ---
+# Zenith Determinism Contract
+
+This document defines the strict determinism guarantees provided by the Zenith compiler and bundler.
+These invariants are enforced by the build pipeline and must not be violated.
+
+## 1. CSS Output Determinism
+
+The CSS output is a **pure function** of the canonical module graph and normalized source content.
+It is guaranteed to be byte-stable across environments (OS, CI, local).
+
+### Invariants:
+
+1.  **Topological Ordering**:
+    Styles are ordered by **dependency depth** (reverse topological sort).
+    If `A` imports `B`, and `B` imports `C`, the CSS order is guaranteed to be:
+    ```
+    [C styles]
+    [B styles]
+    [A styles]
+    ```
+    This ensures that parent components (`A`) can always override styles of their dependencies (`B`).
+
+2.  **Byte-Stability**:
+    - All line endings are normalized to `\n` (LF) before hashing and concatenation.
+    - `\r\n` (CRLF) is strictly forbidden in the final output.
+    - UTF-8 encoding is enforced.
+
+3.  **Strict Anchor Enforcement**:
+    The HTML template **must** contain exactly one `<!-- ZENITH_STYLES_ANCHOR -->`.
+    The bundler will **hard-fail** if:
+    - The anchor is missing.
+    - Multiple anchors are present.
+    - The anchor is malformed.
+    This ensures CSS injection is explicit and never accidental.
+
+4.  **No Hidden Mutation**:
+    The CSS bundle is constructed via simple concatenation of topologically sorted blocks.
+    - **Duplicate (module_id, order) pairs hard-fail**: The compiler ensures uniqueness of identity.
+    - **Duplicate content preserved**: If two different modules emit identical CSS, both are included.
+    - No reordering based on specificity or file names.
+    - No implicit optimization or minification in the extraction phase.
+
+## 2. Compiler Determinism
+
+1.  **Canonical Module IDs**:
+    - All module IDs are normalized to forward slashes (`/`), regardless of OS.
+    - Relative imports are resolved relative to the *canonical* path of the importer.
+    - This ensures `sha256` hashes of module graphs are identical on Windows, macOS, and Linux.
+
+2.  **Expression Stability**:
+    - Expression extraction order is determinstic (left-to-right, depth-first).
+    - `__zenith_expr` array order matches the source appearance exactly.
+
+## 3. Runtime Parity
+
+1.  **Unified Pipeline**:
+    - `zenith dev` uses the **exact same** `zenith-bundler` binary and pipeline as `zenith build`.
+    - No "fast path" or "in-memory only" bypasses that skip the determinism checks.
+    - CSS in `dev` mode is identical to `prod` (excluding optional minification).
+
+2.  **Virtual Modules**:
+    - `zenith:css:<page>` and `zenith:entry:<page>` virtual modules are sealed.
+    - User code cannot mock or override these internal modules.
+
+
+--- packages/bundler/src/utils.rs ---
+//! Utility functions for the bundler.
+//!
+//! - Virtual module ID construction and parsing
+//! - JS literal serialization through compiler-owned helpers
+//! - Post-build validation helpers
+
+use regex::Regex;
+
+use crate::{BundleError, CompilerOutput, Diagnostic, DiagnosticLevel};
+use zenith_compiler::deterministic::sha256_hex;
+use zenith_compiler::js_serialize::{serialize_js_string_literal, serialize_js_template_literal};
+use zenith_compiler::script::ExtractedStyleBlock;
+
+use oxc_allocator::Allocator;
+use oxc_codegen::{Codegen, CodegenOptions};
+use oxc_parser::Parser;
+use oxc_span::SourceType;
+
+#[path = "utils_import_rewrite.rs"]
+mod import_rewrite;
+pub use self::import_rewrite::rewrite_js_imports_ast;
+
+// ---------------------------------------------------------------------------
+// Virtual Module IDs
+// ---------------------------------------------------------------------------
+
+/// Prefix for all Zenith virtual modules.
+/// The `\0` prefix prevents filesystem resolution collisions.
+pub const VIRTUAL_PREFIX: &str = "\0zenith:";
+
+/// Create the virtual entry module ID for a page.
+pub fn virtual_entry_id(page_id: &str) -> String {
+    format!("\0zenith:entry:{}", page_id)
+}
+
+/// Create the virtual CSS module ID for a page.
+pub fn virtual_css_id(page_id: &str) -> String {
+    format!("\0zenith:css:{}", page_id)
+}
+
+/// Create the virtual page-script module ID.
+pub fn virtual_page_script_id(page_id: &str) -> String {
+    format!("\0zenith:page-script:{}", page_id)
+}
+
+/// Extract the page ID from a virtual module ID.
+/// Returns `None` if the ID doesn't match the expected pattern.
+pub fn extract_page_id(virtual_id: &str) -> Option<&str> {
+    if let Some(rest) = virtual_id.strip_prefix("\0zenith:entry:") {
+        Some(rest)
+    } else if let Some(rest) = virtual_id.strip_prefix("\0zenith:css:") {
+        Some(rest)
+    } else if let Some(rest) = virtual_id.strip_prefix("\0zenith:page-script:") {
+        Some(rest)
+    } else {
+        None
+    }
+}
+
+/// Check if a module ID is a Zenith virtual module.
+pub fn is_virtual(id: &str) -> bool {
+    id.starts_with(VIRTUAL_PREFIX)
+}
+
+/// Check if a file path is a `.zen` file.
+pub fn is_zen_file(path: &str) -> bool {
+    path.ends_with(".zen")
+}
+
+/// Check if a module ID is a Zenith internal virtual module.
+/// These use the `\0zenith:` prefix and must never be user-resolvable.
+pub fn is_zenith_virtual_id(id: &str) -> bool {
+    id.starts_with(VIRTUAL_PREFIX)
+}
+
+/// Reject user-space imports that attempt to use the `\0zenith:` namespace.
+/// Returns `Err` if the specifier collides with internal virtual IDs.
+/// This prevents namespace pollution and ensures virtual modules are hermetically sealed.
+pub fn reject_external_zenith_import(specifier: &str) -> Result<(), BundleError> {
+    // User specifiers should never start with \0 (null byte prefix)
+    // Any specifier containing "zenith:" after a null byte is an internal ID
+    if specifier.starts_with('\0') {
+        return Err(BundleError::ValidationError(format!(
+            "Cannot import internal virtual module '{}' — \\0zenith: namespace is reserved",
+            specifier
+        )));
+    }
+    // Also reject literal string "\0zenith:" in non-null-prefixed specifiers
+    // (e.g. someone trying to escape the prefix)
+    if specifier.contains("\\0zenith:") || specifier.contains("%00zenith:") {
+        return Err(BundleError::ValidationError(format!(
+            "Cannot reference internal virtual namespace in specifier '{}'",
+            specifier
+        )));
+    }
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Rolldown Commit Pin
+// ---------------------------------------------------------------------------
+
+/// Expected Rolldown git commit. If the actual Rolldown version differs,
+/// determinism guarantees may be invalidated.
+pub const EXPECTED_ROLLDOWN_COMMIT: &str = "67a1f58";
+
+/// Clean a path string by resolving . and .. components purely textually.
+/// Does NOT touch the filesystem.
+pub fn clean_path(path: &str) -> String {
+    let path = path.replace('\\', "/");
+    let mut out = Vec::new();
+
+    for segment in path.split('/') {
+        if segment.is_empty() || segment == "." {
+            continue;
+        }
+        if segment == ".." {
+            out.pop();
+        } else {
+            out.push(segment);
+        }
+    }
+
+    let result = out.join("/");
+    if path.starts_with('/') {
+        format!("/{}", result)
+    } else {
+        result
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Virtual Entry Generation
+// ---------------------------------------------------------------------------
+
+/// Generate the virtual entry module JS source for a compiled page.
+///
+/// The entry contains:
+/// - `__zenith_html` — the HTML template string
+/// - `__zenith_expr` — the expression table
+/// - A default export function (hydration stub)
+pub fn generate_virtual_entry(output: &CompilerOutput) -> String {
+    let html_literal = serialize_js_template_literal(&output.html);
+
+    let expr_items: Vec<String> = output
+        .expressions
+        .iter()
+        .map(|e| serialize_js_string_literal(e))
+        .collect();
+
+    let expr_array = expr_items.join(", ");
+
+    format!(
+        r#"export const __zenith_html = {};
+export const __zenith_expr = [{}];
+export const __zenith_contract = "v0";
+export default function __zenith_page() {{
+  return {{ html: __zenith_html, expressions: __zenith_expr, contract: __zenith_contract }};
+}}"#,
+        html_literal, expr_array
+    )
+}
+
+/// Emit a runtime expression function through AST parse/codegen instead of
+/// splicing compiler output directly into generated JS.
+pub fn emit_runtime_expression_function(compiled_expr: &str) -> Result<String, String> {
+    let uses_signal_map = expression_references_identifier(compiled_expr, "signalMap");
+    let uses_params = expression_references_identifier(compiled_expr, "params");
+    let uses_props = expression_references_identifier(compiled_expr, "props");
+    let uses_data = expression_references_identifier(compiled_expr, "data");
+    let uses_ssr = expression_references_identifier(compiled_expr, "ssr");
+    let uses_ssr_data = expression_references_identifier(compiled_expr, "ssrData");
+    let uses_component_bindings =
+        expression_references_identifier(compiled_expr, "componentBindings");
+    let needs_ssr_data = uses_ssr_data || uses_data || uses_ssr;
+
+    let mut source = String::new();
+    source.push_str("const __zenith_expr_fn = function(__ctx) {\n");
+    if uses_signal_map {
+        source.push_str("  const signalMap = __ctx.signalMap;\n");
+    }
+    if uses_params {
+        source.push_str("  const params = __ctx.params;\n");
+    }
+    if uses_props {
+        source.push_str("  const props = __ctx.props;\n");
+    }
+    if needs_ssr_data {
+        source.push_str("  const ssrData = __ctx.ssrData;\n");
+    }
+    if uses_data {
+        source.push_str("  const data = ssrData;\n");
+    }
+    if uses_ssr {
+        source.push_str("  const ssr = ssrData;\n");
+    }
+    if uses_component_bindings {
+        source.push_str("  const componentBindings = __ctx.componentBindings;\n");
+    }
+    source.push_str("  return (");
+    source.push_str(compiled_expr);
+    source.push_str(");\n};\n");
+
+    let allocator = Allocator::default();
+    let source_type = SourceType::default().with_module(true);
+    let parser = Parser::new(&allocator, &source, source_type);
+    let parse_result = parser.parse();
+
+    if !parse_result.errors.is_empty() {
+        let errs = parse_result
+            .errors
+            .iter()
+            .map(|error| format!("{error}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        return Err(format!(
+            "failed to emit runtime expression function from compiler expression:\n{}",
+            errs
+        ));
+    }
+
+    let codegen = Codegen::<false>::new(&source, CodegenOptions::default());
+    let compiled = codegen.build(&parse_result.program);
+    let rendered = compiled.source_text.trim();
+    let prefix = "const __zenith_expr_fn = ";
+    let initializer = rendered
+        .strip_prefix(prefix)
+        .and_then(|value| value.strip_suffix(';'))
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| {
+            "failed to extract canonical runtime expression function source".to_string()
+        })?;
+
+    Ok(initializer.to_string())
+}
+
+fn expression_references_identifier(compiled_expr: &str, identifier: &str) -> bool {
+    let pattern = format!(r"\b{}\b", regex::escape(identifier));
+    match Regex::new(&pattern) {
+        Ok(re) => re.is_match(compiled_expr),
+        Err(_) => false,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Canonicalize Page ID
+// ---------------------------------------------------------------------------
+
+/// Derive a deterministic page ID from a file path.
+/// Strips extensions, normalizes separators, and lowercases.
+pub fn canonicalize_page_id(page_path: &str) -> String {
+    let path = std::path::Path::new(page_path);
+    let stem = path.file_stem().unwrap_or_default().to_string_lossy();
+    // Use the stem as the page ID, lowercased
+    stem.to_lowercase()
+}
+
+// ---------------------------------------------------------------------------
+// Post-Build Validation
+// ---------------------------------------------------------------------------
+
+/// Validate that the bundled output contains all expected expression placeholders.
+pub fn validate_placeholders(html: &str, expression_count: usize) -> Result<(), Vec<Diagnostic>> {
+    let mut found_indices = std::collections::HashSet::new();
+
+    // Regex to find all data-zx-* attributes and capture their values (quoted or unquoted)
+    // Matches: data-zx-something="value" OR data-zx-something='value' OR data-zx-something=value
+    let re = Regex::new(r#"data-zx-[a-z-]+=(?:"([^"]+)"|'([^']+)'|([^\s>"']+))"#).unwrap();
+    let comment_re = Regex::new(r#"<!--\s*zx-e:(\d+)\s*-->"#).unwrap();
+
+    for cap in re.captures_iter(html) {
+        // Value is in group 1, 2, or 3
+        let val = cap
+            .get(1)
+            .or(cap.get(2))
+            .or(cap.get(3))
+            .map(|m| m.as_str())
+            .unwrap_or("");
+
+        // Parse space-separated indices
+        for part in val.split_whitespace() {
+            if let Ok(idx) = part.parse::<usize>() {
+                found_indices.insert(idx);
+            }
+        }
+    }
+
+    for cap in comment_re.captures_iter(html) {
+        let val = cap.get(1).map(|m| m.as_str()).unwrap_or("");
+        if let Ok(idx) = val.parse::<usize>() {
+            found_indices.insert(idx);
+        }
+    }
+
+    let mut missing = Vec::new();
+    for i in 0..expression_count {
+        if !found_indices.contains(&i) {
+            missing.push(Diagnostic {
+                level: DiagnosticLevel::Error,
+                message: format!("Missing placeholder for expression index {}", i),
+                context: Some(format!(
+                    "Expected index {} in a data-zx-e, data-zx-on-*, or comment placeholder",
+                    i
+                )),
+            });
+        }
+    }
+
+    if missing.is_empty() {
+        Ok(())
+    } else {
+        Err(missing)
+    }
+}
+
+/// Validate that compiled expressions match metadata expressions exactly.
+pub fn validate_expressions(compiled: &[String], metadata: &[String]) -> Result<(), BundleError> {
+    if compiled.len() != metadata.len() {
+        return Err(BundleError::ExpressionMismatch {
+            expected: metadata.len(),
+            got: compiled.len(),
+        });
+    }
+
+    for (i, (got, expected)) in compiled.iter().zip(metadata.iter()).enumerate() {
+        if got != expected {
+            return Err(BundleError::ExpressionContentMismatch {
+                index: i,
+                expected: expected.clone(),
+                got: got.clone(),
+            });
+        }
+    }
+
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// CSS Processing
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProcessedCss {
+    pub hash: String,
+    pub content: String,
+}
+
+pub fn contains_raw_tailwind_import(content: &str) -> bool {
+    content.contains("@import \"tailwindcss\"") || content.contains("@import 'tailwindcss'")
+}
+
+pub fn process_css(
+    style_blocks: &[ExtractedStyleBlock],
+    html: &str,
+) -> Result<(Option<ProcessedCss>, String), String> {
+    if style_blocks.is_empty() {
+        let anchor = "<!-- ZENITH_STYLES_ANCHOR -->";
+        if html.contains(anchor) {
+            return Ok((None, html.replace(anchor, "")));
+        }
+        return Ok((None, html.to_string()));
+    }
+
+    let mut style_hashes = Vec::new();
+    let mut clean_content = Vec::new();
+
+    for block in style_blocks {
+        let seed = format!("{}:{}:{}", block.module_id, block.order, block.content);
+        let hash = sha256_hex(seed.as_bytes());
+        style_hashes.push(hash);
+        clean_content.push(block.content.clone());
+    }
+
+    let mut sorted_hashes = style_hashes.clone();
+    sorted_hashes.sort();
+    let bundle_seed = sorted_hashes.join("|");
+    let bundle_hash = sha256_hex(bundle_seed.as_bytes());
+
+    let final_content = clean_content.join("\n\n");
+
+    if final_content.trim().is_empty() {
+        return Err(
+            "Determinism violation: style_blocks > 0 but final CSS content is empty.".to_string(),
+        );
+    }
+
+    if contains_raw_tailwind_import(&final_content) {
+        return Err(
+            "Tailwind CSS contract violation: emitted CSS still contains raw @import \"tailwindcss\". \
+             Zenith should compile local Tailwind entry CSS internally before emission. \
+             Raw Tailwind imports are not valid browser CSS and will 404 if shipped.".to_string(),
+        );
+    }
+
+    let anchor = "<!-- ZENITH_STYLES_ANCHOR -->";
+    let count = html.matches(anchor).count();
+    if count != 1 {
+        return Err(format!(
+            "Expected exactly one ZENITH_STYLES_ANCHOR, found {}",
+            count
+        ));
+    }
+
+    let link_tag = format!(
+        "<link rel=\"stylesheet\" href=\"/assets/styles.{}.css\">",
+        bundle_hash
+    );
+    let new_html = html.replace(anchor, &link_tag);
+
+    Ok((
+        Some(ProcessedCss {
+            hash: bundle_hash,
+            content: final_content,
+        }),
+        new_html,
+    ))
+}
+
+// ---------------------------------------------------------------------------
+// Hashing
+// ---------------------------------------------------------------------------
+
+/// Compute a stable 8-character hex hash from a string.
+/// Uses a simple polynomial rolling hash algorithm (Java-like) mixed to hex.
+/// This matches the behavior expected by Zenith's legacy hashing.
+pub fn stable_hash_8(content: &str) -> String {
+    let mut hash: i32 = 0;
+    for byte in content.bytes() {
+        hash = hash
+            .wrapping_shl(5)
+            .wrapping_sub(hash)
+            .wrapping_add(byte as i32);
+    }
+    let normalized = hash.wrapping_abs() as u32;
+    format!("{normalized:08x}")
+}
+
+#[cfg(test)]
+#[path = "utils_tests.rs"]
+mod tests;
+
+
+--- packages/bundler/src/bundler_html_emit.rs ---
+use super::*;
+
+pub(crate) fn write_file(
+    path: &PathBuf,
+    content: &str,
+    output_mode: OutputMode,
+) -> Result<(), String> {
+    write_file_for_mode(path, content, output_mode).map(|_| ())
+}
+
+pub(crate) fn ensure_document_html(fragment_or_doc: &str) -> String {
+    let pascal_re = regex::Regex::new(r"<([A-Z][a-zA-Z0-9]+)[\s/>]").unwrap();
+    for cap in pascal_re.captures_iter(fragment_or_doc) {
+        eprintln!(
+            "[zenith-bundler] WARNING: unresolved component tag <{}> in HTML emission. \
+             The CLI did not expand all component references.",
+            &cap[1]
+        );
+    }
+
+    let lower = fragment_or_doc.to_ascii_lowercase();
+    if lower.contains("<html") {
+        if lower.contains("<!doctype") {
+            return fragment_or_doc.to_string();
+        }
+        return format!("<!DOCTYPE html>{fragment_or_doc}");
+    }
+    format!(
+        "<!DOCTYPE html><html><head></head><body>{}</body></html>",
+        fragment_or_doc
+    )
+}
+
+pub(crate) fn inject_script_once(html: &str, script_src: &str, marker_attr: &str) -> String {
+    if html.contains(script_src) {
+        return html.to_string();
+    }
+    let script_tag =
+        format!("<script type=\"module\" src=\"{script_src}\" {marker_attr}></script>");
+    if html.contains("</body>") {
+        return html.replacen("</body>", &format!("{script_tag}</body>"), 1);
+    }
+    format!("{html}{script_tag}")
+}
+
+pub(crate) fn inject_stylesheet_link_once(
+    html: &str,
+    css_href: &str,
+    route: &str,
+) -> Result<String, String> {
+    let anchor = "<!-- ZENITH_STYLES_ANCHOR -->";
+    let css_link = format!("<link href=\"{}\" rel=\"stylesheet\">", css_href);
+    let anchor_count = html.matches(anchor).count();
+
+    let updated = match anchor_count {
+        1 => html.replacen(anchor, &css_link, 1),
+        0 => {
+            let stylesheet_count = count_stylesheet_links(html)?;
+            match stylesheet_count {
+                1 => replace_single_stylesheet_link(html, &css_link)?,
+                0 => {
+                    if html.contains("</head>") {
+                        html.replacen("</head>", &format!("{}\n</head>", css_link), 1)
+                    } else if html.contains("<head>") {
+                        html.replacen("<head>", &format!("<head>\n{}", css_link), 1)
+                    } else {
+                        format!("{}\n{}", css_link, html)
+                    }
+                }
+                _ => {
+                    return Err(format!(
+                        "Route '{}' must contain exactly one ZENITH_STYLES_ANCHOR or one stylesheet link before emission, found anchors={} stylesheets={}",
+                        route, anchor_count, stylesheet_count
+                    ));
+                }
+            }
+        }
+        _ => {
+            return Err(format!(
+                "Route '{}' must contain exactly one ZENITH_STYLES_ANCHOR before emission, found {}",
+                route, anchor_count
+            ));
+        }
+    };
+
+    if updated.contains(anchor) {
+        return Err(format!(
+            "Route '{}' retained ZENITH_STYLES_ANCHOR after stylesheet injection",
+            route
+        ));
+    }
+    let stylesheet_count = count_stylesheet_links(&updated)?;
+    if stylesheet_count != 1 {
+        return Err(format!(
+            "Route '{}' must contain exactly one stylesheet link, found {}",
+            route, stylesheet_count
+        ));
+    }
+    if updated.matches(&format!("href=\"{}\"", css_href)).count() != 1 {
+        return Err(format!(
+            "Route '{}' must contain exactly one stylesheet link for '{}'",
+            route, css_href
+        ));
+    }
+
+    Ok(updated)
+}
+
+fn count_stylesheet_links(html: &str) -> Result<usize, String> {
+    let stylesheet_re = Regex::new(r#"(?i)<link\b[^>]*\brel\s*=\s*['"]stylesheet['"][^>]*>"#)
+        .map_err(|e| format!("failed to compile stylesheet link regex: {e}"))?;
+    Ok(stylesheet_re.find_iter(html).count())
+}
+
+fn replace_single_stylesheet_link(html: &str, replacement: &str) -> Result<String, String> {
+    let stylesheet_re = Regex::new(r#"(?i)<link\b[^>]*\brel\s*=\s*['"]stylesheet['"][^>]*>"#)
+        .map_err(|e| format!("failed to compile stylesheet link rewrite regex: {e}"))?;
+
+    let mut replaced = false;
+    let rewritten = stylesheet_re
+        .replace_all(html, |captures: &regex::Captures| {
+            if replaced {
+                captures
+                    .get(0)
+                    .map(|m| m.as_str().to_string())
+                    .unwrap_or_default()
+            } else {
+                replaced = true;
+                replacement.to_string()
+            }
+        })
+        .into_owned();
+
+    if !replaced {
+        return Err("expected existing stylesheet link to rewrite".to_string());
+    }
+    Ok(rewritten)
+}
+
+
+--- packages/bundler/tests/css_determinism.rs ---
+use zenith_bundler::utils::process_css;
+use zenith_compiler::script::ExtractedStyleBlock;
+
+#[test]
+fn test_css_content_normalization_and_hashing() {
+    let block1 = ExtractedStyleBlock {
+        module_id: "a.css".into(),
+        order: 0,
+        content: "body { color: red; }".into(),
+    };
+
+    let html = "<html><head><!-- ZENITH_STYLES_ANCHOR --></head><body></body></html>";
+
+    let (css, new_html) = process_css(&[block1.clone()], html).expect("Processing failed");
+    let css = css.expect("Expected CSS");
+
+    // Hash should be deterministic
+    // seed: "a.css:0:body { color: red; }"
+    // sha256 of seed...
+    // bundle hash: sha256(hash(block))
+
+    assert_eq!(css.content, "body { color: red; }");
+    assert!(new_html.contains(&format!("/assets/styles.{}.css", css.hash)));
+    assert!(!new_html.contains("<!-- ZENITH_STYLES_ANCHOR -->"));
+}
+
+#[test]
+fn test_topo_sort_preservation() {
+    let block1 = ExtractedStyleBlock {
+        module_id: "base.css".into(),
+        order: 0,
+        content: "/* base */".into(),
+    };
+    let block2 = ExtractedStyleBlock {
+        module_id: "component.css".into(),
+        order: 1,
+        content: "/* component */".into(),
+    };
+
+    let html = "<!-- ZENITH_STYLES_ANCHOR -->";
+
+    // Order 1 -> 2
+    let (css, _) = process_css(&[block1.clone(), block2.clone()], html).expect("Processing failed");
+    let css = css.expect("Expected CSS");
+    assert_eq!(css.content, "/* base */\n\n/* component */");
+
+    // The function expects input to be ALREADY topologically sorted (by compiler).
+    // But process_css implementation sorts hashes for BUNDLE HASH, but concatenates content in INPUT ORDER?
+    // Let's check implementation.
+    // "clean_content.push(block.content.clone());" -> iterates in input order.
+    // "sorted_hashes.sort();" -> sorts hashes for bundle stability.
+    // So YES, it preserves input order for content, but sorts hashes for bundle hash (which is weird?
+    // If input order changes, bundle hash stays same? No, normally bundle hash should depend on order?
+    // Prompt says: "Compute Bundle Hash: sha256(sorted(style_hashes).join("|"))".
+    // This implies bundle hash is INDEPENDENT of order?
+    // "Emit CSS Content: Concatenate in strict topo order".
+    // "style_blocks" passed to process_css are expected to be from "compiled.style_blocks" which IS sorted.
+    // But wait, if order changes (topo sort changes), content changes.
+    // If bundle hash ignores order, then changing order won't change filename?
+    // That seems like a feature to avoid cache busting if only order changes but content doesn't?
+    // But CSS order MATTERS.
+    // If CSS order changes, the RESULT changes. So filename SHOULD change?
+    // The prompt explicitly said: "sorted(style_hashes)".
+    // This suggests the bundle hash is order-independent of the blocks.
+    // This might be a prompt instruction I should follow strictly, even if I question it.
+    // "Compute Bundle Hash: sha256(sorted(style_hashes).join("|"))".
+    // I followed this.
+    // So if I swap input order, content changes, but hash stays same?
+    // Let's test this.
+
+    let (css_reversed, _) =
+        process_css(&[block2.clone(), block1.clone()], html).expect("Processing failed");
+    let css_reversed = css_reversed.expect("Expected CSS");
+
+    assert_eq!(css_reversed.content, "/* component */\n\n/* base */"); // Content changed
+    assert_eq!(css.hash, css_reversed.hash); // Hash SAME per strict prompt instruction?
+
+    // NOTE: This behavior means filename doesn't change when order swaps.
+    // This technically violates "content addressable" if the content implies order.
+    // But I must follow the prompt.
+}
+
+#[test]
+fn test_cross_os_normalization() {
+    // strict_normalize_css should have been called BEFORE process_css.
+    // process_css assumes content is already normalized?
+    // Prompt says "In bundle.rs: ... Compute Per-Block Hash: sha256(module_id + ":" + order + ":" + content)".
+    // If content is not normalized, hash varies.
+    // compiler.rs / graph.rs handles normalization.
+    // So integration test should rely on previous normalization.
+    // However, process_css uses what is given.
+
+    let block = ExtractedStyleBlock {
+        module_id: "a.css".into(),
+        order: 0,
+        content: "body { color: red; }".into(),
+    };
+
+    let _ = process_css(&[block], "<!-- ZENITH_STYLES_ANCHOR -->");
+}
+
+#[test]
+fn test_anchor_validation() {
+    let block = ExtractedStyleBlock {
+        module_id: "a.css".into(),
+        order: 0,
+        content: "body{}".into(),
+    };
+
+    // Missing anchor
+    let res = process_css(&[block.clone()], "<html></html>");
+    assert!(res.is_err());
+
+    // Multiple anchors
+    let res = process_css(
+        &[block.clone()],
+        "<!-- ZENITH_STYLES_ANCHOR --><!-- ZENITH_STYLES_ANCHOR -->",
+    );
+    assert!(res.is_err());
+
+    // Exactly one
+    let res = process_css(&[block.clone()], "<!-- ZENITH_STYLES_ANCHOR -->");
+    assert!(res.is_ok());
+}
+
+#[test]
+fn test_empty_css_blocks() {
+    // If blocks are provided but empty content?
+    // strict_normalize_css removes empty blocks?
+    // If they arrive here, they are processed.
+
+    let block = ExtractedStyleBlock {
+        module_id: "empty.css".into(),
+        order: 0,
+        content: "".into(),
+    };
+
+    // If content is empty -> joined content is empty -> error?
+    // "Determine violation: style_blocks > 0 but final CSS content is empty."
+    let res = process_css(&[block], "<!-- ZENITH_STYLES_ANCHOR -->");
+    assert!(res.is_err()); // Should fail
+}
+
+#[test]
+fn test_no_css_blocks() {
+    let res = process_css(&[], "<!-- ZENITH_STYLES_ANCHOR -->");
+    assert!(res.is_ok());
+    let (css, html) = res.unwrap();
+    assert!(css.is_none());
+    assert!(!html.contains("<!-- ZENITH_STYLES_ANCHOR -->")); // Should be removed
+}
+
+
+--- packages/bundler/src/plugin/zenith_loader.rs ---
+//! Zenith Loader — Rolldown Plugin that transforms `.zen` files
+//! and serves virtual entry modules.
+//!
+//! Implements the Rolldown `Plugin` trait with:
+//! - `resolve_id` — intercept `.zen` file imports and virtual module IDs
+//! - `load` — serve content for virtual modules and compile `.zen` sources
+//! - `transform` — inject HMR footer in dev mode
+//!
+//! **Invariants:**
+//! - Never mutates compiler expressions
+//! - Never resolves components
+//! - Never re-orders exports
+//! - Fails fast on mismatch in strict mode
+
+use std::borrow::Cow;
+use std::collections::HashMap;
+use std::fmt;
+use std::sync::Arc;
+
+use arcstr::ArcStr;
+use dashmap::DashMap;
+use rolldown_common::ResolvedExternal;
+use rolldown_plugin::{
+    HookLoadArgs, HookLoadOutput, HookResolveIdArgs, HookResolveIdOutput, HookTransformArgs,
+    HookTransformOutput, HookUsage, Plugin, SharedLoadPluginContext, SharedTransformPluginContext,
+};
+
+use zenith_compiler::compiler::{compile_structured_with_source, CompilerOutput};
+
+use crate::plugin::css_cache::CssCache;
+use crate::utils;
+use crate::{BundleError, ComponentDef};
+
+trait IntoCompilerResult {
+    fn into_compiler_result(self) -> Result<CompilerOutput, String>;
+}
+
+impl IntoCompilerResult for CompilerOutput {
+    fn into_compiler_result(self) -> Result<CompilerOutput, String> {
+        Ok(self)
+    }
+}
+
+impl IntoCompilerResult for Result<CompilerOutput, String> {
+    fn into_compiler_result(self) -> Result<CompilerOutput, String> {
+        self
+    }
+}
+
+/// Configuration for the Zenith loader plugin.
+#[derive(Debug, Clone)]
+pub struct ZenithLoaderConfig {
+    /// Optional components map. Forwarded to compiler when available.
+    pub components: Option<HashMap<String, ComponentDef>>,
+    /// Optional pre-compiled metadata for strict validation.
+    pub metadata: Option<CompilerOutput>,
+    /// Whether to fail on invariant violations.
+    pub strict: bool,
+    /// Dev mode — enables HMR footer injection.
+    pub is_dev: bool,
+}
+
+/// HMR footer injected in dev mode.
+/// Per BUNDLER_CONTRACT.md §7: appended after exports, once per module.
+pub const HMR_FOOTER: &str =
+    "\n/* zenith-hmr */\nif (import.meta.hot) { import.meta.hot.accept(); }\n";
+
+/// Marker used to detect if HMR footer is already present.
+pub const HMR_MARKER: &str = "/* zenith-hmr */";
+
+/// The Zenith Loader Rolldown plugin.
+///
+/// This implements the Rolldown `Plugin` trait. It intercepts `.zen` file
+/// imports, compiles them via the sealed compiler API, and emits virtual
+/// entry modules.
+pub struct ZenithLoader {
+    config: ZenithLoaderConfig,
+    css_cache: Arc<CssCache>,
+    /// Compiled outputs keyed by module ID — used for post-build validation.
+    compiled_outputs: Arc<DashMap<String, CompilerOutput>>,
+}
+
+impl fmt::Debug for ZenithLoader {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ZenithLoader")
+            .field("config", &self.config)
+            .field("css_cache", &self.css_cache)
+            .finish()
+    }
+}
+
+impl ZenithLoader {
+    pub fn new(config: ZenithLoaderConfig) -> Self {
+        Self {
+            config,
+            css_cache: Arc::new(CssCache::new()),
+            compiled_outputs: Arc::new(DashMap::new()),
+        }
+    }
+
+    /// Get the CSS cache (for reading collected CSS after build).
+    pub fn css_cache(&self) -> Arc<CssCache> {
+        Arc::clone(&self.css_cache)
+    }
+
+    /// Get all compiled outputs (for post-build validation).
+    pub fn compiled_outputs(&self) -> Arc<DashMap<String, CompilerOutput>> {
+        Arc::clone(&self.compiled_outputs)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Rolldown Plugin Trait Implementation
+// ---------------------------------------------------------------------------
+
+impl Plugin for ZenithLoader {
+    fn name(&self) -> Cow<'static, str> {
+        Cow::Borrowed("zenith-loader")
+    }
+
+    fn register_hook_usage(&self) -> HookUsage {
+        let mut usage = HookUsage::ResolveId | HookUsage::Load;
+        if self.config.is_dev {
+            usage = usage | HookUsage::Transform;
+        }
+        usage
+    }
+
+    /// Intercept `.zen` file imports and virtual module IDs.
+    fn resolve_id(
+        &self,
+        _ctx: &rolldown_plugin::PluginContext,
+        args: &HookResolveIdArgs<'_>,
+    ) -> impl std::future::Future<Output = rolldown_plugin::HookResolveIdReturn> + Send {
+        let specifier = args.specifier.to_string();
+
+        async move {
+            // Handle .zen files
+            if specifier.ends_with(".zen") {
+                let resolved = if specifier.starts_with('.') {
+                    if let Some(importer_path) = args.importer.as_ref() {
+                        let p = std::path::Path::new(importer_path);
+                        if let Some(parent) = p.parent() {
+                            // Simple path join + clean (could use canonicalize but that requires file existence)
+                            // For tests, files exist. For robustness, we normalize.
+                            // But std::fs::canonicalize requires existence.
+                            // Let's rely on parent.join for now, assuming standard fs.
+                            let full_path = parent.join(&specifier);
+                            // Attempt to canonicalize to remove ../ and ./
+                            match full_path.canonicalize() {
+                                Ok(p) => p.to_string_lossy().to_string(),
+                                Err(_) => full_path.to_string_lossy().to_string(), // Fallback
+                            }
+                        } else {
+                            specifier
+                        }
+                    } else {
+                        // Relative import with no importer? Should not happen in graph but possible in entry
+                        specifier
+                    }
+                } else {
+                    // Absolute path or node_modules (not supported yet, assuming absolute)
+                    specifier
+                };
+
+                return Ok(Some(HookResolveIdOutput {
+                    id: ArcStr::from(resolved),
+                    external: Some(ResolvedExternal::Bool(false)),
+                    ..Default::default()
+                }));
+            }
+
+            // Handle virtual modules
+            if specifier.starts_with("\0zenith:") {
+                return Ok(Some(HookResolveIdOutput {
+                    id: ArcStr::from(specifier),
+                    external: Some(ResolvedExternal::Bool(false)),
+                    ..Default::default()
+                }));
+            }
+
+            Ok(None)
+        }
+    }
+
+    /// Load and compile `.zen` files, serve virtual modules.
+    fn load(
+        &self,
+        _ctx: SharedLoadPluginContext,
+        args: &HookLoadArgs<'_>,
+    ) -> impl std::future::Future<Output = rolldown_plugin::HookLoadReturn> + Send {
+        let id = args.id.to_string();
+        let config = self.config.clone();
+        let css_cache = Arc::clone(&self.css_cache);
+        let compiled_outputs = Arc::clone(&self.compiled_outputs);
+
+        async move {
+            // Handle virtual CSS module
+            if id.starts_with("\0zenith:css:") {
+                let page_id = utils::extract_page_id(&id).unwrap_or("unknown");
+                let css = css_cache.get(page_id).unwrap_or_default();
+                return Ok(Some(HookLoadOutput {
+                    code: ArcStr::from(css),
+                    ..Default::default()
+                }));
+            }
+
+            // Handle virtual entry module
+            if id.starts_with("\0zenith:entry:") {
+                if let Some(ref metadata) = config.metadata {
+                    let entry_code = utils::generate_virtual_entry(metadata);
+                    return Ok(Some(HookLoadOutput {
+                        code: ArcStr::from(entry_code),
+                        ..Default::default()
+                    }));
+                }
+            }
+
+            // Handle .zen files — compile via sealed compiler API
+            if id.ends_with(".zen") {
+                // Offload heavy compilation and file I/O to blocking thread specific to this task
+                // This prevents starving the async runtime during graph discovery
+                let id_clone = id.clone();
+                let config_clone = config.clone();
+
+                let (js_code, compiled) =
+                    tokio::task::spawn_blocking(move || -> Result<_, BundleError> {
+                        let source = std::fs::read_to_string(&id_clone)?;
+
+                        // Call the sealed compiler API
+                        compile_zen_source(&source, &id_clone, &config_clone)
+                    })
+                    .await
+                    .map_err(|e| {
+                        BundleError::BuildError(format!("Compilation task join error: {}", e))
+                    })??;
+
+                // Store compiled output for post-build validation
+                // CSS extraction (if any) would happen here or in transform
+                compiled_outputs.insert(id.clone(), compiled);
+
+                return Ok(Some(HookLoadOutput {
+                    code: ArcStr::from(js_code),
+                    ..Default::default()
+                }));
+            }
+
+            Ok(None)
+        }
+    }
+
+    /// Transform hook: inject HMR footer in dev mode.
+    /// Per BUNDLER_CONTRACT.md §7:
+    /// - Appended once per .zen module
+    /// - Never mutates exports
+    /// - Never re-orders exports
+    /// - Absent in production
+    fn transform(
+        &self,
+        _ctx: SharedTransformPluginContext,
+        args: &HookTransformArgs<'_>,
+    ) -> impl std::future::Future<Output = rolldown_plugin::HookTransformReturn> + Send {
+        let id = args.id.to_string();
+        let code = args.code.clone();
+        let is_dev = self.config.is_dev;
+
+        async move {
+            // Only inject HMR for .zen files in dev mode
+            if !is_dev || !id.ends_with(".zen") {
+                return Ok(None);
+            }
+
+            // Guard: only inject once (idempotent)
+            if code.contains(HMR_MARKER) {
+                return Ok(None);
+            }
+
+            // Append HMR footer after all existing code
+            let transformed = format!("{}{}", code, HMR_FOOTER);
+
+            Ok(Some(HookTransformOutput {
+                code: Some(transformed),
+                ..Default::default()
+            }))
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Standalone functions (used by both Plugin and non-Plugin codepaths)
+// ---------------------------------------------------------------------------
+
+/// Compile a .zen source string directly (no filesystem).
+/// Used by `bundle.rs` when reading files through tokio.
+pub fn compile_zen_source(
+    source: &str,
+    id: &str,
+    _config: &ZenithLoaderConfig,
+) -> Result<(String, CompilerOutput), BundleError> {
+    // Normalize newlines to LF for determinism (CRLF -> LF)
+    let source = source.replace("\r\n", "\n");
+    let compiled = compile_structured_with_source(&source, id)
+        .into_compiler_result()
+        .map_err(BundleError::CompilerError)?;
+
+    let js_code = utils::generate_virtual_entry(&compiled);
+    Ok((js_code, compiled))
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn loader_config_no_metadata() -> ZenithLoaderConfig {
+        ZenithLoaderConfig {
+            components: None,
+            metadata: None,
+            strict: false,
+            is_dev: false,
+        }
+    }
+
+    fn loader_config_with_metadata(expressions: Vec<String>) -> ZenithLoaderConfig {
+        ZenithLoaderConfig {
+            components: None,
+            metadata: Some(CompilerOutput {
+                ir_version: 1,
+                graph_hash: String::new(),
+                graph_edges: Vec::new(),
+                graph_nodes: Vec::new(),
+                html: String::new(),
+                expressions,
+                imports: Default::default(),
+                server_script: Default::default(),
+                prerender: false,
+                ssr_data: Default::default(),
+                hoisted: Default::default(),
+                components_scripts: Default::default(),
+                component_instances: Default::default(),
+                signals: Default::default(),
+                expression_bindings: Default::default(),
+                marker_bindings: Default::default(),
+                event_bindings: Default::default(),
+                ref_bindings: Default::default(),
+                style_blocks: Default::default(),
+                image_materialization: Default::default(),
+            }),
+            strict: true,
+            is_dev: false,
+        }
+    }
+
+    #[test]
+    fn compile_zen_source_basic() {
+        let config = loader_config_no_metadata();
+        let (js, compiled) =
+            compile_zen_source("<h1>{props.title}</h1>", "page.zen", &config).unwrap();
+        assert!(js.contains("__zenith_html"));
+        assert!(js.contains("__zenith_expr"));
+        assert_eq!(compiled.expressions, vec!["props.title"]);
+    }
+
+    #[test]
+    fn compile_zen_source_no_expressions() {
+        let config = loader_config_no_metadata();
+        let (js, compiled) = compile_zen_source("<p>Hello</p>", "page.zen", &config).unwrap();
+        assert!(js.contains("__zenith_html"));
+        assert!(compiled.expressions.is_empty());
+    }
+
+    #[test]
+    fn compile_zen_source_strict_match() {
+        let config = loader_config_with_metadata(vec!["props.title".into()]);
+        let result = compile_zen_source("<h1>{props.title}</h1>", "page.zen", &config);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn compile_zen_source_multiple_expressions() {
+        let config = loader_config_no_metadata();
+        let (_, compiled) = compile_zen_source(
+            r#"<div><h1>{props.a}</h1><p>{props.b}</p></div>"#,
+            "page.zen",
+            &config,
+        )
+        .unwrap();
+        assert_eq!(compiled.expressions, vec!["props.a", "props.b"]);
+    }
+
+    #[test]
+    fn compile_zen_source_with_event() {
+        let config = loader_config_no_metadata();
+        let (js, compiled) = compile_zen_source(
+            r#"<button on:click={props.handler}>Go</button>"#,
+            "page.zen",
+            &config,
+        )
+        .unwrap();
+        assert_eq!(compiled.expressions, vec!["props.handler"]);
+        assert!(js.contains("\"props.handler\""));
+    }
+
+    #[test]
+    fn compile_zen_source_preserves_compiler_contract_envelope() {
+        let config = loader_config_no_metadata();
+        let err = compile_zen_source(
+            "<script>const x = 1</script><main>{x}</main>",
+            "page.zen",
+            &config,
+        )
+        .expect_err("missing lang should fail");
+
+        let text = err.to_string();
+        assert!(text.starts_with("Zenith requires TypeScript scripts. Add lang=\"ts\"."));
+        assert!(text.contains("File: page.zen#script0"));
+        assert!(text.contains("Reason:"));
+        assert!(text.contains("Example: <script lang=\"ts\">"));
+    }
+
+    #[test]
+    fn plugin_name() {
+        let loader = ZenithLoader::new(loader_config_no_metadata());
+        assert_eq!(loader.name(), "zenith-loader");
+    }
+
+    #[test]
+    fn plugin_register_hooks() {
+        let loader = ZenithLoader::new(loader_config_no_metadata());
+        let usage = loader.register_hook_usage();
+        // Should include ResolveId and Load
+        assert!(usage.contains(HookUsage::ResolveId));
+        assert!(usage.contains(HookUsage::Load));
+    }
+}
+
+
+--- packages/bundler/src/bundle.rs ---
+//! Core bundling logic.
+//!
+//! This module orchestrates the full bundle pipeline:
+//! 1. Read and compile the `.zen` source via the ZenithLoader plugin
+//! 2. Run through Rolldown for import resolution and graph building
+//! 3. Validate output against metadata
+//! 4. Return sealed BundleResult
+//!
+//! **Single emission engine.** All builds go through Rolldown.
+//! There is one graph, one emission flow, one source of truth.
+//! No inline bypass is permitted — determinism requires a unified pipeline.
+
+use std::collections::BTreeSet;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+
+use regex::Regex;
+use rolldown::{BundlerBuilder, BundlerOptions, InputItem};
+use rolldown_common::OutputFormat;
+use zenith_compiler::script::ExtractedStyleBlock;
+
+use crate::plugin::zenith_loader::{ZenithLoader, ZenithLoaderConfig};
+use crate::utils;
+use crate::{
+    BuildMode, BundleError, BundleOptions, BundlePlan, BundleResult, Diagnostic, DiagnosticLevel,
+};
+
+// ---------------------------------------------------------------------------
+// Single emission engine — all builds go through Rolldown
+// ---------------------------------------------------------------------------
+
+/// Execute the bundle pipeline using Rolldown as the single emission engine.
+///
+/// This creates a ZenithLoader plugin, wires it into Rolldown via
+/// `BundlerBuilder`, runs the full build, and validates the output.
+///
+/// **Invariant:** There is no alternative codepath. Every build —
+/// single-page, multi-page, dev, prod — runs through this function.
+pub async fn execute_bundle(
+    plan: BundlePlan,
+    opts: BundleOptions,
+) -> Result<BundleResult, BundleError> {
+    let mut diagnostics: Vec<Diagnostic> = Vec::new();
+
+    let page_id = utils::canonicalize_page_id(&plan.page_path);
+
+    // Pre-build: verify source file exists (clean IoError)
+    if !Path::new(&plan.page_path).exists() {
+        return Err(BundleError::IoError(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!("Source file not found: {}", plan.page_path),
+        )));
+    }
+
+    diagnostics.push(Diagnostic {
+        level: DiagnosticLevel::Info,
+        message: format!(
+            "Bundle started for page: {} (id: {})",
+            plan.page_path, page_id
+        ),
+        context: None,
+    });
+
+    // Create the loader plugin
+    let loader = ZenithLoader::new(ZenithLoaderConfig {
+        components: opts.components.clone(),
+        metadata: opts.metadata.clone(),
+        strict: opts.strict,
+        is_dev: plan.mode == BuildMode::Dev,
+    });
+
+    let compiled_outputs = loader.compiled_outputs();
+
+    // Configure Rolldown — single-entry, ESM, browser
+    let rolldown_options = BundlerOptions {
+        input: Some(vec![InputItem {
+            name: Some("index".into()),
+            import: plan.page_path.clone(),
+        }]),
+        format: Some(OutputFormat::Esm),
+        platform: Some(rolldown_common::Platform::Browser),
+        minify: if opts.minify.unwrap_or(plan.mode == BuildMode::Prod) {
+            Some(Default::default())
+        } else {
+            None
+        },
+        ..Default::default()
+    };
+
+    // Build bundler with plugin
+    let mut bundler = BundlerBuilder::default()
+        .with_options(rolldown_options)
+        .with_plugins(vec![Arc::new(loader)])
+        .build()
+        .map_err(|e| BundleError::BuildError(format!("Rolldown init failed: {:?}", e)))?;
+
+    // Run the bundling pass
+    let bundle_output = bundler
+        .generate()
+        .await
+        .map_err(|e| BundleError::BuildError(format!("Rolldown build failed: {:?}", e)))?;
+
+    // Close the bundler
+    bundler
+        .close()
+        .await
+        .map_err(|e| BundleError::BuildError(format!("Rolldown close failed: {:?}", e)))?;
+
+    // Extract the entry chunk
+    let entry_js = bundle_output
+        .assets
+        .iter()
+        .find_map(|asset| match asset {
+            rolldown_common::Output::Chunk(chunk) => Some(chunk.code.clone()),
+            _ => None,
+        })
+        .ok_or_else(|| BundleError::BuildError("No entry chunk in Rolldown output".into()))?;
+
+    // Strip non-deterministic comments (Rolldown emits //#region with absolute paths)
+    // Also normalizes line endings to \n
+    let entry_js = entry_js
+        .lines()
+        .filter(|line| !line.starts_with("//#region") && !line.starts_with("//#endregion"))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    // Get compiled output for the page (stored by the plugin during load)
+    let compiled = compiled_outputs
+        .get(&plan.page_path)
+        .map(|entry| entry.value().clone())
+        .unwrap_or_default();
+
+    let expressions = compiled.expressions.clone();
+
+    // Post-build strict validation
+    if opts.strict {
+        // 1. Verify expressions match metadata
+        if let Some(ref metadata) = opts.metadata {
+            utils::validate_expressions(&expressions, &metadata.expressions)?;
+        }
+
+        // 2. Verify HTML contains required placeholders
+        if !expressions.is_empty() {
+            if let Err(diags) = utils::validate_placeholders(&compiled.html, expressions.len()) {
+                return Err(BundleError::ValidationError(
+                    diags
+                        .iter()
+                        .map(|d| d.message.clone())
+                        .collect::<Vec<_>>()
+                        .join("; "),
+                ));
+            }
+        }
+    }
+
+    let mut effective_style_blocks = compiled.style_blocks.clone();
+    if effective_style_blocks.is_empty() {
+        effective_style_blocks = collect_graph_style_blocks(&plan.page_path);
+    }
+
+    // Process CSS and Anchor.
+    // For legacy fragment-only pages (no styles anchor), preserve previous behavior:
+    // still emit deterministic CSS bytes, but keep HTML untouched in this codepath.
+    let (processed_css, new_html) =
+        match utils::process_css(&effective_style_blocks, &compiled.html) {
+            Ok(value) => value,
+            Err(err)
+                if !effective_style_blocks.is_empty()
+                    && compiled.style_blocks.is_empty()
+                    && err.starts_with("Expected exactly one ZENITH_STYLES_ANCHOR, found") =>
+            {
+                let (css_only, _) =
+                    utils::process_css(&effective_style_blocks, "<!-- ZENITH_STYLES_ANCHOR -->")
+                        .map_err(BundleError::ValidationError)?;
+                (css_only, compiled.html.clone())
+            }
+            Err(err) => return Err(BundleError::ValidationError(err)),
+        };
+
+    let css = processed_css.as_ref().map(|p| p.content.clone());
+
+    diagnostics.push(Diagnostic {
+        level: DiagnosticLevel::Info,
+        message: format!(
+            "Bundle complete: {} expressions, {} bytes JS, {} bytes CSS",
+            expressions.len(),
+            entry_js.len(),
+            css.as_ref().map_or(0, |c| c.len()),
+        ),
+        context: None,
+    });
+
+    // Write to disk if requested
+    if opts.write_to_disk {
+        let out_dir = plan
+            .out_dir
+            .unwrap_or_else(|| Path::new("dist").to_path_buf());
+        let pages_dir = out_dir.join("pages");
+        tokio::fs::create_dir_all(&pages_dir).await?;
+
+        let js_path = pages_dir.join(format!("{}.js", page_id));
+        tokio::fs::write(&js_path, &entry_js).await?;
+
+        if let Some(ref css_data) = processed_css {
+            let css_path = pages_dir.join(format!("styles.{}.css", css_data.hash));
+            tokio::fs::write(&css_path, &css_data.content).await?;
+        }
+
+        diagnostics.push(Diagnostic {
+            level: DiagnosticLevel::Info,
+            message: format!("Written to {}", pages_dir.display()),
+            context: None,
+        });
+    }
+
+    Ok(BundleResult {
+        entry_js,
+        css,
+        html: new_html,
+        expressions,
+        diagnostics,
+    })
+}
+
+fn collect_graph_style_blocks(entry_path: &str) -> Vec<ExtractedStyleBlock> {
+    let resolved_entry = if let Ok(canon) = std::fs::canonicalize(entry_path) {
+        canon.to_string_lossy().to_string()
+    } else {
+        entry_path.to_string()
+    };
+
+    let mut ordered = Vec::new();
+    let mut visiting = BTreeSet::new();
+    let mut visited = BTreeSet::new();
+    dfs_source_modules(&resolved_entry, &mut visiting, &mut visited, &mut ordered);
+
+    let mut blocks = Vec::new();
+    for module_id in ordered {
+        let module_blocks = extract_style_blocks_from_source_file(&module_id).unwrap_or_default();
+        blocks.extend(module_blocks);
+    }
+
+    blocks
+}
+
+fn dfs_source_modules(
+    module_id: &str,
+    visiting: &mut BTreeSet<String>,
+    visited: &mut BTreeSet<String>,
+    ordered: &mut Vec<String>,
+) {
+    if visited.contains(module_id) {
+        return;
+    }
+    if !visiting.insert(module_id.to_string()) {
+        return;
+    }
+
+    for dep in extract_zen_imports_from_source_file(module_id) {
+        dfs_source_modules(&dep, visiting, visited, ordered);
+    }
+
+    visiting.remove(module_id);
+    visited.insert(module_id.to_string());
+    ordered.push(module_id.to_string());
+}
+
+fn extract_zen_imports_from_source_file(module_id: &str) -> Vec<String> {
+    let source = match std::fs::read_to_string(module_id) {
+        Ok(value) => value,
+        Err(_) => return Vec::new(),
+    };
+
+    let mut out = Vec::new();
+    let mut seen = BTreeSet::new();
+
+    let import_re = Regex::new(r#"(?i)^\s*import\s+[^'"]*['"]([^'"]+)['"]"#).expect("valid regex");
+    for line in source.lines() {
+        let Some(caps) = import_re.captures(line) else {
+            continue;
+        };
+        let Some(m) = caps.get(1) else {
+            continue;
+        };
+        let spec = m.as_str();
+        if !spec.ends_with(".zen") {
+            continue;
+        }
+        let resolved = resolve_relative_specifier(module_id, spec);
+        if seen.insert(resolved.clone()) {
+            out.push(resolved);
+        }
+    }
+
+    out
+}
+
+fn resolve_relative_specifier(module_id: &str, spec: &str) -> String {
+    let module_path = Path::new(module_id);
+
+    if spec.starts_with('/') {
+        return spec.to_string();
+    }
+
+    if spec.starts_with("./") || spec.starts_with("../") {
+        let parent = module_path.parent().unwrap_or_else(|| Path::new("."));
+        let joined = parent.join(spec);
+        if let Ok(canon) = std::fs::canonicalize(&joined) {
+            return canon.to_string_lossy().to_string();
+        }
+        return normalize_path(joined);
+    }
+
+    spec.to_string()
+}
+
+fn normalize_path(path: PathBuf) -> String {
+    path.components()
+        .collect::<PathBuf>()
+        .to_string_lossy()
+        .to_string()
+}
+
+fn extract_style_blocks_from_html(module_id: &str, html: &str) -> Vec<ExtractedStyleBlock> {
+    let style_re = Regex::new(r#"(?is)<style(?:\s[^>]*)?>(.*?)</style>"#).expect("valid regex");
+    let mut out = Vec::new();
+    for (idx, caps) in style_re.captures_iter(html).enumerate() {
+        let Some(content_match) = caps.get(1) else {
+            continue;
+        };
+        let content = content_match
+            .as_str()
+            .replace("\r\n", "\n")
+            .trim()
+            .to_string();
+        if content.is_empty() {
+            continue;
+        }
+        out.push(ExtractedStyleBlock {
+            module_id: module_id.to_string(),
+            order: idx as u32,
+            content,
+        });
+    }
+    out
+}
+
+fn extract_style_blocks_from_source_file(module_id: &str) -> Option<Vec<ExtractedStyleBlock>> {
+    let path = Path::new(module_id);
+    if !path.exists() {
+        return None;
+    }
+    let source = std::fs::read_to_string(path).ok()?;
+    Some(extract_style_blocks_from_html(module_id, &source))
+}
+
+
+--- AGENTS.md ---
+# Zenith Agent Contract (Read before writing code)
+
+You are generating code for the Zenith framework. Follow these rules exactly. Do not guess. Do not write vanilla framework patterns unless Zenith docs explicitly allow them.
+
+## Events (Universal)
+- Bind events on any element using `on:<event>={handler}`.
+- Event names normalize to lowercase.
+- Supported aliases:
+  - `on:hoverin` -> `pointerenter`
+  - `on:hoverout` -> `pointerleave`
+  - `on:doubleclick` -> `dblclick`
+  - `on:esc` -> Escape-filtered `keydown` handled by document-level dispatch
+- Handler expressions must be function-valued.
+- Allowed: identifier/member references and inline function expressions (arrow/function).
+- Forbidden: string handlers and direct call expressions such as `on:click={doThing()}`.
+- Prefer pointer events (`pointerenter/leave`, `pointerdown/up`) over mouse events.
+
+## Reactivity Primitives
+### `state`
+Use `state` when changes should update DOM expressions.
+
+```zen
+state open = false
+function toggle() { open = !open }
+```
+
+### `signal`
+Use `signal()` for stable identity and explicit `get()` / `set()`, especially for frequent updates.
+
+```ts
+const count = signal(0)
+count.set(count.get() + 1)
+```
+
+### `ref`
+Use `ref<T>()` for DOM nodes (animation, measurements, focus management).
+No global `document.querySelector` for root selection; scope queries to refs.
+
+## Slots and Scope
+- Slot content always retains parent reactive scope.
+- Component local state must not implicitly change slot scope.
+
+## Controlled vs Uncontrolled Components
+For interactive components, support both:
+- Controlled: `open` / `value` + `onOpenChange` / `onValueChange`
+- Uncontrolled: `defaultOpen` / `defaultValue` internal state
+
+Rule: if `open`/`value` is provided, it overrides internal state.
+
+## Compiler Diagnostics
+- Unknown event names are non-fatal compiler warnings with typo suggestions.
+- CLI/dev tooling should print compiler diagnostics; warning origin is compiler.
+
+## Tailwind Tokens
+Use Tailwind tokens and `dark:` variants. Do not use raw CSS variables or hardcoded hex colors unless the Tailwind config defines them.
+
+## File Size Limit
+- Treat `500` lines as a hard per-file limit for source files you create or edit.
+- Do not grow a file past `500` lines unless the user explicitly approves that exception.
+- If a change would push a file near or over the limit, split the code into smaller modules/components/helpers first.
+- If you encounter an existing file already far above the limit, prefer refactoring it downward instead of adding more code into it.
+- `2k+` line files are not acceptable as an output target for new Zenith work.
+
+## Canonical DOM + Environment Rules (Non-Negotiable)
+- Use `ref<T>()` for DOM access in `.zen` scripts.
+- Do not use `querySelector`, `querySelectorAll`, or `getElementById` in `.zen` scripts.
+- Rare interop exception only: `// zen-allow:dom-query <reason>` on the relevant query usage.
+- Use `zenOn(target, eventName, handler, options?)` for event subscriptions.
+- Do not call `addEventListener` directly in `.zen` scripts.
+- Use `zenWindow()` / `zenDocument()` for global DOM access.
+- Do not declare custom wrappers like `runtimeWindow` / `runtimeDocument`.
+- Use `zenResize(handler)` for window-resize-driven reactive updates.
+- Use `collectRefs(...refs)` for deterministic multi-node operations instead of selector scans.
+- Passing handler functions through component props is supported and must preserve scoped symbol identity; do not workaround with querySelector/addEventListener.
+- If canonical primitives are insufficient, do not invent APIs or workarounds; report the missing primitive explicitly.
+
+## Forbidden Patterns
+- No `onclick="..."`, no `onClick=`, no `@click=`, no `{#if}` / `{#each}` templating.
+- No unbound identifiers in markup. Every `{name}` must resolve to state, signal, ref, props, or a local const in the same file.
+
+## Route Protection (guard/load)
+- **Always** use `export const guard = async (ctx) => ...` and `export const load = async (ctx) => ...` in `<script server lang="ts">` or adjacent files (`page.guard.ts`/`page.load.ts`) for protected routes.
+- **Server is Security**: Do not create generic "client-only" route guards. The Zenith router runs `guard`/`load` on the client solely for SPA UX (preventing flashes); the real security boundary is the server rendering pipeline.
+- `guard(ctx)` must return `allow()`, `redirect(url)`, or `deny()`. It evaluates before anything else.
+- `load(ctx)` may return `data(payload)`, `redirect(url)`, or `deny()`. It evaluates after `guard`.
+- A route protected by `guard`/`load` cannot be statically generated (`prerender = true`).
+
+## Packaged Agent Rules
+
+The Zenith agent contract is also published as a standalone npm package for agents and projects:
+
+- `packages/zenithbuild/` in this repo
+- package name: `zenithbuild`
+
+Use it to install or copy the canonical rules into any Zenith project. See `packages/zenithbuild/README.md` for install, copy, and detection instructions.
+
+
+Agent A: Verify the Zenith CSS determinism contract.
+
+Read only the files listed under "Repository files" below. Trace each claim in contracts/DETERMINISM.md to the code that implements it. For each claim, record:
+- the claim text
+- the implementation file and function
+- whether the claim is satisfied, partially satisfied, or contradicted
+- any open questions
+
+Stop at a clear boundary before the next verification step. Do not propose code changes.
+
+Repository files:
+{FILES}
+
+Return JSON with this shape:
+{
+  "understanding": {
+    "current_goal": "...",
+    "latest_decision": "...",
+    "active_task": "...",
+    "next_action": "..."
+  },
+  "findings": [
+    { "claim": "...", "location": "...", "assessment": "satisfied|partial|contradicted", "notes": "..." }
+  ],
+  "update": {
+    "record_id": "<task id from repack>",
+    "expected_revision": <task revision from repack>,
+    "patch": {
+      "next": "<one concrete next verification step>"
+    },
+    "reason": "..."
+  },
+  "stopping_point": "exact boundary where you stopped",
+  "completed": ["completed item 1", "completed item 2"]
+}

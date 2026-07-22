@@ -136,6 +136,8 @@ export interface BlockerPayload {
 }
 
 export interface HandoffPayload {
+  /** Optional structured handoff object stored verbatim for round-trip loading. */
+  structured_handoff?: Record<string, unknown>;
   from: string;
   to: string;
   context: string;
@@ -234,6 +236,8 @@ export interface CreateBlockerInput extends CreateInputBase {
 }
 
 export interface CreateHandoffInput extends CreateInputBase {
+  /** Optional structured handoff object stored verbatim for round-trip loading. */
+  structured_handoff?: Record<string, unknown>;
   type: "handoff";
   from: string;
   to: string;

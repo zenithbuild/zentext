@@ -1,0 +1,59 @@
+# Zentext context — zenithbuild/framework
+Generated: 2026-07-22T00:14:52.838Z | focus: CSS determinism | from: 4 records | budget: 12000 chars
+
+> Point-in-time snapshot. Live memory is at ~/.zentext/projects/b1391d80609491d9/store.sqlite
+
+## Active task
+- Verify Zenith CSS determinism contract (active)
+- ID: rec_task_01KY3JQXBE2YZJKV7JXVA2HGV0 | revision: 3
+- Goal: Trace Zenith CSS determinism contract claims to implementation
+- Next: Obtain read access to packages/compiler source files, then inspect CSS block emission, CRLF normalization, and duplicate validation
+- Refs: (none)
+
+## Latest handoff
+- Handoff from agent:B (latest)
+- ID: rec_handoff_01KY3JSQX5M2QP9E28S7ZWQKH0 | revision: 1
+- From: agent:B to next-agent at 2026-07-22T00:14:52.838Z
+- Context: Compiler pre-sorts CSS blocks: CSS blocks are ordered by dependency depth via compiler pre-sort before process_css is called
+- State: {
+  "completed": [
+    "Acknowledged handoff and recorded blocker preventing compiler source inspection"
+  ],
+  "stopping_point": "Acknowledged Zentext handoff and identified lack of repository file access as the immediate blocker before inspecting packages/compiler.",
+  "next_action": "Obtain read access to packages/compiler source files, then inspect CSS block emission, CRLF normalization, and duplicate validation",
+  "blockers": [],
+  "files_changed": [],
+  "verification": []
+}
+- Next: Obtain read access to packages/compiler source files, then inspect CSS block emission, CRLF normalization, and duplicate validation
+
+## Decisions (1)
+- Compiler pre-sorts CSS blocks (accepted)
+  - Decision: CSS blocks are ordered by dependency depth via compiler pre-sort before process_css is called
+
+
+Agent C: Review the Zenith CSS determinism verification.
+
+Confirm the updated stopping point, review the previous agent's work for scope and architecture drift, and check that no Zenith source files were modified.
+
+Return JSON with this shape:
+{
+  "understanding": {
+    "current_goal": "...",
+    "latest_decision": "...",
+    "active_task": "...",
+    "next_action": "..."
+  },
+  "review": {
+    "repeated_work": false,
+    "invented_work": false,
+    "zenith_files_modified": false,
+    "scope_drift": false,
+    "notes": "..."
+  },
+  "stale_attempt": {
+    "record_id": "<task id from repack>",
+    "expected_revision": <an earlier revision>,
+    "patch": { "next": "outdated step" }
+  }
+}
