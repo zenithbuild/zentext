@@ -1,0 +1,6 @@
+{
+  "attempted": true,
+  "applied": false,
+  "conflict": true,
+  "error": "Expected revision 1, but current revision is 3."
+}

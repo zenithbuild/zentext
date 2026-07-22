@@ -1,0 +1,80 @@
+```json
+{
+  "understanding": {
+    "current_goal": "Trace every claim in contracts/DETERMINISM.md to the implementation that enforces it, and assess whether each claim is satisfied, partially satisfied, or contradicted by the code shown.",
+    "latest_decision": "Compiler pre-sorts CSS blocks (accepted) — CSS blocks are ordered by dependency depth via compiler pre-sort before process_css is called.",
+    "active_task": "Verify Zenith CSS determinism contract (active)",
+    "next_action": "Inspect the compiler source to verify the pre-sort, CRLF normalization, and duplicate (module_id, order) checks that the bundler assumes have already happened."
+  },
+  "findings": [
+    {
+      "claim": "CSS styles are ordered by dependency depth (reverse topological sort): if A imports B and B imports C, CSS order is [C][B][A].",
+      "location": "packages/bundler/src/bundle.rs:collect_graph_style_blocks / dfs_source_modules; packages/bundler/src/utils.rs:process_css",
+      "assessment": "partial",
+      "notes": "The bundler fallback path (collect_graph_style_blocks) performs a post-order DFS, yielding [C,B,A] correctly. However, the normal path uses compiled.style_blocks directly and process_css concatenates blocks in input order without re-sorting. The bundler therefore relies entirely on the compiler's pre-sort, which is not visible in the provided files."
+    },
+    {
+      "claim": "All line endings are normalized to \\n (LF) before hashing and concatenation; \\r\\n is strictly forbidden in the final output; UTF-8 is enforced.",
+      "location": "packages/bundler/src/bundle.rs:compile_zen_source / extract_style_blocks_from_source_file; packages/bundler/src/utils.rs:process_css",
+      "assessment": "partial",
+      "notes": "CRLF is normalized when the bundler extracts raw <style> blocks from source files (extract_style_blocks_from_source_file replaces \\r\\n with \\n) and when JS source is loaded (compile_zen_source). But process_css itself does not normalize or validate line endings before hashing/concatenation, nor does it enforce UTF-8. Cross-OS stability depends on upstream normalization that is not fully visible here."
+    },
+    {
+      "claim": "The HTML template must contain exactly one <!-- ZENITH_STYLES_ANCHOR -->; the bundler hard-fails if missing, multiple, or malformed.",
+      "location": "packages/bundler/src/utils.rs:process_css; packages/bundler/src/bundler_html_emit.rs:inject_stylesheet_link_once",
+      "assessment": "satisfied",
+      "notes": "Both call sites count anchor occurrences and return an Err when the count is not exactly one. inject_stylesheet_link_once also validates that no anchor remains after injection and that exactly one stylesheet link exists."
+    },
+    {
+      "claim": "Duplicate (module_id, order) pairs hard-fail; duplicate content is preserved; no reordering based on specificity or file names; no implicit optimization or minification in extraction.",
+      "location": "packages/bundler/src/utils.rs:process_css; packages/bundler/src/bundle.rs",
+      "assessment": "partial",
+      "notes": "process_css concatenates blocks in input order without specificity/file-name reordering and without minification, and duplicate content is preserved. However, no code in the provided files checks for or rejects duplicate (module_id, order) pairs, so that hard-fail claim is not implemented in the bundler."
+    },
+    {
+      "claim": "CSS output is a pure function of the canonical module graph and normalized source content; the bundle hash is byte-stable.",
+      "location": "packages/bundler/src/utils.rs:process_css",
+      "assessment": "partial",
+      "notes": "process_css computes per-block hashes from module_id:order:content and then computes the bundle hash as sha256(sorted(per-block hashes).join('|')). Because the bundle hash sorts the block hashes, it is insensitive to block order. If block order changes (and CSS cascade meaning changes), the emitted filename stays the same while the content changes. This is consistent with the explicit 'sorted hashes' instruction but creates a determinism/addressability concern if the input order is not strictly guaranteed elsewhere."
+    },
+    {
+      "claim": "All module IDs are normalized to forward slashes regardless of OS; relative imports are resolved relative to the canonical path of the importer; graph hashes are identical cross-platform.",
+      "location": "packages/bundler/src/utils.rs:clean_path; packages/bundler/src/bundle.rs:resolve_relative_specifier / dfs_source_modules",
+      "assessment": "partial",
+      "notes": "A textual clean_path utility exists in utils.rs, but it is not used in the bundler's graph resolution path. resolve_relative_specifier calls std::fs::canonicalize, which preserves OS-native separators (backslashes on Windows). Therefore the bundler-collected fallback graph could produce different module IDs across platforms, contradicting strict cross-platform canonicalization."
+    },
+    {
+      "claim": "Expression extraction order is deterministic (left-to-right, depth-first); __zenith_expr array order matches source appearance exactly.",
+      "location": "packages/bundler/src/plugin/zenith_loader.rs:compile_zen_source / generate_virtual_entry; zenith_compiler internals (not shown)",
+      "assessment": "partial",
+      "notes": "The bundler preserves the compiler-provided expression order verbatim when generating __zenith_expr. Tests confirm source-order extraction for simple cases. The actual compiler traversal rule (left-to-right, depth-first) is not visible in the provided bundler files, so it cannot be fully verified here."
+    },
+    {
+      "claim": "zenith dev uses the exact same zenith-bundler binary and pipeline as zenith build; no fast path bypasses determinism checks; CSS in dev is identical to prod (excluding optional minification).",
+      "location": "packages/bundler/src/bundle.rs:execute_bundle; packages/bundler/src/plugin/zenith_loader.rs:ZenithLoaderConfig.is_dev",
+      "assessment": "satisfied",
+      "notes": "execute_bundle is the single emission engine for all modes. Dev only toggles HMR footer injection and minification; it does not skip the same pipeline or change CSS processing. process_css has no mode parameter, so the CSS bytes are identical in dev and prod."
+    },
+    {
+      "claim": "zenith:css:<page> and zenith:entry:<page> virtual modules are sealed; user code cannot mock or override these internal modules.",
+      "location": "packages/bundler/src/utils.rs:virtual_css_id / virtual_entry_id / is_zenith_virtual_id / reject_external_zenith_import; packages/bundler/src/plugin/zenith_loader.rs:resolve_id",
+      "assessment": "satisfied",
+      "notes": "Virtual module IDs are constructed with the \\0zenith: prefix, resolve_id handles them internally, and reject_external_zenith_import returns an error for any user specifier starting with \\0 or containing escaped null-prefixed 'zenith:' strings. This prevents user-space imports from colliding with internal virtual modules."
+    }
+  ],
+  "update": {
+    "record_id": "rec_task_01KY3JQXBE2YZJKV7JXVA2HGV0",
+    "expected_revision": 1,
+    "patch": {
+      "next": "Inspect packages/compiler source to confirm that (1) style_blocks are emitted in reverse-topological order, (2) CSS content is CRLF-normalized before hashing, and (3) duplicate (module_id, order) pairs are rejected before blocks reach the bundler."
+    },
+    "reason": "The bundler implementation delegates several critical determinism invariants to the compiler (topological ordering, CRLF normalization, duplicate pair rejection). Those claims cannot be fully verified from the bundler files alone, so the next step is to trace them into the compiler source."
+  },
+  "stopping_point": "After mapping each DETERMINISM.md claim to the provided bundler implementation, assessing satisfaction, and identifying open questions that require compiler internals; before proposing code changes or reading additional packages.",
+  "completed": [
+    "Read and analyzed contracts/DETERMINISM.md and the provided bundler source files",
+    "Mapped each CSS, compiler, and runtime-parity claim to its implementation location",
+    "Recorded assessments, partial gaps, and contradictions found in the visible code"
+  ]
+}
+```

@@ -6,7 +6,19 @@
  *   init, status, show, list
  */
 
-import { CliError, init, list, printUsage, repack, show, status } from "./commands.js";
+import {
+  CliError,
+  handoffAcknowledge,
+  handoffCreate,
+  handoffShow,
+  handoffValidate,
+  init,
+  list,
+  printUsage,
+  repack,
+  show,
+  status,
+} from "./commands.js";
 
 function parseArgs(argv: string[]): {
   command: string;
@@ -37,6 +49,59 @@ function parseArgs(argv: string[]): {
     command: positional[0] ?? "",
     positional: positional.slice(1),
     flags,
+  };
+}
+
+
+function collectRepeated(values: (string | number | boolean | undefined)[]): string[] {
+  return values.filter((v): v is string => typeof v === "string").map((v) => v);
+}
+
+function parseHandoffOptions(
+  positional: string[],
+  flags: Record<string, string | number | boolean | undefined>,
+): {
+  from: string;
+  stoppingPoint: string;
+  nextAction: string;
+  completed: string[];
+  blockers: string[];
+  filesChanged: string[];
+  verification: string[];
+  previousResponse?: string;
+} {
+  const from =
+    typeof flags.from === "string"
+      ? flags.from
+      : positional.find((_, i, arr) => arr[i - 1] === "--from");
+  const stoppingPoint =
+    typeof flags["stopping-point"] === "string"
+      ? flags["stopping-point"]
+      : positional.find((_, i, arr) => arr[i - 1] === "--stopping-point");
+  const nextAction =
+    typeof flags["next-action"] === "string"
+      ? flags["next-action"]
+      : positional.find((_, i, arr) => arr[i - 1] === "--next-action");
+
+  if (!from || !stoppingPoint || !nextAction) {
+    throw new CliError(
+      "Usage: zentext handoff create --from <agent> --stopping-point <text> --next-action <text>",
+      1,
+    );
+  }
+
+  return {
+    from,
+    stoppingPoint,
+    nextAction,
+    completed: collectRepeated([flags.completed]),
+    blockers: collectRepeated([flags.blockers]),
+    filesChanged: collectRepeated([flags["files-changed"]]),
+    verification: collectRepeated([flags.verification]),
+    previousResponse:
+      typeof flags["previous-response"] === "string"
+        ? flags["previous-response"]
+        : undefined,
   };
 }
 
@@ -88,6 +153,38 @@ async function main(): Promise<void> {
           maxSize: typeof maxSizeRaw === "number" ? maxSizeRaw : undefined,
           out: typeof flags.out === "string" ? flags.out : undefined,
         });
+        break;
+      }
+      case "handoff": {
+        const subcommand = positional[0] ?? "";
+        const json = flags.json === true;
+        switch (subcommand) {
+          case "show": {
+            result = await handoffShow(cwd, { json });
+            break;
+          }
+          case "acknowledge": {
+            result = await handoffAcknowledge(cwd, { json });
+            break;
+          }
+          case "validate": {
+            result = await handoffValidate(cwd, { json });
+            break;
+          }
+          case "create": {
+            const opts = parseHandoffOptions(positional.slice(1), flags);
+            result = await handoffCreate(cwd, opts);
+            break;
+          }
+          default: {
+            throw new CliError(
+              `Unknown handoff subcommand: ${subcommand}
+
+${printUsage()}`,
+              1,
+            );
+          }
+        }
         break;
       }
       default: {

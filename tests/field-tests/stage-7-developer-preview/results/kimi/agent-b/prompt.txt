@@ -1,0 +1,77 @@
+# Zentext context — zenithbuild/framework
+Generated: 2026-07-22T00:14:34.927Z | focus: CSS determinism | from: 3 records | budget: 12000 chars
+
+> Point-in-time snapshot. Live memory is at ~/.zentext/projects/b1391d80609491d9/store.sqlite
+
+## Active task
+- Verify Zenith CSS determinism contract (active)
+- ID: rec_task_01KY3JQXBE2YZJKV7JXVA2HGV0 | revision: 2
+- Goal: Trace Zenith CSS determinism contract claims to implementation
+- Next: Inspect packages/compiler source to confirm that (1) style_blocks are emitted in reverse-topological order, (2) CSS content is CRLF-normalized before hashing, and (3) duplicate (module_id, order) pairs are rejected before blocks reach the bundler.
+- Refs: (none)
+
+## Latest handoff
+- Handoff from agent:A (latest)
+- ID: rec_handoff_01KY3JS6DE4KNS179JQMG0WKQ4 | revision: 1
+- From: agent:A to next-agent at 2026-07-22T00:14:34.926Z
+- Context: Compiler pre-sorts CSS blocks: CSS blocks are ordered by dependency depth via compiler pre-sort before process_css is called
+- State: {
+  "completed": [
+    "Read and analyzed contracts/DETERMINISM.md and the provided bundler source files",
+    "Mapped each CSS, compiler, and runtime-parity claim to its implementation location",
+    "Recorded assessments, partial gaps, and contradictions found in the visible code"
+  ],
+  "stopping_point": "After mapping each DETERMINISM.md claim to the provided bundler implementation, assessing satisfaction, and identifying open questions that require compiler internals; before proposing code changes or reading additional packages.",
+  "next_action": "Inspect packages/compiler source to confirm that (1) style_blocks are emitted in reverse-topological order, (2) CSS content is CRLF-normalized before hashing, and (3) duplicate (module_id, order) pairs are rejected before blocks reach the bundler.",
+  "blockers": [],
+  "files_changed": [],
+  "verification": []
+}
+- Next: Inspect packages/compiler source to confirm that (1) style_blocks are emitted in reverse-topological order, (2) CSS content is CRLF-normalized before hashing, and (3) duplicate (module_id, order) pairs are rejected before blocks reach the bundler.
+
+## Decisions (1)
+- Compiler pre-sorts CSS blocks (accepted)
+  - Decision: CSS blocks are ordered by dependency depth via compiler pre-sort before process_css is called
+
+
+Agent B: Continue the Zenith CSS determinism verification.
+
+Respond first with exactly:
+
+Zentext context loaded.
+
+Active task: <title>
+Task ID: <id>
+Task revision: <revision>
+Previous agent: <agent>
+Completed: <verified summary>
+Stopping point: <exact previous boundary>
+Next action: <first unfinished action>
+Blockers: <none or list>
+
+I will continue from this stopping point without restarting completed work.
+
+Then perform exactly one next step: inspect the specific implementation detail identified by the previous agent and add one new finding.
+
+Return JSON with this shape:
+{
+  "understanding": {
+    "current_goal": "...",
+    "latest_decision": "...",
+    "active_task": "...",
+    "next_action": "..."
+  },
+  "findings": [
+    { "claim": "...", "location": "...", "assessment": "satisfied|partial|contradicted", "notes": "..." }
+  ],
+  "update": {
+    "record_id": "<task id from repack>",
+    "expected_revision": <task revision from repack>,
+    "patch": {
+      "next": "<one concrete next verification step>"
+    },
+    "reason": "..."
+  },
+  "stopping_point": "exact boundary where you stopped",
+  "completed": ["new completed item"]
+}
