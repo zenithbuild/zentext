@@ -43,6 +43,7 @@
     "docs/tester-onboarding.md",
     "docs/continuation.md",
     "docs/portability-audit.md",
+    "docs/recovery-runbook.md",
     "LICENSE",
     "!dist/proof"
   ],

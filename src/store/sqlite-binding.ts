@@ -21,7 +21,7 @@ export class SqliteBindingError extends Error {
   }
 }
 
-export const SUPPORTED_NODE_ENGINES = "22.13+, 24.x, and 26.x (26.x is experimental)";
+export const SUPPORTED_NODE_ENGINES = "22.13+ through 24.x (Node 26.x is experimental)";
 
 function runtimeSummary(): string {
   return `Node ${process.version} on ${platform()} ${arch()}`;
@@ -55,7 +55,7 @@ How to fix:
 
 - Or switch to a supported Node LTS version:
 
-    Node 20.x, 22.x, or 24.x
+    Node 22.13+ or 24.x
 
 Original error: ${original.split("\n")[0]}`;
 }

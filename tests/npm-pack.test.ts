@@ -122,6 +122,7 @@ describe("npm package validation", () => {
       "package/docs/tester-onboarding.md",
       "package/docs/continuation.md",
       "package/docs/portability-audit.md",
+      "package/docs/recovery-runbook.md",
     ];
 
     for (const path of required) {
@@ -195,42 +196,18 @@ await client.close();
     rmSync(home, { recursive: true, force: true });
   });
 
-  it("installed zentext handoff acknowledge works after creation", () => {
+  it("installed public task and handoff workflow rejects stale state", () => {
     const project = mkdtempSync(join(tmpdir(), "zentext-consumer-proj-"));
     const home = mkdtempSync(join(tmpdir(), "zentext-install-home-"));
     runInstalled(["init"], { cwd: project, home });
 
-    const seedHome = home;
-    const scriptPath = join(project, "seed.mjs");
-    writeFileSync(
-      scriptPath,
-      `
-import { SqliteStore } from "${installDir}/node_modules/zentext/dist/index.js";
-const project = process.cwd();
-const store = new SqliteStore();
-const meta = await store.initProjectStore(project);
-console.log("seed project_id", meta.projectId);
-const task = store.createRecord({ type: "task", title: "Verify CSS determinism", goal: "Trace contract", status: "active", author: "agent:A" });
-console.log("seed task_id", task.id);
-console.log("seed list", store.listRecords({ type: "task" }).length);
-store.close();
-`,
-      "utf8",
+    const create = runInstalled(
+      ["task", "create", "--title", "Verify CSS determinism", "--goal", "Trace contract"],
+      { cwd: project, home },
     );
-    const seedEnv: Record<string, string> = { PATH: process.env.PATH ?? "" };
-    for (const [key, value] of Object.entries(process.env)) {
-      if (value !== undefined && !key.toLowerCase().startsWith("npm_config_")) {
-        seedEnv[key] = value;
-      }
-    }
-    seedEnv.HOME = seedHome;
-    const seedOut = execSync(`node ${scriptPath}`, { cwd: project, env: seedEnv, encoding: "utf8" });
-    // Verify seed worked by listing tasks through the installed CLI.
-    const statusOut = runInstalled(["status"], { cwd: project, home });
-    const listOut = runInstalled(["list", "--type", "task"], { cwd: project, home });
-    if (!listOut.includes("Verify CSS determinism")) {
-      throw new Error(`Seed did not create task. Seed output: ${seedOut}. List output: ${listOut}`);
-    }
+    expect(create).toContain("Created task");
+    const task = runInstalled(["task", "show"], { cwd: project, home });
+    expect(task).toContain("Verify CSS determinism");
 
     runInstalled(
       [
@@ -248,9 +225,32 @@ store.close();
       { cwd: project, home },
     );
 
+    const shown = runInstalled(["handoff", "show"], { cwd: project, home });
+    expect(shown).toContain("Read contract.");
+    const valid = runInstalled(["handoff", "validate"], { cwd: project, home });
+    expect(valid).toContain("Handoff is current");
     const ack = runInstalled(["handoff", "acknowledge"], { cwd: project, home });
     expect(ack).toContain("Zentext context loaded.");
     expect(ack).toContain("Active task: Verify CSS determinism");
+
+    runInstalled(["task", "update", "--summary", "Contract reviewed", "--note", "Continue"], {
+      cwd: project,
+      home,
+    });
+
+    try {
+      runInstalled(["handoff", "validate"], { cwd: project, home });
+      throw new Error("Expected stale handoff validation to fail");
+    } catch (error) {
+      expect((error as { status?: number }).status).toBe(4);
+    }
+    try {
+      runInstalled(["handoff", "acknowledge"], { cwd: project, home });
+      throw new Error("Expected stale handoff acknowledgement to fail");
+    } catch (error) {
+      expect((error as { status?: number }).status).toBe(4);
+      expect((error as { stdout?: string }).stdout).not.toContain("Zentext context loaded.");
+    }
     rmSync(project, { recursive: true, force: true });
     rmSync(home, { recursive: true, force: true });
   });
@@ -380,6 +380,7 @@ store.close();
     const taskOut = runInstalled(["task", "create", "--title", "Investigate CSS determinism", "--goal", "Confirm ordering"]);
     expect(taskOut).toContain("Created task");
     expect(taskOut).toContain("Status: active");
+    expect(runInstalled(["task", "show"])).toContain("Investigate CSS determinism");
 
     const handoffOut = runInstalled([
       "handoff", "create",
@@ -392,6 +393,8 @@ store.close();
     ]);
     expect(handoffOut).toContain("Previous agent: kimi");
     expect(handoffOut).toContain("Stored handoff record:");
+    expect(runInstalled(["handoff", "show"])).toContain("Read contract and implementation.");
+    expect(runInstalled(["handoff", "validate"])).toContain("Handoff is current");
 
     const ackOut = runInstalled(["handoff", "acknowledge"]);
     expect(ackOut).toContain("Zentext context loaded.");
