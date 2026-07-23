@@ -72,3 +72,7 @@ export {
   renderStaleContinuation,
   type ContinuationFormat,
 } from "./continuation-format.js";
+export {
+  TOOL_NEUTRAL_CONTINUATION_INSTRUCTIONS,
+  renderToolNeutralContinuationPrompt,
+} from "./continuation-prompt.js";

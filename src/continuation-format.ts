@@ -1,4 +1,5 @@
 import type { ContinuationStaleError, ContinuationView } from "./continuation.js";
+import { renderToolNeutralContinuationPrompt } from "./continuation-prompt.js";
 
 export type ContinuationFormat = "human" | "json" | "markdown" | "prompt";
 
@@ -85,15 +86,7 @@ export function renderContinuationMarkdown(view: ContinuationView): string {
 }
 
 export function renderContinuationPrompt(view: ContinuationView): string {
-  return [
-    "Use the following validated Zentext continuation as external project memory.",
-    "Confirm the project, task, and task revision before changing anything.",
-    "Explain the completed work, changed files, blockers, verification, stopping point, and exact next action.",
-    "Do not repeat completed work. Inspect the repository, then begin from the exact next action.",
-    "If the live task revision no longer matches, refuse to continue and report the stale state.",
-    "",
-    renderContinuationMarkdown(view),
-  ].join("\n");
+  return renderToolNeutralContinuationPrompt(renderContinuationMarkdown(view));
 }
 
 export function renderContinuation(
@@ -142,4 +135,3 @@ export function renderStaleContinuation(
     "Create a new handoff from the live task state before continuing.",
   ].join("\n");
 }
-

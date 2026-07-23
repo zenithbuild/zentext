@@ -72,6 +72,10 @@ All four modes render the same canonical continuation view:
 - `--markdown`: portable Markdown;
 - `--prompt`: provider-neutral instruction plus the portable state.
 
+Prompt instructions come from one canonical template documented in
+[`continuation-prompt.md`](./continuation-prompt.md). CLI and handoff export do
+not maintain separate provider instructions.
+
 The modes are mutually exclusive. Unknown options fail with exit code 1. A
 missing store returns exit code 2, missing actionable task or handoff returns 3,
 stale state returns 4, and malformed canonical state returns 5.

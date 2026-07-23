@@ -43,6 +43,7 @@
     "docs/switching-agents.md",
     "docs/tester-onboarding.md",
     "docs/continuation.md",
+    "docs/continuation-prompt.md",
     "docs/portability-audit.md",
     "docs/recovery-runbook.md",
     "LICENSE",

@@ -99,6 +99,8 @@ zentext handoff validate
 - [docs/mcp.md](./docs/mcp.md) — MCP adapter usage
 - [docs/continuation.md](./docs/continuation.md) — current architecture, release
   state, limitations, and continuation commands
+- [docs/continuation-prompt.md](./docs/continuation-prompt.md) — canonical
+  provider-neutral prompt and manual use
 
 ## Troubleshooting
 

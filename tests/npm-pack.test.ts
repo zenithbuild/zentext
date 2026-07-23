@@ -122,6 +122,7 @@ describe("npm package validation", () => {
       "package/docs/switching-agents.md",
       "package/docs/tester-onboarding.md",
       "package/docs/continuation.md",
+      "package/docs/continuation-prompt.md",
       "package/docs/portability-audit.md",
       "package/docs/recovery-runbook.md",
     ];

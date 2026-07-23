@@ -107,7 +107,9 @@ The Developer Preview exposes:
 - deterministic context: `repack`
 - tasks: `task create`, `task show`, `task update`
 - handoffs: `handoff create`, `handoff show`, `handoff validate`,
-  `handoff acknowledge`
+  `handoff acknowledge`, `handoff export`
+- validated continuation: `continue` with human, JSON, Markdown, and canonical
+  tool-neutral prompt output
 
 Task and handoff mutations flow through the transactional writer. General
 record-authoring commands such as `zentext add` and `zentext edit` are not part
@@ -160,8 +162,8 @@ tool listing, package contents, and both SQLite adapters as described in
 - Node 26 is experimental; Node 20 is unsupported
 - A project without a Git origin uses a path-derived ID, so moving it to a
   different absolute path does not automatically discover the old store
-- Repeated CLI options are tracked separately in issue #26 and are not part of
-  the M0 portability batch
+- Repeatable task notes and handoff completed work, blockers, changed files,
+  and verification values are stored as ordered arrays
 - Provider/model field tests may expose response-format or availability
   failures unrelated to the deterministic local store
 
@@ -206,11 +208,13 @@ Historical or regenerable artifacts:
 
 ## Current roadmap position
 
-The active milestone is **M0: Laptop Exit and Project Portability**:
+The active milestone is **M1: Cross-Platform Text Proof**:
 
-1. #19 — reconcile repository truth and create this continuation guide
-2. #20 — prove clean-clone and packed-artifact portability
-3. #21 — publish a safe recovery runbook based on verified behavior
+1. #26 — preserve repeated CLI option values
+2. #22 — run the official isolated cross-platform field test
+3. #23 — provide one validated `zentext continue` entry point
+4. #24 — export the same state as JSON, Markdown, and prompt text
+5. #25 — keep one canonical tool-neutral continuation template
 
 After this batch, the next ordered issue is
-[#22 — Create the official cross-platform field test](https://github.com/zenithbuild/zentext/issues/22).
+[#27 — Define formal input schemas](https://github.com/zenithbuild/zentext/issues/27).

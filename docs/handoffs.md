@@ -116,6 +116,8 @@ Handoff exports are stdout-only in this release, matching their primary use as
 portable text. Redirect output with the shell when a file is needed. Exported
 JSON, Markdown, and prompt text are rendered from the same validated view as
 `zentext continue`; no format creates a separate handoff or memory system.
+The prompt format uses the canonical rules in
+[`continuation-prompt.md`](./continuation-prompt.md).
 
 ## Startup acknowledgement
 
