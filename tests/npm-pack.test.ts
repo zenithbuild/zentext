@@ -411,7 +411,9 @@ await client.close();
       });
     }
 
+    expect(runInstalled(["--help"])).toContain("zentext continue");
     runInstalled(["init"]);
+    expect(runInstalled(["status"])).toContain("Record counts:");
     const taskOut = runInstalled(["task", "create", "--title", "Investigate CSS determinism", "--goal", "Confirm ordering"]);
     expect(taskOut).toContain("Created task");
     expect(taskOut).toContain("Status: active");
@@ -434,6 +436,24 @@ await client.close();
     const ackOut = runInstalled(["handoff", "acknowledge"]);
     expect(ackOut).toContain("Zentext context loaded.");
     expect(ackOut).toContain("Investigate CSS determinism");
+
+    const continuationJson = JSON.parse(runInstalled(["continue", "--json"]));
+    expect(continuationJson.validation.status).toBe("current");
+    expect(continuationJson.handoff.completed).toEqual(["Read contract"]);
+    expect(runInstalled(["continue"])).toContain("Exact next action:");
+    expect(runInstalled(["continue", "--markdown"])).toContain("# Zentext continuation");
+    expect(runInstalled(["continue", "--prompt"])).toContain(
+      "Tool-neutral Zentext continuation instruction",
+    );
+    expect(
+      JSON.parse(runInstalled(["handoff", "export", "--format", "json"])).validation.status,
+    ).toBe("current");
+    expect(runInstalled(["handoff", "export", "--format", "markdown"])).toContain(
+      "# Zentext continuation",
+    );
+    expect(runInstalled(["handoff", "export", "--format", "prompt"])).toContain(
+      "Tool-neutral Zentext continuation instruction",
+    );
 
     const updateOut = runInstalled(["task", "update", "--summary", "Updated", "--note", "Progress"]);
     expect(updateOut).toContain("Updated task");
@@ -458,6 +478,17 @@ await client.close();
     expect(staleAckExit).toBe(4);
     expect(staleAckOut).toContain("Handoff rejected");
     expect(staleAckOut).not.toContain("Zentext context loaded.");
+
+    let staleContinueExit = 0;
+    let staleContinueOut = "";
+    try {
+      staleContinueOut = runInstalled(["continue", "--json"]);
+    } catch (e) {
+      staleContinueExit = (e as { status?: number; stdout?: string }).status ?? 1;
+      staleContinueOut = (e as { stdout?: string }).stdout ?? "";
+    }
+    expect(staleContinueExit).toBe(4);
+    expect(JSON.parse(staleContinueOut).validation.status).toBe("stale");
 
     rmSync(project, { recursive: true, force: true });
     rmSync(home, { recursive: true, force: true });

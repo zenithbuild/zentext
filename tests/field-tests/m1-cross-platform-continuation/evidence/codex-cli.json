@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "scenario_id": "m1-regional-total-continuation",
+  "executed_at": "2026-07-23T02:17:22Z",
+  "participant": {
+    "tool": "Codex CLI",
+    "tool_family": "openai-codex",
+    "version_or_model": "codex-cli 0.144.5",
+    "input_surface": "prompt",
+    "execution_kind": "real_tool"
+  },
+  "isolation": {
+    "fresh_project": true,
+    "isolated_zentext_home": true,
+    "tool_a_process_exited": true,
+    "prior_conversation_available": false,
+    "provider_resume_used": false
+  },
+  "normalized_response": {
+    "sequence": [
+      "state_explained",
+      "continuation_performed"
+    ],
+    "project_id": "bfd206d0e396f8a1",
+    "task_id": "rec_task_01KY6C5MMS66V1Q230865T2P0T",
+    "task_revision": 2,
+    "state_summary": {
+      "task": "Verify the regional fixture total",
+      "completed": [
+        "Inspected fixture/source-a.txt and recorded north=17 and south=11.",
+        "Calculated and documented the source-a subtotal of 28."
+      ],
+      "changed_files": [
+        "work/continuation-report.md",
+        "work/verification.log"
+      ],
+      "blockers": [
+        "fixture/source-b.txt has not been inspected.",
+        "The grand total cannot be verified until source-b is inspected."
+      ],
+      "verification": [
+        "Confirmed source-a contains exactly north=17 and south=11.",
+        "Verified 17 + 11 = 28."
+      ],
+      "stopping_point": "The source-a subtotal is recorded; source-b remains intentionally uninspected.",
+      "next_action": "Inspect fixture/source-b.txt, calculate its subtotal, then verify the grand total without redoing source-a work."
+    },
+    "continuation_result": {
+      "inspected_file": "fixture/source-b.txt",
+      "east": 13,
+      "west": 9,
+      "source_b_subtotal": 22,
+      "grand_total": 50,
+      "repeated_completed_work": false
+    },
+    "progress_update": {
+      "summary": "Inspected fixture/source-b.txt, verified east=13 and west=9, calculated the source-b subtotal as 22, and verified the grand total as 50 using the recorded source-a subtotal of 28.",
+      "notes": [
+        "Source-b contains exactly east=13 and west=9; 13 + 9 = 22.",
+        "The recorded source-a subtotal of 28 plus the verified source-b subtotal of 22 equals the grand total of 50."
+      ],
+      "next_action": "Record this progress update in Zentext and mark the regional fixture total verification complete."
+    }
+  },
+  "revision_evidence": {
+    "before": 2,
+    "after": 3,
+    "handoff_revision": 2,
+    "validation_exit_code": 4,
+    "continuation_exit_code": 4
+  }
+}

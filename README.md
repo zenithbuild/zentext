@@ -88,7 +88,9 @@ zentext handoff validate
 ## Developer Preview limitations
 
 - General-purpose write tools (`zentext add`, `zentext edit`) and MCP write tools are not in this preview. The Developer Preview exposes `zentext task create`, `zentext task show`, `zentext task update`, and `zentext handoff create` so a normal user can record and continue work without importing the store module directly.
-- Multi-agent handoffs are validated against local Ollama models; provider flakiness may affect some models.
+- The official M1 field test validates serial continuation across Codex CLI,
+  Gemini through Antigravity CLI, and Kimi through Ollama. Provider availability
+  remains external to Zentext and can still fail independently.
 - Enterprise features (cloud, sync, auth, vector search) are out of scope for this release.
 
 ## Documentation

@@ -1,44 +1,124 @@
 {
   "schema_version": 1,
   "scenario_id": "m1-regional-total-continuation",
-  "execution_status": "not-run",
+  "executed_at": "2026-07-23T02:17:22Z",
+  "execution_status": "pass",
+  "evidence_categories": {
+    "automated_regression_tests": "covered by the repository Vitest suite",
+    "deterministic_harness": "validated before real execution",
+    "real_tool_executions": "3 passed",
+    "unsupported_or_unavailable": 2
+  },
   "surfaces": {
-    "continue_human": "not-run",
-    "continue_json": "not-run",
-    "continue_markdown": "not-run",
-    "continue_prompt": "not-run",
-    "export_json": "not-run",
-    "export_markdown": "not-run",
-    "export_prompt": "not-run",
-    "prompt_template": "not-run"
+    "continue_human": "pass",
+    "continue_json": "pass",
+    "continue_markdown": "pass",
+    "continue_prompt": "pass",
+    "export_json": "pass",
+    "export_markdown": "pass",
+    "export_prompt": "pass",
+    "prompt_template": "pass"
   },
   "repeated_values": {
-    "completed": [],
-    "files_changed": [],
-    "blockers": [],
-    "verification": [],
-    "notes": []
+    "completed": [
+      "Inspected fixture/source-a.txt and recorded north=17 and south=11.",
+      "Calculated and documented the source-a subtotal of 28."
+    ],
+    "files_changed": [
+      "work/continuation-report.md",
+      "work/verification.log"
+    ],
+    "blockers": [
+      "fixture/source-b.txt has not been inspected.",
+      "The grand total cannot be verified until source-b is inspected."
+    ],
+    "verification": [
+      "Confirmed source-a contains exactly north=17 and south=11.",
+      "Verified 17 + 11 = 28."
+    ],
+    "notes": [
+      "Preserve each regional value as written, including labels.",
+      "Use decimal addition and report the verified grand total."
+    ]
   },
   "isolation": {
-    "fresh_project_per_run": false,
-    "isolated_home_per_run": false,
-    "tool_a_exited_before_receiver": false,
-    "prior_conversation_available": null,
-    "shared_provider_session": null,
-    "answer_carried_in_memory": null
+    "fresh_project_per_run": true,
+    "isolated_home_per_run": true,
+    "tool_a_exited_before_receiver": true,
+    "prior_conversation_available": false,
+    "shared_provider_session": false,
+    "answer_carried_in_memory": false
   },
   "revision_evidence": {
-    "before": null,
-    "after": null,
-    "handoff_revision": null,
-    "validation_exit_code": null,
-    "continuation_exit_code": null,
-    "stale_rejected": false
+    "before": 2,
+    "after": 3,
+    "handoff_revision": 2,
+    "validation_exit_code": 4,
+    "continuation_exit_code": 4,
+    "stale_rejected": true
   },
-  "participants": [],
-  "failures": [],
+  "participants": [
+    {
+      "tool": "Codex CLI",
+      "tool_family": "openai-codex",
+      "version_or_model": "codex-cli 0.144.5",
+      "environment": "darwin arm64; v24.18.0",
+      "input_surface": "prompt",
+      "execution_kind": "real_tool",
+      "prior_state_available": false,
+      "result": "pass",
+      "defects": [],
+      "explained_before_continuing": true,
+      "continued_from_exact_next_action": true,
+      "repeated_completed_work": false,
+      "evidence": "tests/field-tests/m1-cross-platform-continuation/evidence/codex-cli.json"
+    },
+    {
+      "tool": "Antigravity CLI",
+      "tool_family": "google-gemini",
+      "version_or_model": "1.1.5 / gemini-3.6-flash-high",
+      "environment": "darwin arm64; v24.18.0",
+      "input_surface": "json",
+      "execution_kind": "real_tool",
+      "prior_state_available": false,
+      "result": "pass",
+      "defects": [],
+      "explained_before_continuing": true,
+      "continued_from_exact_next_action": true,
+      "repeated_completed_work": false,
+      "evidence": "tests/field-tests/m1-cross-platform-continuation/evidence/antigravity-gemini.json"
+    },
+    {
+      "tool": "Ollama",
+      "tool_family": "moonshot-kimi",
+      "version_or_model": "ollama version is 0.32.1 / kimi-k2.7-code:cloud",
+      "environment": "darwin arm64; v24.18.0",
+      "input_surface": "markdown",
+      "execution_kind": "real_tool",
+      "prior_state_available": false,
+      "result": "pass",
+      "defects": [],
+      "explained_before_continuing": true,
+      "continued_from_exact_next_action": true,
+      "repeated_completed_work": false,
+      "evidence": "tests/field-tests/m1-cross-platform-continuation/evidence/ollama-kimi.json"
+    }
+  ],
+  "failures": [
+    {
+      "tool": "Claude CLI",
+      "classification": "unavailable",
+      "summary": "The standalone claude executable was not installed; it was not substituted with another session or reported as tested."
+    },
+    {
+      "tool": "Kimi CLI",
+      "classification": "unavailable",
+      "summary": "The standalone kimi executable was not installed; the Kimi model was tested only through a fresh Ollama API execution."
+    }
+  ],
   "limitations": [
-    "Baseline contract only; continuation surfaces and real participant executions are pending."
+    "This is serial continuation only; it does not test orchestration or concurrent workers.",
+    "Text-only model APIs receive the explicitly allowed source-b fixture content in their isolated prompt.",
+    "Provider execution proves portable consumption, not transfer of hidden model state or session history."
   ]
 }
-

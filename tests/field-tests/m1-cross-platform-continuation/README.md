@@ -4,10 +4,10 @@ This is the canonical field-test contract for Zentext issue #22. It proves
 serial continuation through external project memory. It does not test hidden
 model state, shared provider history, orchestration, or concurrent work.
 
-The contract is established before the M1 continuation surfaces are added.
-`results.json` therefore begins in an honest `not-run` state. The final M1 run
-must replace that baseline with evidence from at least three unrelated tools or
-model families and pass `node validate.mjs` without `--allow-pending`.
+The contract was established before the M1 continuation surfaces were added,
+with `results.json` in an honest `not-run` state. The completed M1 run now
+contains evidence from three unrelated tool/model families and passes
+`node validate.mjs` without `--allow-pending`.
 
 ## Exact task
 
@@ -115,8 +115,16 @@ node tests/field-tests/m1-cross-platform-continuation/validate.mjs --allow-pendi
 For the final proof:
 
 ```sh
+npm run build
+node tests/field-tests/m1-cross-platform-continuation/run.mjs
 node tests/field-tests/m1-cross-platform-continuation/validate.mjs
 ```
+
+The runner configuration is in `participants.json`; the normalized receiver
+contract is `receiver-response.schema.json`. A safe deterministic harness smoke
+can be run without provider calls by passing `--dry-run` and temporary
+`--output`/`--evidence-dir` paths. Dry-run participants never count toward the
+strict three-tool gate.
 
 The strict command fails unless every required surface passes, at least three
 unrelated participants pass, isolation is affirmed, repeated arrays remain
@@ -129,4 +137,3 @@ Never place tokens, passwords, private keys, recovery codes, private databases,
 provider session data, unredacted home paths, or environment secrets in this
 directory. Record tool versions and safe failure summaries only. Temporary
 stores and raw provider output are deleted after normalization.
-

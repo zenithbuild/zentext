@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = dirname(fileURLToPath(import.meta.url));
+const repoRoot = join(root, "../../..");
 const allowPending = process.argv.includes("--allow-pending");
 const scenario = JSON.parse(readFileSync(join(root, "scenario.json"), "utf8"));
 const results = JSON.parse(readFileSync(join(root, "results.json"), "utf8"));
@@ -70,6 +71,7 @@ const participantKeys = [
   "continued_from_exact_next_action",
   "repeated_completed_work",
   "evidence",
+  "execution_kind",
 ];
 for (const participant of results.participants) {
   for (const key of participantKeys) {
@@ -114,6 +116,10 @@ assert.equal(revisions.stale_rejected, true);
 const passing = results.participants.filter((participant) => participant.result === "pass");
 assert.ok(passing.length >= 3, "fewer than three participants passed");
 assert.ok(
+  passing.filter((participant) => participant.execution_kind === "real_tool").length >= 3,
+  "fewer than three real tool executions passed",
+);
+assert.ok(
   new Set(passing.map((participant) => participant.tool_family ?? participant.tool)).size >= 3,
   "passing participants are not from three distinct tool or model families",
 );
@@ -123,7 +129,10 @@ for (const participant of passing) {
   assert.equal(participant.continued_from_exact_next_action, true);
   assert.equal(participant.repeated_completed_work, false);
   assert.ok(participant.evidence.length > 0);
+  assert.ok(
+    existsSync(join(repoRoot, participant.evidence)),
+    `participant evidence does not exist: ${participant.evidence}`,
+  );
 }
 
 console.log(`M1 field test passed with ${passing.length} isolated participants.`);
-
