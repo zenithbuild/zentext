@@ -570,8 +570,55 @@ describe("Zentext CLI — handoff commands", () => {
     expect(result.output).toContain("Updated task");
     expect(result.output).toContain("revision:   2");
     expect(result.output).toContain("Updated objective");
-    expect(result.output).toContain("note: Making progress");
+    expect(result.output).toContain("notes: Making progress");
     expect(result.output).toContain("next_action: Run tests");
+  });
+
+  it("retains repeated task notes and handoff values through persisted reload and output", async () => {
+    await init(tempProject);
+    await taskCreate(tempProject, { title: "Portable continuation", goal: "Retain every value" });
+
+    const updated = await taskUpdate(tempProject, {
+      notes: ["First note, with comma", "Second note with spaces", "検証済み ✅"],
+    });
+    expect(updated.output).toContain("First note, with comma");
+    expect(updated.output).toContain("Second note with spaces");
+    expect(updated.output).toContain("検証済み ✅");
+
+    await handoffCreate(tempProject, {
+      from: "tool-a",
+      stoppingPoint: "Parser and persistence are complete.",
+      nextAction: "Validate every output surface.",
+      completed: ["Implemented parser, preserving commas", "Added regression coverage"],
+      blockers: ["Provider A unavailable", "Need clean consumer run"],
+      filesChanged: ["src/cli/args.ts", "tests/cli-args.test.ts"],
+      verification: ["npm run typecheck:test", "npm test -- cli-args"],
+    });
+
+    const human = await handoffShow(tempProject);
+    expect(human.output.indexOf("Implemented parser, preserving commas")).toBeLessThan(
+      human.output.indexOf("Added regression coverage"),
+    );
+    expect(human.output).toContain("src/cli/args.ts");
+    expect(human.output).toContain("tests/cli-args.test.ts");
+
+    const json = await handoffShow(tempProject, { json: true });
+    const parsed = JSON.parse(json.output);
+    expect(parsed.completed).toEqual([
+      "Implemented parser, preserving commas",
+      "Added regression coverage",
+    ]);
+    expect(parsed.blockers).toEqual(["Provider A unavailable", "Need clean consumer run"]);
+    expect(parsed.files_changed).toEqual(["src/cli/args.ts", "tests/cli-args.test.ts"]);
+    expect(parsed.verification).toEqual(["npm run typecheck:test", "npm test -- cli-args"]);
+
+    const store = new SqliteStore();
+    await store.openProjectStore(tempProject);
+    const task = store.listRecords({ type: "task", status: "active" })[0] as unknown as {
+      notes: string[];
+    };
+    expect(task.notes).toEqual(["First note, with comma", "Second note with spaces", "検証済み ✅"]);
+    store.close();
   });
 
   it("handoff create fails with guidance when no active task exists", async () => {

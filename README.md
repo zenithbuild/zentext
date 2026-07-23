@@ -42,7 +42,10 @@ zentext handoff create \
   --stopping-point "Implemented login route; need password hashing next." \
   --next-action "Add bcrypt password hashing to /api/login." \
   --completed "Scaffolded auth routes" \
-  --files-changed "src/routes/login.ts"
+  --completed "Added /api/login POST handler" \
+  --files-changed "src/routes/login.ts" \
+  --files-changed "tests/routes/login.test.ts" \
+  --verification "npm test -- login"
 
 # A fresh agent can load the handoff
 zentext handoff acknowledge

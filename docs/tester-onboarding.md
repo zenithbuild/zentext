@@ -38,8 +38,15 @@ zentext task create --title "Describe the current engineering task" --goal "What
 Use `zentext task show` to inspect the current task and `zentext task update` to record progress:
 
 ```bash
-zentext task update --summary "Where the work stopped" --next-action "What to do next" --note "Optional progress note"
+zentext task update \
+  --summary "Where the work stopped" \
+  --next-action "What to do next" \
+  --note "First progress note" \
+  --note "Second progress note"
 ```
+
+`--note` is repeatable. Notes are stored as an ordered array, so commas inside
+a note remain part of that note.
 
 ### 1. Initialize a project
 

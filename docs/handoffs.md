@@ -71,8 +71,11 @@ zentext handoff create \
   --completed "Read contracts/DETERMINISM.md" \
   --completed "Read packages/bundler/src/utils.rs" \
   --blockers "Need fresh build artifact" \
-  --files-changed "none" \
-  --verification "Contract trace complete"
+  --blockers "Compiler fixture is unavailable" \
+  --files-changed "docs/findings.md" \
+  --files-changed "tests/determinism.test.ts" \
+  --verification "Contract trace complete" \
+  --verification "Focused determinism test passed"
 
 # Show the latest handoff (exits nonzero if stale)
 zentext handoff show
@@ -86,6 +89,10 @@ zentext handoff acknowledge --json
 zentext handoff validate
 zentext handoff validate --json
 ```
+
+`--completed`, `--blockers`, `--files-changed`, and `--verification` are
+repeatable. Each occurrence is stored as a separate value in invocation order;
+commas inside a value are not treated as separators.
 
 ## Startup acknowledgement
 

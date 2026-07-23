@@ -440,6 +440,7 @@ export async function taskUpdate(
     summary?: string;
     status?: string;
     note?: string;
+    notes?: string[];
     nextAction?: string;
   },
 ): Promise<{ output: string; exitCode: number }> {
@@ -477,7 +478,8 @@ export async function taskUpdate(
     if (options.title !== undefined) patch.title = options.title;
     if (options.summary !== undefined) patch.summary = options.summary;
     if (options.status !== undefined) patch.status = options.status;
-    if (options.note !== undefined) patch.note = options.note;
+    const notes = options.notes ?? (options.note !== undefined ? [options.note] : undefined);
+    if (notes !== undefined && notes.length > 0) patch.notes = notes;
     if (options.nextAction !== undefined) patch.next_action = options.nextAction;
 
     const record = writer.updateRecord(target.id, patch);
@@ -576,15 +578,15 @@ Task subcommands:
     [--status active|blocked|done|canceled]
   zentext task show
   zentext task update [--title <text>] [--summary <text>] [--status <status>]
-    [--note <text>] [--next-action <text>]
+    [--note <text> ...] [--next-action <text>]
 
 Handoff subcommands:
   zentext handoff show [--json]
   zentext handoff acknowledge [--json]
   zentext handoff validate [--json]
   zentext handoff create --from <agent> --stopping-point <text> --next-action <text>
-    [--completed <text>] [--blockers <text>] [--files-changed <text>]
-    [--verification <text>] [--previous-response <text>]
+    [--completed <text> ...] [--blockers <text> ...] [--files-changed <text> ...]
+    [--verification <text> ...] [--previous-response <text>]
 
 Options:
   --type     Filter by record type (task, decision, blocker, ...)
@@ -594,5 +596,9 @@ Options:
   --max-size Character budget for the output (default 12000)
   --out      Write the payload to a file instead of stdout
   --json     Output handoff commands as JSON
+
+Repeatable options:
+  --note, --completed, --blockers, --files-changed, and --verification may be
+  supplied more than once. Values are retained in invocation order.
 `;
 }
