@@ -112,7 +112,7 @@ Normalized evidence:
 Browser-captured evidence:
 
 - [`01-pr-63-merged.jpg`](evidence/screenshots/01-pr-63-merged.jpg)
-- `02-pr-64-retargeted-and-validated.jpg` — captured after the final PR update
+- [`02-pr-64-retargeted-and-validated.jpg`](evidence/screenshots/02-pr-64-retargeted-and-validated.jpg)
 - [`03-proof-overview.jpg`](evidence/screenshots/03-proof-overview.jpg)
 - [`04-cross-tool-matrix.jpg`](evidence/screenshots/04-cross-tool-matrix.jpg)
 - [`05-revision-stale-proof.jpg`](evidence/screenshots/05-revision-stale-proof.jpg)
