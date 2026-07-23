@@ -1,12 +1,30 @@
 # Zentext
 
-A local-first shared context and memory layer for AI coding agents.
+> **AI sessions end. Your project memory shouldn't.**
 
-Zentext preserves external project memory — task state, architecture decisions,
-blockers, handoffs, validation results, and policies — and repacks that memory
-into useful context so that when you switch from one AI coding agent to another,
-the next agent picks up where the last one left off without you re-explaining the
-project from scratch.
+Zentext keeps work from disappearing when an AI coding session ends. It stores
+what was done, where work stopped, and exactly what comes next outside any one
+tool—so a fresh tool can recover validated project context instead of making
+you explain everything again.
+
+Project memory stays local and structured in SQLite. CLI output, JSON, Markdown,
+portable prompts, and the optional read-only MCP server are views over that same
+canonical state. Zentext does not transfer hidden model state or depend on
+conversation history.
+
+## Why Structured Project Memory
+
+An exported summary captures one moment. As work continues, that text can become
+stale without knowing it.
+
+Zentext maintains canonical, evolving project state instead. Tasks have
+revisions. Handoffs identify the exact revision they continue. Completed work,
+changed files, blockers, verification, stopping points, and next actions remain
+separate structured values. When the task advances, Zentext rejects the old
+handoff rather than presenting an outdated summary as current.
+
+That distinction makes the project memory portable without making a specific AI
+tool, prompt format, or provider the source of truth.
 
 ## Developer Preview install
 
@@ -42,10 +60,23 @@ zentext handoff create \
   --stopping-point "Implemented login route; need password hashing next." \
   --next-action "Add bcrypt password hashing to /api/login." \
   --completed "Scaffolded auth routes" \
-  --files-changed "src/routes/login.ts"
+  --completed "Added /api/login POST handler" \
+  --files-changed "src/routes/login.ts" \
+  --files-changed "tests/routes/login.test.ts" \
+  --verification "npm test -- login"
 
-# A fresh agent can load the handoff
-zentext handoff acknowledge
+# A fresh agent loads one validated continuation view
+zentext continue
+
+# The same canonical state is available as JSON, Markdown, or prompt text
+zentext continue --json
+zentext continue --markdown
+zentext continue --prompt
+
+# Or export the same validated handoff state for another interface
+zentext handoff export --format markdown
+zentext handoff export --format json
+zentext handoff export --format prompt
 
 # Update the task as work progresses
 zentext task update --summary "Password hashing implemented" --next-action "Wire login into UI"
@@ -54,6 +85,23 @@ zentext task update --summary "Password hashing implemented" --next-action "Wire
 zentext handoff validate
 ```
 
+## Portable continuation demo
+
+**AI sessions end. Your project memory shouldn't.** This demo installs the
+packed npm package, lets Tool A record structured work and exit, then starts a
+fresh Tool B with only a portable Zentext continuation and the project files.
+Tool B recovers the state, continues from the exact next action, and advances
+the canonical task revision. Zentext then rejects the original handoff as stale.
+
+See the [complete executable demo](./docs/demo/portable-continuation/README.md),
+the [exact validated-continuation checkpoint](./docs/demo/portable-continuation/checkpoints/03-validated-continuation.txt),
+the [fresh-tool checkpoint](./docs/demo/portable-continuation/checkpoints/05-fresh-tool-continuation.txt),
+the [stale-rejection checkpoint](./docs/demo/portable-continuation/checkpoints/06-stale-handoff-rejection.txt),
+and the [full automatically sanitized transcript](./docs/demo/portable-continuation/transcript.txt).
+
+This is external project-memory continuation—not hidden model-state transfer and
+not conversation migration.
+
 ## What Zentext is
 
 - A local SQLite memory store tied to a project.
@@ -61,6 +109,8 @@ zentext handoff validate
 - A thin read-only MCP adapter (`memory.read`, `memory.list`, `memory.query`, `memory.repack`).
 - A CLI for humans and fallback use.
 - Structured handoffs with revision-safe stale detection.
+- A read-only `zentext continue` entry point with human, JSON, Markdown, and
+  tool-neutral prompt output over one validated continuation model.
 
 ## What Zentext is not
 
@@ -73,7 +123,9 @@ zentext handoff validate
 ## Developer Preview limitations
 
 - General-purpose write tools (`zentext add`, `zentext edit`) and MCP write tools are not in this preview. The Developer Preview exposes `zentext task create`, `zentext task show`, `zentext task update`, and `zentext handoff create` so a normal user can record and continue work without importing the store module directly.
-- Multi-agent handoffs are validated against local Ollama models; provider flakiness may affect some models.
+- The official M1 field test validates serial continuation across Codex CLI,
+  Gemini through Antigravity CLI, and Kimi through Ollama. Provider availability
+  remains external to Zentext and can still fail independently.
 - Enterprise features (cloud, sync, auth, vector search) are out of scope for this release.
 
 ## Documentation
@@ -84,6 +136,8 @@ zentext handoff validate
 - [docs/mcp.md](./docs/mcp.md) — MCP adapter usage
 - [docs/continuation.md](./docs/continuation.md) — current architecture, release
   state, limitations, and continuation commands
+- [docs/continuation-prompt.md](./docs/continuation-prompt.md) — canonical
+  provider-neutral prompt and manual use
 
 ## Troubleshooting
 

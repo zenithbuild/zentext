@@ -8,12 +8,16 @@
 
 import {
   CliError,
+  continueProject,
   handoffAcknowledge,
   handoffCreate,
+  handoffExport,
   handoffShow,
   handoffValidate,
   init,
   list,
+  parseContinuationFormat,
+  parseHandoffExportFormat,
   printUsage,
   repack,
   show,
@@ -22,47 +26,17 @@ import {
   taskShow,
   taskUpdate,
 } from "./commands.js";
-
-function parseArgs(argv: string[]): {
-  command: string;
-  positional: string[];
-  flags: Record<string, string | number | boolean | undefined>;
-} {
-  const positional: string[] = [];
-  const flags: Record<string, string | number | boolean | undefined> = {};
-
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg.startsWith("--")) {
-      const key = arg.slice(2);
-      const next = argv[i + 1];
-      if (next === undefined || next.startsWith("--")) {
-        flags[key] = true;
-      } else {
-        const num = Number(next);
-        flags[key] = !isNaN(num) && next.trim() !== "" ? num : next;
-        i += 1;
-      }
-    } else {
-      positional.push(arg);
-    }
-  }
-
-  return {
-    command: positional[0] ?? "",
-    positional: positional.slice(1),
-    flags,
-  };
-}
-
-
-function collectRepeated(values: (string | number | boolean | undefined)[]): string[] {
-  return values.filter((v): v is string => typeof v === "string").map((v) => v);
-}
+import {
+  booleanFlag,
+  numberFlag,
+  parseArgs,
+  repeatedStringFlag,
+  stringFlag,
+  type FlagValue,
+} from "./args.js";
 
 function parseHandoffOptions(
-  positional: string[],
-  flags: Record<string, string | number | boolean | undefined>,
+  flags: Record<string, FlagValue>,
 ): {
   from: string;
   stoppingPoint: string;
@@ -73,18 +47,9 @@ function parseHandoffOptions(
   verification: string[];
   previousResponse?: string;
 } {
-  const from =
-    typeof flags.from === "string"
-      ? flags.from
-      : positional.find((_, i, arr) => arr[i - 1] === "--from");
-  const stoppingPoint =
-    typeof flags["stopping-point"] === "string"
-      ? flags["stopping-point"]
-      : positional.find((_, i, arr) => arr[i - 1] === "--stopping-point");
-  const nextAction =
-    typeof flags["next-action"] === "string"
-      ? flags["next-action"]
-      : positional.find((_, i, arr) => arr[i - 1] === "--next-action");
+  const from = stringFlag(flags, "from");
+  const stoppingPoint = stringFlag(flags, "stopping-point");
+  const nextAction = stringFlag(flags, "next-action");
 
   if (!from || !stoppingPoint || !nextAction) {
     throw new CliError(
@@ -97,14 +62,11 @@ function parseHandoffOptions(
     from,
     stoppingPoint,
     nextAction,
-    completed: collectRepeated([flags.completed]),
-    blockers: collectRepeated([flags.blockers]),
-    filesChanged: collectRepeated([flags["files-changed"]]),
-    verification: collectRepeated([flags.verification]),
-    previousResponse:
-      typeof flags["previous-response"] === "string"
-        ? flags["previous-response"]
-        : undefined,
+    completed: repeatedStringFlag(flags, "completed"),
+    blockers: repeatedStringFlag(flags, "blockers"),
+    filesChanged: repeatedStringFlag(flags, "files-changed"),
+    verification: repeatedStringFlag(flags, "verification"),
+    previousResponse: stringFlag(flags, "previous-response"),
   };
 }
 
@@ -131,6 +93,15 @@ async function main(): Promise<void> {
         result = await status(cwd);
         break;
       }
+      case "continue": {
+        if (positional.length > 0) {
+          throw new CliError("Usage: zentext continue [--json | --markdown | --prompt]", 1);
+        }
+        result = await continueProject(cwd, {
+          format: parseContinuationFormat(flags),
+        });
+        break;
+      }
       case "show": {
         if (positional.length < 1) {
           throw new CliError("Usage: zentext show <id>", 1);
@@ -140,9 +111,9 @@ async function main(): Promise<void> {
       }
       case "list": {
         result = await list(cwd, {
-          type: typeof flags.type === "string" ? flags.type : undefined,
-          status: typeof flags.status === "string" ? flags.status : undefined,
-          limit: typeof flags.limit === "number" ? flags.limit : undefined,
+          type: stringFlag(flags, "type"),
+          status: stringFlag(flags, "status"),
+          limit: numberFlag(flags, "limit"),
         });
         break;
       }
@@ -152,9 +123,9 @@ async function main(): Promise<void> {
           throw new CliError("--max-size must be a positive number", 1);
         }
         result = await repack(cwd, {
-          focus: typeof flags.focus === "string" ? flags.focus : undefined,
+          focus: stringFlag(flags, "focus"),
           maxSize: typeof maxSizeRaw === "number" ? maxSizeRaw : undefined,
-          out: typeof flags.out === "string" ? flags.out : undefined,
+          out: stringFlag(flags, "out"),
         });
         break;
       }
@@ -162,14 +133,15 @@ async function main(): Promise<void> {
         const subcommand = positional[0] ?? "";
         switch (subcommand) {
           case "create": {
-            if (typeof flags.title !== "string" || flags.title.trim() === "") {
+            const title = stringFlag(flags, "title");
+            if (!title || title.trim() === "") {
               throw new CliError("Usage: zentext task create --title <text> [--goal <text>] [--summary <text>] [--status active|blocked|done|canceled]", 1);
             }
             result = await taskCreate(cwd, {
-              title: flags.title,
-              goal: typeof flags.goal === "string" ? flags.goal : undefined,
-              summary: typeof flags.summary === "string" ? flags.summary : undefined,
-              status: typeof flags.status === "string" ? flags.status : undefined,
+              title,
+              goal: stringFlag(flags, "goal"),
+              summary: stringFlag(flags, "summary"),
+              status: stringFlag(flags, "status"),
             });
             break;
           }
@@ -179,11 +151,11 @@ async function main(): Promise<void> {
           }
           case "update": {
             result = await taskUpdate(cwd, {
-              title: typeof flags.title === "string" ? flags.title : undefined,
-              summary: typeof flags.summary === "string" ? flags.summary : undefined,
-              status: typeof flags.status === "string" ? flags.status : undefined,
-              note: typeof flags.note === "string" ? flags.note : undefined,
-              nextAction: typeof flags["next-action"] === "string" ? flags["next-action"] : undefined,
+              title: stringFlag(flags, "title"),
+              summary: stringFlag(flags, "summary"),
+              status: stringFlag(flags, "status"),
+              notes: repeatedStringFlag(flags, "note"),
+              nextAction: stringFlag(flags, "next-action"),
             });
             break;
           }
@@ -200,7 +172,7 @@ Usage: zentext task {create|show|update} ...`,
       }
       case "handoff": {
         const subcommand = positional[0] ?? "";
-        const json = flags.json === true;
+        const json = booleanFlag(flags, "json");
         switch (subcommand) {
           case "show": {
             result = await handoffShow(cwd, { json });
@@ -215,8 +187,14 @@ Usage: zentext task {create|show|update} ...`,
             break;
           }
           case "create": {
-            const opts = parseHandoffOptions(positional.slice(1), flags);
+            const opts = parseHandoffOptions(flags);
             result = await handoffCreate(cwd, opts);
+            break;
+          }
+          case "export": {
+            result = await handoffExport(cwd, {
+              format: parseHandoffExportFormat(flags),
+            });
             break;
           }
           default: {
@@ -235,7 +213,7 @@ ${printUsage()}`,
       }
     }
 
-    if (result.output && !flags.out) {
+    if (result.output && !stringFlag(flags, "out")) {
       console.log(result.output);
     }
     process.exit(result.exitCode);

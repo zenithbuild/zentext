@@ -118,11 +118,25 @@ describe("npm package validation", () => {
       "package/LICENSE",
       "package/docs/mcp.md",
       "package/docs/handoffs.md",
+      "package/docs/cli-reference.md",
       "package/docs/switching-agents.md",
       "package/docs/tester-onboarding.md",
       "package/docs/continuation.md",
+      "package/docs/continuation-prompt.md",
       "package/docs/portability-audit.md",
       "package/docs/recovery-runbook.md",
+      "package/docs/demo/portable-continuation/README.md",
+      "package/docs/demo/portable-continuation/run-demo.mjs",
+      "package/docs/demo/portable-continuation/tool-a.mjs",
+      "package/docs/demo/portable-continuation/fresh-tool.mjs",
+      "package/docs/demo/portable-continuation/recording-plan.md",
+      "package/docs/demo/portable-continuation/transcript.txt",
+      "package/docs/demo/portable-continuation/checkpoints/01-initialization.txt",
+      "package/docs/demo/portable-continuation/checkpoints/02-task-and-handoff.txt",
+      "package/docs/demo/portable-continuation/checkpoints/03-validated-continuation.txt",
+      "package/docs/demo/portable-continuation/checkpoints/04-portable-prompt-export.txt",
+      "package/docs/demo/portable-continuation/checkpoints/05-fresh-tool-continuation.txt",
+      "package/docs/demo/portable-continuation/checkpoints/06-stale-handoff-rejection.txt",
     ];
 
     for (const path of required) {
@@ -232,6 +246,30 @@ await client.close();
     const ack = runInstalled(["handoff", "acknowledge"], { cwd: project, home });
     expect(ack).toContain("Zentext context loaded.");
     expect(ack).toContain("Active task: Verify CSS determinism");
+    const continuation = runInstalled(["continue"], { cwd: project, home });
+    expect(continuation).toContain("Zentext continuation — validated current");
+    expect(continuation).toContain("Exact next action:");
+    const continuationJson = JSON.parse(
+      runInstalled(["continue", "--json"], { cwd: project, home }),
+    );
+    expect(continuationJson.validation.status).toBe("current");
+    expect(continuationJson.handoff.completed).toEqual(["Read contract"]);
+    expect(runInstalled(["continue", "--markdown"], { cwd: project, home })).toContain(
+      "# Zentext continuation",
+    );
+    expect(runInstalled(["continue", "--prompt"], { cwd: project, home })).toContain(
+      "external project memory",
+    );
+    const exportJson = JSON.parse(
+      runInstalled(["handoff", "export", "--format", "json"], { cwd: project, home }),
+    );
+    expect(exportJson.handoff.completed).toEqual(["Read contract"]);
+    expect(
+      runInstalled(["handoff", "export", "--format", "markdown"], { cwd: project, home }),
+    ).toContain("# Zentext continuation");
+    expect(
+      runInstalled(["handoff", "export", "--format", "prompt"], { cwd: project, home }),
+    ).toContain("external project memory");
 
     runInstalled(["task", "update", "--summary", "Contract reviewed", "--note", "Continue"], {
       cwd: project,
@@ -250,6 +288,15 @@ await client.close();
     } catch (error) {
       expect((error as { status?: number }).status).toBe(4);
       expect((error as { stdout?: string }).stdout).not.toContain("Zentext context loaded.");
+    }
+    try {
+      runInstalled(["continue", "--json"], { cwd: project, home });
+      throw new Error("Expected stale continuation to fail");
+    } catch (error) {
+      expect((error as { status?: number }).status).toBe(4);
+      const parsed = JSON.parse((error as { stdout: string }).stdout);
+      expect(parsed.continuation).toBeNull();
+      expect(parsed.validation.status).toBe("stale");
     }
     rmSync(project, { recursive: true, force: true });
     rmSync(home, { recursive: true, force: true });
@@ -376,7 +423,9 @@ await client.close();
       });
     }
 
+    expect(runInstalled(["--help"])).toContain("zentext continue");
     runInstalled(["init"]);
+    expect(runInstalled(["status"])).toContain("Record counts:");
     const taskOut = runInstalled(["task", "create", "--title", "Investigate CSS determinism", "--goal", "Confirm ordering"]);
     expect(taskOut).toContain("Created task");
     expect(taskOut).toContain("Status: active");
@@ -399,6 +448,24 @@ await client.close();
     const ackOut = runInstalled(["handoff", "acknowledge"]);
     expect(ackOut).toContain("Zentext context loaded.");
     expect(ackOut).toContain("Investigate CSS determinism");
+
+    const continuationJson = JSON.parse(runInstalled(["continue", "--json"]));
+    expect(continuationJson.validation.status).toBe("current");
+    expect(continuationJson.handoff.completed).toEqual(["Read contract"]);
+    expect(runInstalled(["continue"])).toContain("Exact next action:");
+    expect(runInstalled(["continue", "--markdown"])).toContain("# Zentext continuation");
+    expect(runInstalled(["continue", "--prompt"])).toContain(
+      "Tool-neutral Zentext continuation instruction",
+    );
+    expect(
+      JSON.parse(runInstalled(["handoff", "export", "--format", "json"])).validation.status,
+    ).toBe("current");
+    expect(runInstalled(["handoff", "export", "--format", "markdown"])).toContain(
+      "# Zentext continuation",
+    );
+    expect(runInstalled(["handoff", "export", "--format", "prompt"])).toContain(
+      "Tool-neutral Zentext continuation instruction",
+    );
 
     const updateOut = runInstalled(["task", "update", "--summary", "Updated", "--note", "Progress"]);
     expect(updateOut).toContain("Updated task");
@@ -423,6 +490,17 @@ await client.close();
     expect(staleAckExit).toBe(4);
     expect(staleAckOut).toContain("Handoff rejected");
     expect(staleAckOut).not.toContain("Zentext context loaded.");
+
+    let staleContinueExit = 0;
+    let staleContinueOut = "";
+    try {
+      staleContinueOut = runInstalled(["continue", "--json"]);
+    } catch (e) {
+      staleContinueExit = (e as { status?: number; stdout?: string }).status ?? 1;
+      staleContinueOut = (e as { stdout?: string }).stdout ?? "";
+    }
+    expect(staleContinueExit).toBe(4);
+    expect(JSON.parse(staleContinueOut).validation.status).toBe("stale");
 
     rmSync(project, { recursive: true, force: true });
     rmSync(home, { recursive: true, force: true });

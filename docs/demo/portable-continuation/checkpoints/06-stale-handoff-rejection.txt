@@ -1,0 +1,11 @@
+=== 6. ORIGINAL HANDOFF IS NOW STALE ===
+
+$ zentext handoff validate --json
+{
+  "current": false,
+  "reason": "active_task revision changed",
+  "task_id": "rec_task_01KY7Z1FYSQ90DWBRK71SJ2MHM",
+  "handoff_revision": 2,
+  "live_revision": 3
+}
+[exit 4]

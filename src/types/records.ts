@@ -119,6 +119,7 @@ export interface TaskPayload {
   goal: string;
   steps?: string[];
   next?: string;
+  notes?: string[];
   related?: string[];
 }
 
@@ -217,6 +218,7 @@ export interface CreateTaskInput extends CreateInputBase {
   goal: string;
   steps?: string[];
   next?: string;
+  notes?: string[];
   related?: string[];
 }
 

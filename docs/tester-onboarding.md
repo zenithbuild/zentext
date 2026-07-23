@@ -38,8 +38,15 @@ zentext task create --title "Describe the current engineering task" --goal "What
 Use `zentext task show` to inspect the current task and `zentext task update` to record progress:
 
 ```bash
-zentext task update --summary "Where the work stopped" --next-action "What to do next" --note "Optional progress note"
+zentext task update \
+  --summary "Where the work stopped" \
+  --next-action "What to do next" \
+  --note "First progress note" \
+  --note "Second progress note"
 ```
+
+`--note` is repeatable. Notes are stored as an ordered array, so commas inside
+a note remain part of that note.
 
 ### 1. Initialize a project
 
@@ -74,16 +81,22 @@ zentext handoff create \
   --completed "Added /api/login POST handler"
 ```
 
-### 4. Fresh agent loads the handoff
+### 4. Fresh agent loads the validated continuation
 
 In a new agent session, run:
 
 ```bash
-zentext handoff acknowledge
+zentext continue
+
+# For a text-only receiving interface
+zentext handoff export --format prompt
 ```
 
-If the handoff is current, you will see the active task, stopping point, and next action.
-If the task has been updated in the meantime, the command exits nonzero and tells you the handoff is stale.
+If the handoff is current, you will see the active task, completed work,
+stopping point, and exact next action. JSON, Markdown, and prompt output are also
+available with `zentext continue --json|--markdown|--prompt`. If the task has
+been updated in the meantime, continuation exits nonzero and refuses the stale
+state.
 
 ### 5. Validate before trusting a handoff
 

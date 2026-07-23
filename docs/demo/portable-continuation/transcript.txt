@@ -1,0 +1,444 @@
+=== PACKED PACKAGE INSTALL ===
+
+$ npm pack --silent --pack-destination <demo-workspace>/package
+zentext-0.1.0-dev.2.tgz
+[exit 0]
+
+$ npm install --no-audit --no-fund ./zentext-0.1.0-dev.2.tgz
+
+added 130 packages in 4s
+npm warn deprecated prebuild-install@7.1.3: No longer maintained. Please contact the author of the relevant native addon; alternatives are available.
+npm warn allow-scripts 1 package has install scripts not yet covered by allowScripts:
+npm warn allow-scripts   better-sqlite3@12.11.1 (install: prebuild-install || node-gyp rebuild --release)
+npm warn allow-scripts
+npm warn allow-scripts Run `npm approve-scripts --allow-scripts-pending` to review, or `npm approve-scripts <pkg>` to allow.
+[exit 0]
+
+$ git init --quiet
+[exit 0]
+
+$ git remote add origin https://example.invalid/zentext-portable-demo.git
+[exit 0]
+
+=== 1. INITIALIZATION ===
+
+$ zentext init
+Project: zentext-portable-demo
+ID:      c85ef34c5e8fc297
+Store:   <demo-workspace>/home/.zentext/projects/c85ef34c5e8fc297
+Schema:  v1
+State:   created
+
+Next: run `zentext status` to see the current project memory.
+[exit 0]
+
+=== 2. TOOL A CREATES THE TASK AND WORKS ===
+
+$ zentext task create --title 'Complete the portable health route' --goal 'Return status 200 and the exact required response body.'
+Created task rec_task_01KY7Z1FYSQ90DWBRK71SJ2MHM
+Title: Complete the portable health route
+Status: active
+[exit 0]
+
+$ node tool-a.mjs <demo-workspace>/project
+Tool A completed the first work boundary.
+- Added a health-route skeleton.
+- Added and passed the status-code test.
+- Left the response body intentionally pending.
+
+✔ health route returns status 200 (0.747791ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 95.488583
+
+Tool A exits here. It does not inspect or implement the body requirement.
+[exit 0]
+
+$ zentext task update --note 'Status behavior is complete; response body remains pending.' --note 'Tool B must inspect the project requirement before editing.' --next-action 'Implement and verify the exact required response body.'
+Updated task rec_task_01KY7Z1FYSQ90DWBRK71SJ2MHM to revision 2
+TASK: Complete the portable health route
+  id:         rec_task_01KY7Z1FYSQ90DWBRK71SJ2MHM
+  status:     active
+  project:    c85ef34c5e8fc297
+  created:    7/23/2026, 12:05:47 PM
+  updated:    7/23/2026, 12:05:47 PM
+  revision:   2
+  author:     unknown
+  tags:       (none)
+  refs:       (none)
+
+Payload:
+  goal: Return status 200 and the exact required response body.
+  notes: Status behavior is complete; response body remains pending., Tool B must inspect the project requirement before editing.
+  next_action: Implement and verify the exact required response body.
+[exit 0]
+
+$ zentext handoff create --from tool-a --completed 'Added the health-route skeleton.' --completed 'Added and passed the status-code test.' --files-changed src/health-route.mjs --files-changed test/health-route.test.mjs --blockers 'The exact response body is not implemented or tested.' --verification 'node --check src/health-route.mjs passed.' --verification 'node --test passed the status-code test.' --stopping-point 'Status 200 is implemented and verified; body remains '\''pending'\''.' --next-action 'Read requirements/health-response.txt, implement the exact response body, and add its assertion.'
+Handoff: zentext-portable-demo
+Project ID: c85ef34c5e8fc297
+Previous agent: tool-a
+Created: 2026-07-23T17:05:47.952Z
+
+Active task: Complete the portable health route
+  Task ID:      rec_task_01KY7Z1FYSQ90DWBRK71SJ2MHM
+  Task revision: 2
+  Task status:   active
+
+Completed work:
+  - Added the health-route skeleton.
+  - Added and passed the status-code test.
+
+Stopping point: Status 200 is implemented and verified; body remains 'pending'.
+Next action: Read requirements/health-response.txt, implement the exact response body, and add its assertion.
+
+Blockers: The exact response body is not implemented or tested.
+
+Files changed:
+  - src/health-route.mjs
+  - test/health-route.test.mjs
+
+Verification:
+  - node --check src/health-route.mjs passed.
+  - node --test passed the status-code test.
+
+Stored handoff record: rec_handoff_01KY7Z1GDHVGTTW9J32BK1V3QM
+[exit 0]
+
+=== TOOL A EXITS ===
+
+Tool A process has exited.
+No session, conversation, or hidden model state is passed to Tool B.
+
+=== 3. VALIDATED CONTINUATION ===
+
+$ zentext continue
+Zentext continuation — validated current
+
+Project: zentext-portable-demo
+Project ID: c85ef34c5e8fc297
+Active task: Complete the portable health route
+Task ID: rec_task_01KY7Z1FYSQ90DWBRK71SJ2MHM
+Goal: Return status 200 and the exact required response body.
+Status: active
+Task revision: 2
+Previous agent: tool-a
+Completed work:
+  - Added the health-route skeleton.
+  - Added and passed the status-code test.
+Changed files:
+  - src/health-route.mjs
+  - test/health-route.test.mjs
+Blockers:
+  - The exact response body is not implemented or tested.
+Verification:
+  - node --check src/health-route.mjs passed.
+  - node --test passed the status-code test.
+Notes:
+  - Status behavior is complete; response body remains pending.
+  - Tool B must inspect the project requirement before editing.
+Stopping point:
+  Status 200 is implemented and verified; body remains 'pending'.
+Exact next action:
+  Read requirements/health-response.txt, implement the exact response body, and add its assertion.
+
+Validation: current (handoff revision 2, task revision 2)
+[exit 0]
+
+=== CONTINUE PROMPT VIEW ===
+
+$ zentext continue --prompt
+# Tool-neutral Zentext continuation instruction
+
+1. Treat Zentext as external project memory, never as hidden model state, provider reasoning, or prior session history.
+
+2. Confirm the project identity, task identity, and recorded task revision before changing anything.
+
+3. Verify the recorded revision against live Zentext state when that state is available. Refuse to continue and report the mismatch if the handoff is stale; if live validation is unavailable, say so rather than claiming it succeeded.
+
+4. Before editing, summarize the task, completed work, changed files, blockers, verification, stopping point, and exact next action.
+
+5. Do not repeat completed work or claim unverified work as complete.
+
+6. Inspect the repository and available evidence before assuming the handoff is correct.
+
+7. Begin from the exact recorded next action after completing the checks above.
+
+8. Record new progress back into Zentext through an available interface. If you cannot write to Zentext, return the exact progress update for the operator to record.
+
+9. Preserve uncertainty and report missing, conflicting, or unavailable evidence honestly.
+
+--- BEGIN VALIDATED ZENTEXT STATE ---
+
+# Zentext continuation
+
+> Validation: current. This handoff matches the live task revision.
+
+## Project and task
+
+- Project: zentext-portable-demo
+- Project ID: `c85ef34c5e8fc297`
+- Task: Complete the portable health route
+- Task ID: `rec_task_01KY7Z1FYSQ90DWBRK71SJ2MHM`
+- Goal: Return status 200 and the exact required response body.
+- Status: active
+- Task revision: 2
+- Handoff revision: 2
+- Previous agent: tool-a
+
+## Completed work
+
+- Added the health-route skeleton.
+- Added and passed the status-code test.
+
+## Changed files
+
+- src/health-route.mjs
+- test/health-route.test.mjs
+
+## Blockers
+
+- The exact response body is not implemented or tested.
+
+## Verification
+
+- node --check src/health-route.mjs passed.
+- node --test passed the status-code test.
+
+## Notes
+
+- Status behavior is complete; response body remains pending.
+- Tool B must inspect the project requirement before editing.
+
+## Stopping point
+
+Status 200 is implemented and verified; body remains 'pending'.
+
+## Exact next action
+
+Read requirements/health-response.txt, implement the exact response body, and add its assertion.
+
+--- END VALIDATED ZENTEXT STATE ---
+[exit 0]
+
+=== 4. PORTABLE PROMPT EXPORT ===
+
+$ zentext handoff export --format prompt
+# Tool-neutral Zentext continuation instruction
+
+1. Treat Zentext as external project memory, never as hidden model state, provider reasoning, or prior session history.
+
+2. Confirm the project identity, task identity, and recorded task revision before changing anything.
+
+3. Verify the recorded revision against live Zentext state when that state is available. Refuse to continue and report the mismatch if the handoff is stale; if live validation is unavailable, say so rather than claiming it succeeded.
+
+4. Before editing, summarize the task, completed work, changed files, blockers, verification, stopping point, and exact next action.
+
+5. Do not repeat completed work or claim unverified work as complete.
+
+6. Inspect the repository and available evidence before assuming the handoff is correct.
+
+7. Begin from the exact recorded next action after completing the checks above.
+
+8. Record new progress back into Zentext through an available interface. If you cannot write to Zentext, return the exact progress update for the operator to record.
+
+9. Preserve uncertainty and report missing, conflicting, or unavailable evidence honestly.
+
+--- BEGIN VALIDATED ZENTEXT STATE ---
+
+# Zentext continuation
+
+> Validation: current. This handoff matches the live task revision.
+
+## Project and task
+
+- Project: zentext-portable-demo
+- Project ID: `c85ef34c5e8fc297`
+- Task: Complete the portable health route
+- Task ID: `rec_task_01KY7Z1FYSQ90DWBRK71SJ2MHM`
+- Goal: Return status 200 and the exact required response body.
+- Status: active
+- Task revision: 2
+- Handoff revision: 2
+- Previous agent: tool-a
+
+## Completed work
+
+- Added the health-route skeleton.
+- Added and passed the status-code test.
+
+## Changed files
+
+- src/health-route.mjs
+- test/health-route.test.mjs
+
+## Blockers
+
+- The exact response body is not implemented or tested.
+
+## Verification
+
+- node --check src/health-route.mjs passed.
+- node --test passed the status-code test.
+
+## Notes
+
+- Status behavior is complete; response body remains pending.
+- Tool B must inspect the project requirement before editing.
+
+## Stopping point
+
+Status 200 is implemented and verified; body remains 'pending'.
+
+## Exact next action
+
+Read requirements/health-response.txt, implement the exact response body, and add its assertion.
+
+--- END VALIDATED ZENTEXT STATE ---
+[exit 0]
+
+=== PORTABLE JSON FOR THE FRESH TOOL ===
+
+$ zentext handoff export --format json
+{
+  "schema_version": 1,
+  "project": {
+    "id": "c85ef34c5e8fc297",
+    "name": "zentext-portable-demo"
+  },
+  "task": {
+    "id": "rec_task_01KY7Z1FYSQ90DWBRK71SJ2MHM",
+    "title": "Complete the portable health route",
+    "goal": "Return status 200 and the exact required response body.",
+    "status": "active",
+    "revision": 2,
+    "summary": null,
+    "notes": [
+      "Status behavior is complete; response body remains pending.",
+      "Tool B must inspect the project requirement before editing."
+    ],
+    "next_action": "Implement and verify the exact required response body."
+  },
+  "handoff": {
+    "previous_agent": "tool-a",
+    "created_at": "2026-07-23T17:05:47.952Z",
+    "based_on_task_revision": 2,
+    "accepted_decisions": [],
+    "completed": [
+      "Added the health-route skeleton.",
+      "Added and passed the status-code test."
+    ],
+    "files_changed": [
+      "src/health-route.mjs",
+      "test/health-route.test.mjs"
+    ],
+    "blockers": [
+      "The exact response body is not implemented or tested."
+    ],
+    "verification": [
+      "node --check src/health-route.mjs passed.",
+      "node --test passed the status-code test."
+    ],
+    "references": {
+      "files": [],
+      "commits": [],
+      "branches": []
+    },
+    "stopping_point": "Status 200 is implemented and verified; body remains 'pending'.",
+    "next_action": "Read requirements/health-response.txt, implement the exact response body, and add its assertion."
+  },
+  "validation": {
+    "status": "current",
+    "task_revision": 2,
+    "handoff_revision": 2
+  }
+}
+[exit 0]
+
+=== 5. COMPLETELY FRESH TOOL B ===
+
+$ node fresh-tool.mjs <demo-workspace>/consumer/continuation.json <demo-workspace>/project <demo-workspace>/consumer/progress.json
+Fresh Tool B started with no Tool A session or conversation.
+Input: portable Zentext JSON plus the project files.
+
+Recovered project: zentext-portable-demo (c85ef34c5e8fc297)
+Recovered task: Complete the portable health route
+Task revision: 2
+Completed work:
+- Added the health-route skeleton.
+- Added and passed the status-code test.
+Changed files:
+- src/health-route.mjs
+- test/health-route.test.mjs
+Blockers:
+- The exact response body is not implemented or tested.
+Verification:
+- node --check src/health-route.mjs passed.
+- node --test passed the status-code test.
+Stopping point: Status 200 is implemented and verified; body remains 'pending'.
+Exact next action: Read requirements/health-response.txt, implement the exact response body, and add its assertion.
+
+Recovered state explained before changing anything.
+Continued from the exact next action: implemented body='ok'.
+Repeated Tool A's completed work: no.
+
+✔ health route returns status 200 (0.921709ms)
+✔ health route returns the required body (0.079625ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 92.289666
+
+Progress update written for Zentext.
+[exit 0]
+
+$ zentext task update --summary 'Fresh Tool B implemented and verified the required '\''ok'\'' response body.' --note 'Updated the health route body from pending to '\''ok'\''.' --note 'Added the missing response-body assertion and passed the complete test suite.' --next-action 'Review the completed health-route change.'
+Updated task rec_task_01KY7Z1FYSQ90DWBRK71SJ2MHM to revision 3
+TASK: Complete the portable health route
+  id:         rec_task_01KY7Z1FYSQ90DWBRK71SJ2MHM
+  status:     active
+  project:    c85ef34c5e8fc297
+  summary:    Fresh Tool B implemented and verified the required 'ok' response body.
+  created:    7/23/2026, 12:05:47 PM
+  updated:    7/23/2026, 12:05:48 PM
+  revision:   3
+  author:     unknown
+  tags:       (none)
+  refs:       (none)
+
+Payload:
+  goal: Return status 200 and the exact required response body.
+  notes: Updated the health route body from pending to 'ok'., Added the missing response-body assertion and passed the complete test suite.
+  next_action: Review the completed health-route change.
+[exit 0]
+
+=== 6. ORIGINAL HANDOFF IS NOW STALE ===
+
+$ zentext handoff validate --json
+{
+  "current": false,
+  "reason": "active_task revision changed",
+  "task_id": "rec_task_01KY7Z1FYSQ90DWBRK71SJ2MHM",
+  "handoff_revision": 2,
+  "live_revision": 3
+}
+[exit 4]
+
+=== DEMO RESULT ===
+
+PASS
+- packed npm package installed
+- Tool A recorded structured project memory and exited
+- Tool B received only portable Zentext state plus project files
+- Tool B explained recovered state before editing
+- Tool B continued from the exact next action without repeating work
+- task revision advanced
+- original handoff was rejected as stale with exit code 4

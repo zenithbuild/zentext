@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "participants": [
+    {
+      "id": "codex-cli",
+      "tool": "Codex CLI",
+      "tool_family": "openai-codex",
+      "kind": "codex",
+      "input_surface": "prompt"
+    },
+    {
+      "id": "antigravity-gemini",
+      "tool": "Antigravity CLI",
+      "tool_family": "google-gemini",
+      "kind": "antigravity",
+      "model": "gemini-3.6-flash-high",
+      "input_surface": "json"
+    },
+    {
+      "id": "ollama-kimi",
+      "tool": "Ollama",
+      "tool_family": "moonshot-kimi",
+      "kind": "ollama",
+      "model": "kimi-k2.7-code:cloud",
+      "input_surface": "markdown"
+    }
+  ],
+  "unavailable_environments": [
+    {
+      "tool": "Claude CLI",
+      "classification": "unavailable",
+      "summary": "The standalone claude executable was not installed; it was not substituted with another session or reported as tested."
+    },
+    {
+      "tool": "Kimi CLI",
+      "classification": "unavailable",
+      "summary": "The standalone kimi executable was not installed; the Kimi model was tested only through a fresh Ollama API execution."
+    }
+  ]
+}

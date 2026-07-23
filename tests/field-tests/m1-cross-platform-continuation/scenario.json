@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "scenario_id": "m1-regional-total-continuation",
+  "task": {
+    "title": "Verify the regional fixture total",
+    "goal": "Verify all four regional fixture values and report the grand total without repeating completed work.",
+    "next_action": "Inspect fixture/source-a.txt and record its subtotal.",
+    "notes": [
+      "Preserve each regional value as written, including labels.",
+      "Use decimal addition and report the verified grand total."
+    ]
+  },
+  "tool_a": {
+    "allowed_input": "fixture/source-a.txt",
+    "completed": [
+      "Inspected fixture/source-a.txt and recorded north=17 and south=11.",
+      "Calculated and documented the source-a subtotal of 28."
+    ],
+    "files_changed": [
+      "work/continuation-report.md",
+      "work/verification.log"
+    ],
+    "blockers": [
+      "fixture/source-b.txt has not been inspected.",
+      "The grand total cannot be verified until source-b is inspected."
+    ],
+    "verification": [
+      "Confirmed source-a contains exactly north=17 and south=11.",
+      "Verified 17 + 11 = 28."
+    ],
+    "stopping_point": "The source-a subtotal is recorded; source-b remains intentionally uninspected.",
+    "next_action": "Inspect fixture/source-b.txt, calculate its subtotal, then verify the grand total without redoing source-a work."
+  },
+  "tool_b_expected": {
+    "source_b": {
+      "east": 13,
+      "west": 9,
+      "subtotal": 22
+    },
+    "grand_total": 50,
+    "repeated_completed_work": false
+  }
+}
+

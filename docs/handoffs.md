@@ -71,8 +71,11 @@ zentext handoff create \
   --completed "Read contracts/DETERMINISM.md" \
   --completed "Read packages/bundler/src/utils.rs" \
   --blockers "Need fresh build artifact" \
-  --files-changed "none" \
-  --verification "Contract trace complete"
+  --blockers "Compiler fixture is unavailable" \
+  --files-changed "docs/findings.md" \
+  --files-changed "tests/determinism.test.ts" \
+  --verification "Contract trace complete" \
+  --verification "Focused determinism test passed"
 
 # Show the latest handoff (exits nonzero if stale)
 zentext handoff show
@@ -85,7 +88,36 @@ zentext handoff acknowledge --json
 # Check whether the handoff is current against the live task revision
 zentext handoff validate
 zentext handoff validate --json
+
+# Load the active task and handoff through one validated continuation view
+zentext continue
+zentext continue --json
+zentext continue --markdown
+zentext continue --prompt
+
+# Export the same validated state to standard output
+zentext handoff export --format json
+zentext handoff export --format markdown
+zentext handoff export --format prompt
 ```
+
+`--completed`, `--blockers`, `--files-changed`, and `--verification` are
+repeatable. Each occurrence is stored as a separate value in invocation order;
+commas inside a value are not treated as separators.
+
+`zentext continue` is read-only: displaying a handoff does not acknowledge or
+mutate it. It selects the active or blocked task and the current `latest`
+handoff, validates their project, task id, and revision, then renders one
+canonical view. Completed or canceled tasks and archived or superseded handoffs
+are not actionable continuation state. A stale handoff is refused with exit
+code 4.
+
+Handoff exports are stdout-only in this release, matching their primary use as
+portable text. Redirect output with the shell when a file is needed. Exported
+JSON, Markdown, and prompt text are rendered from the same validated view as
+`zentext continue`; no format creates a separate handoff or memory system.
+The prompt format uses the canonical rules in
+[`continuation-prompt.md`](./continuation-prompt.md).
 
 ## Startup acknowledgement
 

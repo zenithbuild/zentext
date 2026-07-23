@@ -1,0 +1,83 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "sequence",
+    "project_id",
+    "task_id",
+    "task_revision",
+    "state_summary",
+    "continuation_result",
+    "progress_update"
+  ],
+  "properties": {
+    "sequence": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["state_explained", "continuation_performed"]
+      },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "project_id": { "type": "string" },
+    "task_id": { "type": "string" },
+    "task_revision": { "type": "integer" },
+    "state_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task",
+        "completed",
+        "changed_files",
+        "blockers",
+        "verification",
+        "stopping_point",
+        "next_action"
+      ],
+      "properties": {
+        "task": { "type": "string" },
+        "completed": { "type": "array", "items": { "type": "string" } },
+        "changed_files": { "type": "array", "items": { "type": "string" } },
+        "blockers": { "type": "array", "items": { "type": "string" } },
+        "verification": { "type": "array", "items": { "type": "string" } },
+        "stopping_point": { "type": "string" },
+        "next_action": { "type": "string" }
+      }
+    },
+    "continuation_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "inspected_file",
+        "east",
+        "west",
+        "source_b_subtotal",
+        "grand_total",
+        "repeated_completed_work"
+      ],
+      "properties": {
+        "inspected_file": { "type": "string" },
+        "east": { "type": "integer" },
+        "west": { "type": "integer" },
+        "source_b_subtotal": { "type": "integer" },
+        "grand_total": { "type": "integer" },
+        "repeated_completed_work": { "type": "boolean" }
+      }
+    },
+    "progress_update": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["summary", "notes", "next_action"],
+      "properties": {
+        "summary": { "type": "string" },
+        "notes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 2
+        },
+        "next_action": { "type": "string" }
+      }
+    }
+  }
+}

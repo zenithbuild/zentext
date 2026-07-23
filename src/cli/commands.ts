@@ -26,6 +26,18 @@ import {
 } from "../handoff.js";
 import { createMemoryWriter, MemoryWriterConflictError } from "../domain/memory-writer.js";
 import { repack as repackEngine } from "../repack/engine.js";
+import {
+  buildContinuationView,
+  ContinuationInvalidError,
+  ContinuationNotFoundError,
+  ContinuationStaleError,
+} from "../continuation.js";
+import {
+  renderContinuation,
+  renderStaleContinuation,
+  type ContinuationFormat,
+} from "../continuation-format.js";
+import type { FlagValue } from "./args.js";
 
 export class CliError extends Error {
   constructor(
@@ -35,6 +47,59 @@ export class CliError extends Error {
     super(message);
     this.name = "CliError";
   }
+}
+
+export function parseContinuationFormat(
+  flags: Record<string, FlagValue>,
+): ContinuationFormat {
+  const supported = new Set(["json", "markdown", "prompt"]);
+  const unsupported = Object.keys(flags).filter((key) => !supported.has(key));
+  if (unsupported.length > 0) {
+    throw new CliError(`Unsupported option for zentext continue: --${unsupported[0]}`, 1);
+  }
+
+  const modes = (["json", "markdown", "prompt"] as const).filter((key) => {
+    const value = flags[key];
+    if (value !== undefined && value !== true) {
+      throw new CliError(`--${key} does not accept a value`, 1);
+    }
+    return value === true;
+  });
+  if (modes.length > 1) {
+    throw new CliError(
+      "Choose only one continuation output mode: --json, --markdown, or --prompt",
+      1,
+    );
+  }
+  return modes[0] ?? "human";
+}
+
+export type HandoffExportFormat = "json" | "markdown" | "prompt";
+
+export function parseHandoffExportFormat(
+  flags: Record<string, FlagValue>,
+): HandoffExportFormat {
+  const unsupported = Object.keys(flags).filter((key) => key !== "format");
+  if (unsupported.length > 0) {
+    throw new CliError(
+      `Unsupported option for zentext handoff export: --${unsupported[0]}`,
+      1,
+    );
+  }
+  const format = flags.format;
+  if (typeof format !== "string") {
+    throw new CliError(
+      "Usage: zentext handoff export --format <json|markdown|prompt>",
+      1,
+    );
+  }
+  if (!(["json", "markdown", "prompt"] as const).includes(format as HandoffExportFormat)) {
+    throw new CliError(
+      `Unsupported handoff export format '${format}'. Choose json, markdown, or prompt.`,
+      1,
+    );
+  }
+  return format as HandoffExportFormat;
 }
 
 function getStoreDbPath(cwd: string): string {
@@ -362,6 +427,44 @@ export async function handoffValidate(
   }
 }
 
+export async function continueProject(
+  cwd: string,
+  options: { format?: ContinuationFormat } = {},
+): Promise<{ output: string; exitCode: number }> {
+  const format = options.format ?? "human";
+  const store = await openStore(cwd);
+  try {
+    const meta = await store.openProjectStore(cwd);
+    try {
+      const view = buildContinuationView(store, meta);
+      return { output: renderContinuation(view, format), exitCode: 0 };
+    } catch (error) {
+      if (error instanceof ContinuationStaleError) {
+        return {
+          output: renderStaleContinuation(error, format),
+          exitCode: 4,
+        };
+      }
+      if (error instanceof ContinuationNotFoundError) {
+        throw new CliError(error.message, 3);
+      }
+      if (error instanceof ContinuationInvalidError) {
+        throw new CliError(error.message, 5);
+      }
+      throw error;
+    }
+  } finally {
+    store.close();
+  }
+}
+
+export async function handoffExport(
+  cwd: string,
+  options: { format: HandoffExportFormat },
+): Promise<{ output: string; exitCode: number }> {
+  return continueProject(cwd, { format: options.format });
+}
+
 export async function taskCreate(
   cwd: string,
   options: {
@@ -440,6 +543,7 @@ export async function taskUpdate(
     summary?: string;
     status?: string;
     note?: string;
+    notes?: string[];
     nextAction?: string;
   },
 ): Promise<{ output: string; exitCode: number }> {
@@ -477,7 +581,8 @@ export async function taskUpdate(
     if (options.title !== undefined) patch.title = options.title;
     if (options.summary !== undefined) patch.summary = options.summary;
     if (options.status !== undefined) patch.status = options.status;
-    if (options.note !== undefined) patch.note = options.note;
+    const notes = options.notes ?? (options.note !== undefined ? [options.note] : undefined);
+    if (notes !== undefined && notes.length > 0) patch.notes = notes;
     if (options.nextAction !== undefined) patch.next_action = options.nextAction;
 
     const record = writer.updateRecord(target.id, patch);
@@ -552,11 +657,12 @@ Create a task first:
 }
 
 export function printUsage(): string {
-  return `Zentext CLI — Phase 2 read/inspect commands
+  return `Zentext CLI — local project memory commands
 
 Usage:
   zentext init
   zentext status
+  zentext continue [--json | --markdown | --prompt]
   zentext task {create|show|update}
   zentext show <id>
   zentext list [--type <type>] [--status <status>] [--limit <n>]
@@ -565,6 +671,7 @@ Usage:
 Commands:
   init    Initialize the local project store
   status  Show a concise overview of the project memory
+  continue  Load the validated current task and handoff without changing state
   task    Create, show, or update the current task
   show    Display a single record by id
   list    List records, optionally filtered
@@ -576,15 +683,22 @@ Task subcommands:
     [--status active|blocked|done|canceled]
   zentext task show
   zentext task update [--title <text>] [--summary <text>] [--status <status>]
-    [--note <text>] [--next-action <text>]
+    [--note <text> ...] [--next-action <text>]
 
 Handoff subcommands:
   zentext handoff show [--json]
   zentext handoff acknowledge [--json]
   zentext handoff validate [--json]
+  zentext handoff export --format <json|markdown|prompt>
   zentext handoff create --from <agent> --stopping-point <text> --next-action <text>
-    [--completed <text>] [--blockers <text>] [--files-changed <text>]
-    [--verification <text>] [--previous-response <text>]
+    [--completed <text> ...] [--blockers <text> ...] [--files-changed <text> ...]
+    [--verification <text> ...] [--previous-response <text>]
+
+Continuation output:
+  zentext continue            Human-readable validated continuation
+  zentext continue --json     Stable machine-readable continuation
+  zentext continue --markdown Portable Markdown continuation
+  zentext continue --prompt   Tool-neutral continuation prompt
 
 Options:
   --type     Filter by record type (task, decision, blocker, ...)
@@ -593,6 +707,12 @@ Options:
   --focus    Prioritize records matching this topic
   --max-size Character budget for the output (default 12000)
   --out      Write the payload to a file instead of stdout
-  --json     Output handoff commands as JSON
+  --json     Output supported commands as JSON
+  --markdown Output continuation as portable Markdown
+  --prompt   Output a tool-neutral continuation prompt
+
+Repeatable options:
+  --note, --completed, --blockers, --files-changed, and --verification may be
+  supplied more than once. Values are retained in invocation order.
 `;
 }
