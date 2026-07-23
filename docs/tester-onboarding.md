@@ -105,7 +105,19 @@ zentext handoff validate
 zentext handoff show --json
 ```
 
-### 6. Stale handoff behavior
+### 6. Use project memory inside a local tool
+
+Tools should use the typed SDK, `zentext rpc`, or a thin adapter instead of
+scraping terminal text. This repository includes a project-local Codex skill.
+Open the project in a fresh Codex desktop task and ask:
+
+> Read the current Zentext project memory, explain where the work stopped, then
+> continue from the recorded next action. Do not repeat completed work.
+
+See [`integrations/codex-app.md`](./integrations/codex-app.md) for setup and the
+isolated acceptance procedure.
+
+### 7. Stale handoff behavior
 
 If another agent updated the task after the handoff was created, `handoff acknowledge` rejects it:
 
@@ -160,6 +172,8 @@ Try one of the following:
 - `npx zentext@next` installs a prerelease tagged `next`, not the stable `latest`.
 - General write commands (`zentext add`, `zentext edit`) are not in this preview.
 - MCP write tools are not in this preview.
+- The Codex packed helper proof is automated, but its fresh desktop UI field
+  result must be recorded separately and must not be inferred from unit tests.
 - Cloud, sync, auth, UI, and vector search are not in this preview.
 
 ## Reporting problems

@@ -11,13 +11,14 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { mkdirSync, existsSync } from "node:fs";
 
-import type { Store, StoreMeta } from "../types/store.js";
+import type { Store, StoreMeta, StoreWriteOptions } from "../types/store.js";
 import type {
   AnyRecord,
   CreateRecordInput,
   ListFilter,
   RecordType,
   RecordRefs,
+  RecordProvenance,
   UpdateRecordInput,
 } from "../types/records.js";
 import {
@@ -31,6 +32,12 @@ import {
 } from "../types/records.js";
 import { deriveProjectId, deriveProjectName } from "./project-id.js";
 import { runMigrations, getSchemaVersion } from "./migrations.js";
+import {
+  parseCreateRecordInput,
+  parseRecordPatch,
+  parseUpdateRecordInput,
+} from "../schemas.js";
+import { assertSafeExternalInput } from "../safety.js";
 
 // ---------------------------------------------------------------------------
 // Validation error
@@ -380,11 +387,25 @@ export class SqliteStore implements Store {
   // create
   // ------------------------------------------------------------------
 
-  createRecord(input: CreateRecordInput): AnyRecord {
+  createRecord(
+    input: CreateRecordInput,
+    options: StoreWriteOptions = {},
+  ): AnyRecord {
     this.ensureOpen();
 
     // Validate
     validateCreateInput(input);
+    let secretOverrideUsed = false;
+    try {
+      parseCreateRecordInput(input);
+      secretOverrideUsed = assertSafeExternalInput(input, {
+        allowSecretOverride: options.allowSecretOverride,
+      }).secretOverrideUsed;
+    } catch (error) {
+      throw new StoreValidationError(
+        error instanceof Error ? error.message : "Record input is invalid.",
+      );
+    }
 
     // Generate fields
     const id = generateId(input.type);
@@ -397,7 +418,28 @@ export class SqliteStore implements Store {
     const refs = input.refs ?? {};
     const summary = input.summary;
     const supersedes = input.supersedes;
-    const payload = extractPayload(input);
+    const suppliedProvenance = input.provenance;
+    if (suppliedProvenance && suppliedProvenance.project_id !== project) {
+      throw new StoreValidationError(
+        `Provenance project_id '${suppliedProvenance.project_id}' does not match '${project}'.`,
+      );
+    }
+    const provenance = {
+      ...(suppliedProvenance ?? {
+        source_environment: input.author ?? "unknown",
+        captured_at: now,
+        project_id: project,
+        files_inspected: [],
+        commands_executed: [],
+        verification: [],
+        ...(input.type === "task" ? { task_id: id, task_revision: revision } : {}),
+      }),
+      ...(secretOverrideUsed ? { secret_override_used: true } : {}),
+    };
+    const payload = {
+      ...extractPayload(input),
+      provenance,
+    };
     const schemaVersion = 1;
 
     // Build the row
@@ -554,13 +596,34 @@ export class SqliteStore implements Store {
   // update
   // ------------------------------------------------------------------
 
-  updateRecord(input: UpdateRecordInput): AnyRecord {
+  updateRecord(
+    input: UpdateRecordInput,
+    options: StoreWriteOptions = {},
+  ): AnyRecord {
     this.ensureOpen();
 
     // Fetch existing record
     const existing = this.getRecord(input.id);
     if (!existing) {
       throw new StoreValidationError(`Record not found: ${input.id}`);
+    }
+    try {
+      parseUpdateRecordInput(input);
+      parseRecordPatch(existing.type, {
+        ...(input.title !== undefined ? { title: input.title } : {}),
+        ...(input.status !== undefined ? { status: input.status } : {}),
+        ...(input.summary !== undefined ? { summary: input.summary } : {}),
+        ...(input.tags !== undefined ? { tags: input.tags } : {}),
+        ...(input.refs !== undefined ? { refs: input.refs } : {}),
+        ...(input.payload ?? {}),
+      });
+      assertSafeExternalInput(input, {
+        allowSecretOverride: options.allowSecretOverride,
+      });
+    } catch (error) {
+      throw new StoreValidationError(
+        error instanceof Error ? error.message : "Record update input is invalid.",
+      );
     }
 
     // Validate immutable fields are not being changed.
@@ -608,9 +671,36 @@ export class SqliteStore implements Store {
     // Merge payload updates
     const payloadRow = this.db!.prepare("SELECT payload_json FROM records WHERE id = ?").get(input.id) as { payload_json: string };
     const existingPayload = JSON.parse(payloadRow.payload_json) as Record<string, unknown>;
-    const updatedPayload = input.payload
-      ? { ...existingPayload, ...input.payload }
-      : existingPayload;
+    const existingProvenance =
+      typeof existingPayload.provenance === "object" &&
+      existingPayload.provenance !== null
+        ? (existingPayload.provenance as Record<string, unknown>)
+        : {};
+    const suppliedUpdateProvenance =
+      typeof input.payload?.provenance === "object" &&
+      input.payload.provenance !== null
+        ? (input.payload.provenance as Record<string, unknown>)
+        : undefined;
+    const updatedProvenance: RecordProvenance = suppliedUpdateProvenance
+      ? (suppliedUpdateProvenance as unknown as RecordProvenance)
+      : {
+          files_inspected: [],
+          commands_executed: [],
+          verification: [],
+          ...existingProvenance,
+          source_environment: author,
+          captured_at: now,
+          project_id: existing.project,
+          parent_record_id: existing.id,
+          ...(existing.type === "task"
+            ? { task_id: existing.id, task_revision: newRevision }
+            : {}),
+        };
+    const updatedPayload: Record<string, unknown> = {
+      ...existingPayload,
+      ...(input.payload ?? {}),
+      provenance: updatedProvenance,
+    };
 
     // Handle supersession links in payload
     const supersedes = (existing.supersedes !== undefined) ? existing.supersedes : undefined;

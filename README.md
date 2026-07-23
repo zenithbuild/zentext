@@ -8,9 +8,10 @@ tool—so a fresh tool can recover validated project context instead of making
 you explain everything again.
 
 Project memory stays local and structured in SQLite. CLI output, JSON, Markdown,
-portable prompts, and the optional read-only MCP server are views over that same
-canonical state. Zentext does not transfer hidden model state or depend on
-conversation history.
+portable prompts, the typed SDK, structured stdio RPC, and the optional read-only
+MCP server are views over that same canonical state. Zentext is a local-first
+project memory layer for AI tools; it does not transfer hidden model state or
+depend on conversation history.
 
 ## Why Structured Project Memory
 
@@ -102,12 +103,31 @@ and the [full automatically sanitized transcript](./docs/demo/portable-continuat
 This is external project-memory continuation—not hidden model-state transfer and
 not conversation migration.
 
+## Use Zentext inside Codex
+
+This repository includes a project-local Codex skill that reads and updates
+Zentext through the versioned machine-readable RPC interface. In a fresh Codex
+desktop task, the user-facing instruction is simply:
+
+> Read the current Zentext project memory, explain where the work stopped, then
+> continue from the recorded next action. Do not repeat completed work.
+
+Codex discovers `.agents/skills/zentext-memory/`, loads the validated
+continuation, explains it before editing, and records progress through the same
+revision-safe domain used by every other interface. See the
+[Codex app setup and field test](./docs/integrations/codex-app.md).
+
+For other local tools, use the [TypeScript SDK](./docs/sdk.md) or
+[`zentext rpc`](./docs/rpc.md); neither requires terminal-text parsing.
+
 ## What Zentext is
 
 - A local SQLite memory store tied to a project.
 - A deterministic repack engine that turns memory into agent context.
-- A thin read-only MCP adapter (`memory.read`, `memory.list`, `memory.query`, `memory.repack`).
-- A CLI for humans and fallback use.
+- A stable, typed memory interface with a SQLite implementation.
+- A TypeScript SDK and versioned NDJSON RPC interface for local tools.
+- A thin read-only MCP adapter, including validated continuation reads.
+- A CLI for humans and fallback use—not the canonical product model.
 - Structured handoffs with revision-safe stale detection.
 - A read-only `zentext continue` entry point with human, JSON, Markdown, and
   tool-neutral prompt output over one validated continuation model.
@@ -138,6 +158,14 @@ not conversation migration.
   state, limitations, and continuation commands
 - [docs/continuation-prompt.md](./docs/continuation-prompt.md) — canonical
   provider-neutral prompt and manual use
+- [docs/memory-interface.md](./docs/memory-interface.md) — stable domain
+  contract, safety, provenance, and read/write behavior
+- [docs/sdk.md](./docs/sdk.md) — machine-readable TypeScript API
+- [docs/rpc.md](./docs/rpc.md) — versioned structured stdio protocol
+- [docs/safety.md](./docs/safety.md) — schemas, sanitization, secret detection,
+  explicit overrides, and output redaction
+- [docs/integrations/codex-app.md](./docs/integrations/codex-app.md) —
+  project-local Codex skill and acceptance procedure
 
 ## Troubleshooting
 

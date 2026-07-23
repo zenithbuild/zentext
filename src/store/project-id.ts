@@ -13,6 +13,7 @@
 import { execSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { resolve } from "node:path";
+import { realpathSync } from "node:fs";
 
 /**
  * Normalize a git remote URL for stable hashing.
@@ -88,7 +89,14 @@ export function deriveProjectId(cwd: string): string {
   }
 
   const absPath = resolve(cwd);
-  return createHash("sha256").update(absPath).digest("hex").slice(0, 16);
+  let canonicalPath = absPath;
+  try {
+    canonicalPath = realpathSync.native(absPath);
+  } catch {
+    // The caller may be deriving an ID before the path exists. In that case,
+    // the normalized absolute path remains deterministic.
+  }
+  return createHash("sha256").update(canonicalPath).digest("hex").slice(0, 16);
 }
 
 /**

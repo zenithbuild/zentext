@@ -38,6 +38,8 @@ import {
   type ContinuationFormat,
 } from "../continuation-format.js";
 import type { FlagValue } from "./args.js";
+import { validateHandoffQuality } from "../handoff-quality.js";
+import { redactForOutput } from "../safety.js";
 
 export class CliError extends Error {
   constructor(
@@ -291,13 +293,14 @@ export async function repack(
       focus: options.focus,
       maxSize: options.maxSize,
     });
+    const safeMarkdown = redactForOutput(result.markdown);
 
     if (options.out) {
       mkdirSync(dirname(options.out), { recursive: true });
-      writeFileSync(options.out, result.markdown, "utf8");
+      writeFileSync(options.out, safeMarkdown, "utf8");
     }
 
-    return { output: result.markdown, exitCode: 0 };
+    return { output: safeMarkdown, exitCode: 0 };
   } finally {
     store.close();
   }
@@ -583,7 +586,7 @@ export async function taskUpdate(
     if (options.status !== undefined) patch.status = options.status;
     const notes = options.notes ?? (options.note !== undefined ? [options.note] : undefined);
     if (notes !== undefined && notes.length > 0) patch.notes = notes;
-    if (options.nextAction !== undefined) patch.next_action = options.nextAction;
+    if (options.nextAction !== undefined) patch.next = options.nextAction;
 
     const record = writer.updateRecord(target.id, patch);
     return {
@@ -633,7 +636,17 @@ export async function handoffCreate(
     const input = handoffToCreateInput(handoff, options.from);
     const record = writer.createHandoff(input);
     const output = formatHandoff(handoff as unknown as Record<string, unknown>);
-    return { output: `${output}
+    const qualityWarnings = validateHandoffQuality(handoff);
+    const warningOutput =
+      qualityWarnings.length === 0
+        ? ""
+        : `\n\nHandoff quality warnings:\n${qualityWarnings
+            .map(
+              (warning) =>
+                `- ${warning.message} ${warning.remediation}`,
+            )
+            .join("\n")}`;
+    return { output: `${output}${warningOutput}
 
 Stored handoff record: ${record.id}`, exitCode: 0 };
   } catch (err) {
@@ -663,6 +676,7 @@ Usage:
   zentext init
   zentext status
   zentext continue [--json | --markdown | --prompt]
+  zentext rpc
   zentext task {create|show|update}
   zentext show <id>
   zentext list [--type <type>] [--status <status>] [--limit <n>]
@@ -672,6 +686,7 @@ Commands:
   init    Initialize the local project store
   status  Show a concise overview of the project memory
   continue  Load the validated current task and handoff without changing state
+  rpc     Exchange typed newline-delimited JSON over stdin/stdout
   task    Create, show, or update the current task
   show    Display a single record by id
   list    List records, optionally filtered

@@ -89,6 +89,20 @@ export interface RecordRefs {
   branches?: string[];
 }
 
+export interface RecordProvenance {
+  source_environment: string;
+  captured_at: string;
+  project_id: string;
+  task_id?: string;
+  task_revision?: number;
+  files_inspected?: string[];
+  commands_executed?: string[];
+  verification?: string[];
+  parent_record_id?: string;
+  parent_handoff_id?: string;
+  secret_override_used?: boolean;
+}
+
 // ---------------------------------------------------------------------------
 // Common envelope (all record types) — stored/output shape
 // ---------------------------------------------------------------------------
@@ -109,6 +123,7 @@ export interface BaseRecord {
   schema_version: number;
   supersedes?: string[];
   superseded_by?: string;
+  provenance?: RecordProvenance;
 }
 
 // ---------------------------------------------------------------------------
@@ -211,6 +226,7 @@ export interface CreateInputBase {
   tags?: string[];
   refs?: RecordRefs;
   supersedes?: string[];
+  provenance?: RecordProvenance;
 }
 
 export interface CreateTaskInput extends CreateInputBase {

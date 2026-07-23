@@ -19,6 +19,10 @@ export interface StoreMeta {
   createdAt: string;
 }
 
+export interface StoreWriteOptions {
+  allowSecretOverride?: boolean;
+}
+
 export interface Store {
   /**
    * Initialize the project store: create directory + database if absent.
@@ -35,7 +39,7 @@ export interface Store {
    * Create a new record. Generated fields (id, project, created_at,
    * updated_at, revision) are assigned by the store, not the caller.
    */
-  createRecord(input: CreateRecordInput): AnyRecord;
+  createRecord(input: CreateRecordInput, options?: StoreWriteOptions): AnyRecord;
 
   /**
    * Read a single record by id. Returns null if not found.
@@ -51,7 +55,7 @@ export interface Store {
    * Update an existing record. Increments revision, updates updated_at,
    * and writes a history/event entry. Immutable fields cannot be changed.
    */
-  updateRecord(input: UpdateRecordInput): AnyRecord;
+  updateRecord(input: UpdateRecordInput, options?: StoreWriteOptions): AnyRecord;
 
   /**
    * Close the database connection.

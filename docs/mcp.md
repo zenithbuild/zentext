@@ -6,10 +6,11 @@ and the shared repack engine.
 
 ## What it exposes
 
-Exactly four read-only tools:
+Exactly five read-only tools:
 
 | Tool | Purpose |
 |------|---------|
+| `memory.continuation` | Return the same validated continuation object used by CLI JSON, SDK, and RPC. |
 | `memory.read` | Read one canonical record by ID, optionally with revision history. |
 | `memory.list` | List records for a project, filtered by type/status/limit. |
 | `memory.query` | Deterministic substring search across title, summary, and tags. |
@@ -81,9 +82,10 @@ npm install-scripts approve better-sqlite3
 npm rebuild better-sqlite3
 ```
 
-Without this step the `zentext-mcp` binary will fail to open stores.
+On supported Node 22.13+ and Node 24 runtimes, Zentext can instead use the
+built-in `node:sqlite` fallback when install scripts are blocked.
 
-## Stage 1 limitations
+## Current limitations
 
 - No write tools (`memory.add`, `memory.edit`, `memory.handoff`, etc.).
 - No model calls, semantic search, embeddings, or fuzzy matching.
@@ -91,5 +93,7 @@ Without this step the `zentext-mcp` binary will fail to open stores.
 - No HTTP/SSE/WebSocket transport; stdio only.
 - `memory.query` searches only `title`, `summary`, and `tags`.
 
-Future stages will add write tools, an audit/staleness engine, and richer
-retrieval only after the read-only system is proven in production use.
+Machine-readable writes are available through the TypeScript SDK and structured
+stdio RPC. MCP remains intentionally read-only; future MCP write tools must
+reuse the same validated memory interface rather than writing directly to
+SQLite.

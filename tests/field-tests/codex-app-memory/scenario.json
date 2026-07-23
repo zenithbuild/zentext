@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "name": "Codex desktop reads and advances canonical project memory",
+  "exact_prompt": "Read the current Zentext project memory, explain where the work stopped, then continue from the recorded next action. Do not repeat completed work.",
+  "starting_task": "Complete the regional report",
+  "tool_a_completed": [
+    "Read the Alpha source",
+    "Recorded Alpha in the report"
+  ],
+  "accepted_decision": "Preserve source order in the final report.",
+  "blocker": "The Beta source has not been read.",
+  "stopping_point": "Alpha is recorded and verified; Beta is intentionally untouched.",
+  "next_action": "Read fixture/source-b.txt, append Beta and the total to work/report.md, then verify both values.",
+  "expected_change": {
+    "work/report.md": [
+      "Alpha: 28",
+      "Beta: 29",
+      "Total: 57"
+    ]
+  },
+  "required_final_state": {
+    "revision_delta": 1,
+    "original_handoff_current": false
+  }
+}

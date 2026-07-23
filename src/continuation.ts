@@ -6,6 +6,10 @@ import {
 } from "./handoff.js";
 import type { TaskRecord } from "./types/records.js";
 import type { Store, StoreMeta } from "./types/store.js";
+import {
+  validateHandoffQuality,
+  type HandoffQualityWarning,
+} from "./handoff-quality.js";
 
 export const CONTINUATION_SCHEMA_VERSION = 1;
 
@@ -47,6 +51,7 @@ export interface ContinuationView {
     task_revision: number;
     handoff_revision: number;
   };
+  quality_warnings: HandoffQualityWarning[];
 }
 
 export class ContinuationNotFoundError extends Error {
@@ -210,5 +215,6 @@ export function buildContinuationView(store: Store, meta: StoreMeta): Continuati
       task_revision: task.revision,
       handoff_revision: handoff.active_task.revision,
     },
+    quality_warnings: validateHandoffQuality(handoff),
   };
 }

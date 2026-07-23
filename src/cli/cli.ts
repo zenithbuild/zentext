@@ -34,6 +34,8 @@ import {
   stringFlag,
   type FlagValue,
 } from "./args.js";
+import { runRpcServer } from "../rpc/server.js";
+import { redactForOutput } from "../safety.js";
 
 function parseHandoffOptions(
   flags: Record<string, FlagValue>,
@@ -82,6 +84,14 @@ async function main(): Promise<void> {
   const { command, positional, flags } = parseArgs(argv);
 
   try {
+    if (command === "rpc") {
+      if (positional.length > 0 || Object.keys(flags).length > 0) {
+        throw new CliError("Usage: zentext rpc", 1);
+      }
+      await runRpcServer(process.stdin, process.stdout, process.stderr);
+      return;
+    }
+
     let result: { output: string; exitCode: number };
 
     switch (command) {
@@ -214,15 +224,17 @@ ${printUsage()}`,
     }
 
     if (result.output && !stringFlag(flags, "out")) {
-      console.log(result.output);
+      console.log(redactForOutput(result.output));
     }
     process.exit(result.exitCode);
   } catch (err) {
     if (err instanceof CliError) {
-      console.error(err.message);
+      console.error(redactForOutput(err.message));
       process.exit(err.exitCode);
     }
-    console.error(`Unexpected error: ${err instanceof Error ? err.message : String(err)}`);
+    console.error(
+      redactForOutput(`Unexpected error: ${err instanceof Error ? err.message : String(err)}`),
+    );
     process.exit(5);
   }
 }
