@@ -94,6 +94,11 @@ zentext continue
 zentext continue --json
 zentext continue --markdown
 zentext continue --prompt
+
+# Export the same validated state to standard output
+zentext handoff export --format json
+zentext handoff export --format markdown
+zentext handoff export --format prompt
 ```
 
 `--completed`, `--blockers`, `--files-changed`, and `--verification` are
@@ -106,6 +111,11 @@ handoff, validates their project, task id, and revision, then renders one
 canonical view. Completed or canceled tasks and archived or superseded handoffs
 are not actionable continuation state. A stale handoff is refused with exit
 code 4.
+
+Handoff exports are stdout-only in this release, matching their primary use as
+portable text. Redirect output with the shell when a file is needed. Exported
+JSON, Markdown, and prompt text are rendered from the same validated view as
+`zentext continue`; no format creates a separate handoff or memory system.
 
 ## Startup acknowledgement
 

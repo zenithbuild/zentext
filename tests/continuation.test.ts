@@ -7,8 +7,10 @@ import {
   CliError,
   continueProject,
   handoffCreate,
+  handoffExport,
   init,
   parseContinuationFormat,
+  parseHandoffExportFormat,
   taskCreate,
   taskUpdate,
 } from "../src/cli/commands.js";
@@ -115,6 +117,27 @@ describe("validated continuation view", () => {
     expect(prompt.output).toContain("Do not repeat completed work");
   });
 
+  it("exports JSON, Markdown, and prompt from the identical validated view", async () => {
+    await seedCurrentContinuation();
+    for (const format of ["json", "markdown", "prompt"] as const) {
+      const continuation = await continueProject(tempProject, { format });
+      const exported = await handoffExport(tempProject, { format });
+      expect(exported).toEqual(continuation);
+    }
+
+    const json = JSON.parse((await handoffExport(tempProject, { format: "json" })).output);
+    expect(json.project.id).toMatch(/^[0-9a-f]{16}$/);
+    expect(json.task.id).toMatch(/^rec_task_/);
+    expect(json.handoff.based_on_task_revision).toBe(json.task.revision);
+    expect(json.handoff.completed).toEqual([
+      "Inspected source-a.txt",
+      "Verified 17 + 11 = 28",
+    ]);
+    expect(json.handoff.next_action).toBe(
+      "Inspect source-b.txt and verify the grand total.",
+    );
+  });
+
   it("keeps renderers deterministic and preserves arrays as JSON arrays", async () => {
     await seedCurrentContinuation();
     const store = new SqliteStore();
@@ -146,6 +169,13 @@ describe("validated continuation view", () => {
         expect(parsed.validation.handoff_revision).toBe(2);
         expect(parsed.validation.live_revision).toBe(3);
       }
+    }
+
+    for (const format of ["json", "markdown", "prompt"] as const) {
+      const result = await handoffExport(tempProject, { format });
+      expect(result.exitCode).toBe(4);
+      expect(result.output).toContain("stale");
+      expect(result.output).not.toContain("Source A is complete");
     }
   });
 
@@ -224,5 +254,20 @@ describe("continue output option parsing", () => {
       expect(error).toBeInstanceOf(CliError);
       expect((error as CliError).exitCode).toBe(1);
     }
+  });
+});
+
+describe("handoff export option parsing", () => {
+  it("requires one documented format", () => {
+    expect(parseHandoffExportFormat({ format: "json" })).toBe("json");
+    expect(parseHandoffExportFormat({ format: "markdown" })).toBe("markdown");
+    expect(parseHandoffExportFormat({ format: "prompt" })).toBe("prompt");
+    expect(() => parseHandoffExportFormat({})).toThrow(/Usage/);
+    expect(() => parseHandoffExportFormat({ format: "html" })).toThrow(
+      /Unsupported handoff export format/,
+    );
+    expect(() => parseHandoffExportFormat({ format: "json", out: "file" })).toThrow(
+      /Unsupported option/,
+    );
   });
 });

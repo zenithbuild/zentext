@@ -247,6 +247,16 @@ await client.close();
     expect(runInstalled(["continue", "--prompt"], { cwd: project, home })).toContain(
       "external project memory",
     );
+    const exportJson = JSON.parse(
+      runInstalled(["handoff", "export", "--format", "json"], { cwd: project, home }),
+    );
+    expect(exportJson.handoff.completed).toEqual(["Read contract"]);
+    expect(
+      runInstalled(["handoff", "export", "--format", "markdown"], { cwd: project, home }),
+    ).toContain("# Zentext continuation");
+    expect(
+      runInstalled(["handoff", "export", "--format", "prompt"], { cwd: project, home }),
+    ).toContain("external project memory");
 
     runInstalled(["task", "update", "--summary", "Contract reviewed", "--note", "Continue"], {
       cwd: project,

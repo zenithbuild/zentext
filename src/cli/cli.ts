@@ -11,11 +11,13 @@ import {
   continueProject,
   handoffAcknowledge,
   handoffCreate,
+  handoffExport,
   handoffShow,
   handoffValidate,
   init,
   list,
   parseContinuationFormat,
+  parseHandoffExportFormat,
   printUsage,
   repack,
   show,
@@ -187,6 +189,12 @@ Usage: zentext task {create|show|update} ...`,
           case "create": {
             const opts = parseHandoffOptions(flags);
             result = await handoffCreate(cwd, opts);
+            break;
+          }
+          case "export": {
+            result = await handoffExport(cwd, {
+              format: parseHandoffExportFormat(flags),
+            });
             break;
           }
           default: {

@@ -55,6 +55,11 @@ zentext continue --json
 zentext continue --markdown
 zentext continue --prompt
 
+# Or export the same validated handoff state for another interface
+zentext handoff export --format markdown
+zentext handoff export --format json
+zentext handoff export --format prompt
+
 # Update the task as work progresses
 zentext task update --summary "Password hashing implemented" --next-action "Wire login into UI"
 

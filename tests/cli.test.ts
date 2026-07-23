@@ -657,6 +657,7 @@ describe("Zentext CLI — handoff commands", () => {
     expect(commands.repack).toBeTypeOf("function");
     expect(commands.handoffShow).toBeTypeOf("function");
     expect(commands.handoffCreate).toBeTypeOf("function");
+    expect(commands.handoffExport).toBeTypeOf("function");
     expect(commands.taskCreate).toBeTypeOf("function");
     expect(commands.taskShow).toBeTypeOf("function");
     expect(commands.taskUpdate).toBeTypeOf("function");

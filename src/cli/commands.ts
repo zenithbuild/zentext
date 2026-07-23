@@ -74,6 +74,34 @@ export function parseContinuationFormat(
   return modes[0] ?? "human";
 }
 
+export type HandoffExportFormat = "json" | "markdown" | "prompt";
+
+export function parseHandoffExportFormat(
+  flags: Record<string, FlagValue>,
+): HandoffExportFormat {
+  const unsupported = Object.keys(flags).filter((key) => key !== "format");
+  if (unsupported.length > 0) {
+    throw new CliError(
+      `Unsupported option for zentext handoff export: --${unsupported[0]}`,
+      1,
+    );
+  }
+  const format = flags.format;
+  if (typeof format !== "string") {
+    throw new CliError(
+      "Usage: zentext handoff export --format <json|markdown|prompt>",
+      1,
+    );
+  }
+  if (!(["json", "markdown", "prompt"] as const).includes(format as HandoffExportFormat)) {
+    throw new CliError(
+      `Unsupported handoff export format '${format}'. Choose json, markdown, or prompt.`,
+      1,
+    );
+  }
+  return format as HandoffExportFormat;
+}
+
 function getStoreDbPath(cwd: string): string {
   const projectId = deriveProjectId(cwd);
   return join(homedir(), ".zentext", "projects", projectId, "store.sqlite");
@@ -430,6 +458,13 @@ export async function continueProject(
   }
 }
 
+export async function handoffExport(
+  cwd: string,
+  options: { format: HandoffExportFormat },
+): Promise<{ output: string; exitCode: number }> {
+  return continueProject(cwd, { format: options.format });
+}
+
 export async function taskCreate(
   cwd: string,
   options: {
@@ -654,6 +689,7 @@ Handoff subcommands:
   zentext handoff show [--json]
   zentext handoff acknowledge [--json]
   zentext handoff validate [--json]
+  zentext handoff export --format <json|markdown|prompt>
   zentext handoff create --from <agent> --stopping-point <text> --next-action <text>
     [--completed <text> ...] [--blockers <text> ...] [--files-changed <text> ...]
     [--verification <text> ...] [--previous-response <text>]

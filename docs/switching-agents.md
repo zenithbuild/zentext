@@ -12,6 +12,9 @@ When one agent session ends and another begins, the new agent should not restart
 2. **New agent starts fresh**
    - Open the project directory.
    - Run `zentext continue` (or `--json`, `--markdown`, or `--prompt`).
+   - If the receiving interface cannot run the CLI, use `zentext handoff export
+     --format json|markdown|prompt` and provide that stdout as its only prior
+     context.
    - Verify the output matches the live task and revision.
    - If the handoff is stale, continuation is refused. Run `zentext handoff
      validate` to inspect the revision mismatch, then create a current handoff

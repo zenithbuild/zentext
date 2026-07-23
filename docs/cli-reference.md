@@ -39,11 +39,18 @@ zentext handoff create --from <agent> --stopping-point <text>
 zentext handoff show [--json]
 zentext handoff validate [--json]
 zentext handoff acknowledge [--json]
+zentext handoff export --format <json|markdown|prompt>
 ```
 
 `--completed`, `--blockers`, `--files-changed`, and `--verification` are
 repeatable and ordered. Handoff validation compares the recorded task revision
 with the live task revision. Stale handoffs return exit code 4.
+
+`handoff export` writes one validated portable representation to standard
+output. JSON preserves arrays and validation metadata; Markdown is copyable
+human-readable state; prompt is a directly usable tool-neutral instruction.
+Exports use the same continuation view as `zentext continue` and reject stale
+state rather than exporting it as current.
 
 ## Validated continuation
 
