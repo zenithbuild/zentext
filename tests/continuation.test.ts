@@ -46,6 +46,18 @@ describe("validated continuation view", () => {
       title: "Verify regional totals",
       goal: "Verify all four values without repeating completed work.",
     });
+    const store = new SqliteStore();
+    await store.openProjectStore(tempProject);
+    store.createRecord({
+      type: "decision",
+      title: "Keep fixture labels ordered",
+      summary: "Preserve source order in the final report.",
+      status: "accepted",
+      author: "tool-a",
+      decision: "Preserve source order in the final report.",
+      rationale: "The report must remain directly auditable.",
+    });
+    store.close();
     await taskUpdate(tempProject, {
       notes: ["Keep labels in order, including commas", "Use Unicode ✓ honestly"],
       nextAction: "Inspect source-a.txt",
@@ -79,6 +91,9 @@ describe("validated continuation view", () => {
       "Inspected source-a.txt",
       "Verified 17 + 11 = 28",
     ]);
+    expect(first.handoff.accepted_decisions).toEqual([
+      "Keep fixture labels ordered: Preserve source order in the final report.",
+    ]);
     expect(first.handoff.files_changed).toEqual([
       "work/report.md",
       "work/verification.log",
@@ -102,6 +117,8 @@ describe("validated continuation view", () => {
     expect(human.output).toContain("Zentext continuation — validated current");
     expect(human.output).toContain("Exact next action:");
     expect(human.output).toContain("work/verification.log");
+    expect(human.output).toContain("Accepted decisions:");
+    expect(human.output).toContain("Keep fixture labels ordered");
 
     const parsed = JSON.parse(json.output);
     expect(parsed.handoff.completed).toEqual([
@@ -112,9 +129,28 @@ describe("validated continuation view", () => {
     expect(parsed.validation.status).toBe("current");
 
     expect(markdown.output).toContain("# Zentext continuation");
+    expect(markdown.output).toContain("## Accepted decisions");
+    expect(markdown.output).toContain("Keep fixture labels ordered");
     expect(markdown.output).toContain("## Exact next action");
     expect(prompt.output).toContain("external project memory");
+    expect(prompt.output).toContain("Keep fixture labels ordered");
     expect(prompt.output).toContain("Do not repeat completed work");
+  });
+
+  it("continues the task referenced by the latest handoff when another task is newer", async () => {
+    await seedCurrentContinuation();
+    await taskCreate(tempProject, {
+      title: "Unrelated newer task",
+      goal: "Remain separate from the current handoff.",
+    });
+
+    const result = await continueProject(tempProject, { format: "json" });
+    expect(result.exitCode).toBe(0);
+    const view = JSON.parse(result.output);
+    expect(view.task.title).toBe("Verify regional totals");
+    expect(view.handoff.next_action).toBe(
+      "Inspect source-b.txt and verify the grand total.",
+    );
   });
 
   it("exports JSON, Markdown, and prompt from the identical validated view", async () => {

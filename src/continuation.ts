@@ -75,24 +75,6 @@ export class ContinuationStaleError extends Error {
   }
 }
 
-function byMostRecentlyUpdated(a: TaskRecord, b: TaskRecord): number {
-  return (
-    new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime() ||
-    a.id.localeCompare(b.id)
-  );
-}
-
-function pickActionableTask(store: Store): TaskRecord | null {
-  const tasks = (store.listRecords({ type: "task" }) as TaskRecord[]).filter(
-    (task) => !task.superseded_by,
-  );
-  return (
-    tasks.filter((task) => task.status === "active").sort(byMostRecentlyUpdated)[0] ??
-    tasks.filter((task) => task.status === "blocked").sort(byMostRecentlyUpdated)[0] ??
-    null
-  );
-}
-
 function pickLatestHandoff(store: Store): StructuredHandoff {
   const latest = store
     .listRecords({ type: "handoff", status: "latest" })
@@ -141,22 +123,27 @@ function taskNextAction(task: TaskRecord): string | null {
 }
 
 export function buildContinuationView(store: Store, meta: StoreMeta): ContinuationView {
-  const task = pickActionableTask(store);
-  if (!task) {
-    throw new ContinuationNotFoundError(
-      "No active or blocked task found. Create or reactivate a task before continuing.",
-    );
-  }
-
   const handoff = pickLatestHandoff(store);
   if (handoff.project_id !== meta.projectId) {
     throw new ContinuationInvalidError(
       "The current handoff belongs to a different project and cannot be continued.",
     );
   }
-  if (handoff.active_task.id !== task.id) {
+
+  const referencedTask = store.getRecord(handoff.active_task.id);
+  if (!referencedTask || referencedTask.type !== "task") {
     throw new ContinuationInvalidError(
-      `The current handoff references task ${handoff.active_task.id}, but the active task is ${task.id}.`,
+      `The current handoff references missing task ${handoff.active_task.id}.`,
+    );
+  }
+  const task = referencedTask as TaskRecord;
+  if (
+    task.project !== meta.projectId ||
+    task.superseded_by ||
+    !["active", "blocked"].includes(task.status)
+  ) {
+    throw new ContinuationNotFoundError(
+      "The task referenced by the current handoff is no longer active or blocked.",
     );
   }
 
@@ -225,4 +212,3 @@ export function buildContinuationView(store: Store, meta: StoreMeta): Continuati
     },
   };
 }
-
