@@ -1,69 +1,159 @@
-# Zentext Tester Onboarding
+# Zentext Developer Preview — Tester Onboarding
 
-Install Zentext from a locally packed tarball and run the core commands without any repository-specific knowledge.
+## Install
 
-## Install from tarball
+Officially supported on Node.js `>=22.13 <25` (Node 22.13+ and Node 24.x).
+Node 26 is experimental and Node 20 and earlier are unsupported for this
+Developer Preview.
 
-```bash
-npm pack
-mkdir /tmp/zentext-consumer
-cd /tmp/zentext-consumer
-cat > package.json <<'JSON'
-{
-  "name": "zentext-consumer",
-  "version": "1.0.0",
-  "type": "module",
-  "private": true,
-  "allowScripts": {
-    "better-sqlite3": true,
-    "esbuild": true,
-    "fsevents": true
-  }
-}
-JSON
-npm install --save /path/to/zentext-0.1.0.tgz
-```
-
-## First commands
+Node 22+ can fall back to the built-in `node:sqlite` module if better-sqlite3 install scripts are blocked. Node 22.13+ is the minimum supported version because node:sqlite is required for the install-script fallback.
 
 ```bash
-# See available commands
-npx zentext --help
+# Try once without installing
+npx zentext@next init
 
-# Initialize Zentext for the current project
-npx zentext init
-
-# View current project memory
-npx zentext status
-
-# Generate a focused context payload
-npx zentext repack
-
-# Inspect a handoff
-npx zentext handoff acknowledge
+# Or install globally
+npm install -g zentext@next
+zentext init
 ```
 
-## Report back
-
-When testing Zentext, report:
-
-- installation failures
-- unclear commands
-- incorrect context
-- repeated work
-- invented work
-- wrong stopping point
-- stale-write handling
-- package-boundary drift
-- confusing errors
-- uninstall or cleanup problems
-
-Do not report whether you "like" the product. Report where it breaks or misleads.
-
-## Cleanup
-
-Zentext stores data under `~/.zentext/projects/`. To remove a project:
+## Verify the install
 
 ```bash
-rm -rf ~/.zentext/projects/<project-id>
+zentext --help
+zentext init
+zentext status
 ```
+
+## Basic workflow
+
+### 0. Start a task
+
+Every handoff depends on a current task. Create one first:
+
+```bash
+zentext task create --title "Describe the current engineering task" --goal "What this task should achieve"
+```
+
+Use `zentext task show` to inspect the current task and `zentext task update` to record progress:
+
+```bash
+zentext task update --summary "Where the work stopped" --next-action "What to do next" --note "Optional progress note"
+```
+
+### 1. Initialize a project
+
+In the root of any project you want agents to share:
+
+```bash
+zentext init
+```
+
+This creates a local SQLite store under `~/.zentext/projects/`.
+
+### 2. Inspect context
+
+```bash
+zentext status
+zentext repack
+zentext repack --focus "authentication"
+```
+
+### 3. Create a handoff before switching agents
+
+When you are done with one agent session, record the stopping point. A task must exist first:
+
+```bash
+zentext task create --title "Implement login route" --goal "Add password-based authentication"
+
+zentext handoff create \
+  --from "codex" \
+  --stopping-point "Implemented login route; need password hashing next." \
+  --next-action "Add bcrypt password hashing to /api/login." \
+  --completed "Scaffolded auth routes" \
+  --completed "Added /api/login POST handler"
+```
+
+### 4. Fresh agent loads the handoff
+
+In a new agent session, run:
+
+```bash
+zentext handoff acknowledge
+```
+
+If the handoff is current, you will see the active task, stopping point, and next action.
+If the task has been updated in the meantime, the command exits nonzero and tells you the handoff is stale.
+
+### 5. Validate before trusting a handoff
+
+```bash
+zentext handoff validate
+zentext handoff show --json
+```
+
+### 6. Stale handoff behavior
+
+If another agent updated the task after the handoff was created, `handoff acknowledge` rejects it:
+
+```
+Handoff rejected: the recorded handoff is stale and must be regenerated.
+Reason: active_task revision changed
+Task ID: rec_task_...
+Handoff revision: 1
+Live revision: 2
+```
+
+Regenerate with `zentext handoff create` before continuing.
+
+## Uninstall
+
+```bash
+npm uninstall -g zentext
+```
+
+The local project store remains under `~/.zentext/projects/` if you want to keep it.
+
+## Troubleshooting install errors
+
+### better-sqlite3 binding errors
+
+If you see an error such as `Could not locate the bindings file` or a message about `NODE_MODULE_VERSION`, better-sqlite3 did not install its native binding.
+
+Try one of the following:
+
+1. Allow better-sqlite3 scripts and reinstall:
+
+   ```bash
+   npm install-scripts approve better-sqlite3
+   npm install -g zentext@next
+   ```
+
+2. Override the restriction for one npx invocation (Node 22+ only):
+
+   ```bash
+   npm_config_allow_scripts=better-sqlite3 npx zentext@next init
+   ```
+
+3. Force the `node:sqlite` fallback on Node 22+ by skipping lifecycle scripts:
+
+   ```bash
+   npm_config_ignore_scripts=true npx zentext@next init
+   ```
+
+## Limitations
+
+- This is a Developer Preview. Breaking changes are likely before 1.0.
+- `npx zentext@next` installs a prerelease tagged `next`, not the stable `latest`.
+- General write commands (`zentext add`, `zentext edit`) are not in this preview.
+- MCP write tools are not in this preview.
+- Cloud, sync, auth, UI, and vector search are not in this preview.
+
+## Reporting problems
+
+Open an issue at https://github.com/zenithbuild/zentext/issues with:
+
+- `zentext --version`
+- `node --version`
+- The exact command
+- Expected vs actual behavior

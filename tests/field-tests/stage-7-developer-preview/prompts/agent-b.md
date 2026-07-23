@@ -1,21 +1,10 @@
-# Agent B Prompt — Stage 7
+# Agent B instructions
 
-You are a fresh agent with no prior conversation context.
+Agent B: Continue the Zenith CSS determinism verification from a fresh session.
 
-## Starting point
+You have no prior conversation. Use only the Zentext context and repository evidence above.
 
-Run these commands in the Zenith Framework project directory:
-
-```bash
-zentext handoff acknowledge
-zentext handoff validate
-zentext status
-zentext repack
-```
-
-## Required acknowledgement
-
-Respond first with exactly this format:
+First, respond with the startup acknowledgement:
 
 ```
 Zentext context loaded.
@@ -32,14 +21,6 @@ Blockers: <none or list>
 I will continue from this stopping point without restarting completed work.
 ```
 
-## Continue exactly one step
+Then perform exactly one next step: inspect the specific implementation detail identified by the previous agent, using the repository evidence above, and add one new finding.
 
-Perform only the next action described in the handoff. Do not repeat Agent A's completed work. Do not modify Zenith source files.
-
-## Update Zentext
-
-Update the active task using the live revision. Then create the next handoff with `zentext handoff create --from agent:B`.
-
-## Stop if stale
-
-If `zentext handoff validate` reports a stale handoff, load the current state with `zentext status` and `zentext repack`, then continue from the live revision.
+Do not repeat work already listed in the Zentext handoff. Do not invent completed work.

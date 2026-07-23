@@ -1,20 +1,22 @@
 # Zentext context — zenithbuild/framework
-Generated: 2026-07-22T00:13:52.881Z | focus: CSS determinism | from: 2 records | budget: 12000 chars
+Generated: 2026-07-22T03:35:03.635Z | focus: CSS determinism | from: 2 records | budget: 12000 chars
 
 > Point-in-time snapshot. Live memory is at ~/.zentext/projects/b1391d80609491d9/store.sqlite
 
 ## Active task
-- Verify Zenith CSS determinism contract (active)
-- ID: rec_task_01KY3JQXBE2YZJKV7JXVA2HGV0 | revision: 1
-- Goal: Trace Zenith CSS determinism contract claims to implementation
+- Verify CSS determinism contract (active)
+- ID: rec_task_01KY3Y896HCXNDZFBHWXQFHV2N | revision: 1
+- Goal: Trace Zenith CSS determinism contract to implementation
+- Next: Read contracts/DETERMINISM.md and map claims to code
 - Refs: (none)
 
 ## Decisions (1)
-- Compiler pre-sorts CSS blocks (accepted)
-  - Decision: CSS blocks are ordered by dependency depth via compiler pre-sort before process_css is called
+- Use topological sort for CSS (accepted)
+  - Decision: CSS blocks are ordered by dependency depth via compiler sort
 
 
-Repository files:
+--- Repository evidence ---
+
 --- contracts/DETERMINISM.md ---
 # Zenith Determinism Contract
 
@@ -1717,18 +1719,17 @@ The Zenith agent contract is also published as a standalone npm package for agen
 Use it to install or copy the canonical rules into any Zenith project. See `packages/zenithbuild/README.md` for install, copy, and detection instructions.
 
 
+--- Agent instructions ---
+
 Agent A: Verify the Zenith CSS determinism contract.
 
-Read only the files listed under "Repository files" below. Trace each claim in contracts/DETERMINISM.md to the code that implements it. For each claim, record:
+Trace each claim in contracts/DETERMINISM.md to the code that implements it. For each claim, record:
 - the claim text
 - the implementation file and function
 - whether the claim is satisfied, partially satisfied, or contradicted
 - any open questions
 
 Stop at a clear boundary before the next verification step. Do not propose code changes.
-
-Repository files:
-{FILES}
 
 Return JSON with this shape:
 {
@@ -1742,8 +1743,8 @@ Return JSON with this shape:
     { "claim": "...", "location": "...", "assessment": "satisfied|partial|contradicted", "notes": "..." }
   ],
   "update": {
-    "record_id": "<task id from repack>",
-    "expected_revision": <task revision from repack>,
+    "record_id": "<task id from Zentext context>",
+    "expected_revision": <task revision from Zentext context>,
     "patch": {
       "next": "<one concrete next verification step>"
     },

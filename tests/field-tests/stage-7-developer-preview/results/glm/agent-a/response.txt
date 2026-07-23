@@ -1,0 +1,124 @@
+Looking at the contract claims and tracing each to implementation code across the provided files.
+
+**Analysis of each claim:**
+
+1. **Topological Ordering** — `bundle.rs::collect_graph_style_blocks` does DFS post-order via `dfs_source_modules`, producing [C, B, A] order. `process_css` in `utils.rs` preserves input order via `clean_content.push(block.content.clone())`. The sorting is delegated to the caller, not done in `process_css`. Satisfied.
+
+2. **Byte-Stability (LF normalization)** — Normalization happens upstream: `zenith_loader.rs::compile_zen_source` does `source.replace("\r\n", "\n")`, and `bundle.rs::extract_style_blocks_from_html` does `.replace("\r\n", "\n")`. But `process_css` itself does NO normalization — it trusts upstream. No final guard checking CRLF absence. Partial.
+
+3. **Strict Anchor Enforcement** — `process_css` checks `count != 1` covering missing and multiple. But "malformed" anchors (e.g. extra whitespace, wrong casing) are not detected — a malformed anchor would remain in output if a correct one also exists. Partial.
+
+4. **No Hidden Mutation — duplicate (module_id, order) hard-fail** — No check anywhere in `process_css` or `collect_graph_style_blocks` for duplicate identity pairs. Contradicted.
+
+5. **No Hidden Mutation — duplicate content preserved** — Code does not deduplicate. Satisfied.
+
+6. **No Hidden Mutation — no reordering/minification** — `process_css` concatenates in input order, no minification. Satisfied.
+
+7. **Canonical Module IDs (forward slashes)** — `utils.rs::clean_path` normalizes `\` to `/`, but it is NOT called in the CSS collection path. `collect_graph_style_blocks` uses `std::fs::canonicalize` which produces OS-specific separators. Contradicted for CSS pipeline.
+
+8. **Expression Stability** — `generate_virtual_entry` iterates `output.expressions` in order; tests confirm left-to-right source order. Satisfied (based on test evidence; compiler internals not in provided files).
+
+9. **Runtime Parity — unified pipeline** — `bundle.rs::execute_bundle` is the single entry point; `is_dev` only toggles HMR footer and minification default. Satisfied.
+
+10. **Virtual Modules sealed** — `reject_external_zenith_import` blocks `\0`-prefixed and encoded variants. `\0` prefix prevents filesystem resolution. Satisfied.
+
+11. **Bundle hash order-independence** — `process_css` sorts hashes before computing bundle hash (`sorted_hashes.sort()`), making the hash independent of block order. The test `test_topo_sort_preservation` explicitly validates this. Open question: if topological order changes (different content) but same blocks present, filename stays same while content changes — potential cache staleness.
+
+```json
+{
+  "understanding": {
+    "current_goal": "Trace Zenith CSS determinism contract to implementation",
+    "latest_decision": "CSS blocks are ordered by dependency depth via compiler sort",
+    "active_task": "Verify CSS determinism contract",
+    "next_action": "Read compiler-side style block extraction and normalization to confirm upstream LF normalization and duplicate identity enforcement"
+  },
+  "findings": [
+    {
+      "claim": "Topological Ordering: Styles ordered by dependency depth (reverse topological sort). If A imports B, B imports C, CSS order is [C][B][A].",
+      "location": "packages/bundler/src/bundle.rs — collect_graph_style_blocks / dfs_source_modules",
+      "assessment": "satisfied",
+      "notes": "DFS post-order traversal adds dependencies before dependents, producing [C, B, A] order. process_css in utils.rs preserves input order for content concatenation (clean_content.push). The sort is delegated to the caller, not performed inside process_css."
+    },
+    {
+      "claim": "Byte-Stability: All line endings normalized to \\n (LF) before hashing and concatenation. CRLF strictly forbidden in final output. UTF-8 enforced.",
+      "location": "packages/bundler/src/utils.rs — process_css (no normalization); zenith_loader.rs — compile_zen_source (source.replace CRLF); bundle.rs — extract_style_blocks_from_html (.replace CRLF)",
+      "assessment": "partial",
+      "notes": "Normalization happens upstream in compile_zen_source and extract_style_blocks_from_html, but process_css itself performs NO line-ending normalization and has NO final guard checking CRLF absence. If a code path bypasses upstream normalization, CRLF would pass through to output and hash. UTF-8 is satisfied implicitly via Rust String/bytes semantics."
+    },
+    {
+      "claim": "Strict Anchor Enforcement: HTML must contain exactly one <!-- ZENITH_STYLES_ANCHOR -->. Hard-fail if missing, multiple, or malformed.",
+      "location": "packages/bundler/src/utils.rs — process_css (anchor count check)",
+      "assessment": "partial",
+      "notes": "Count check (count != 1) covers missing (0) and multiple (>1). But 'malformed' anchors (extra whitespace, wrong casing, typos) are not detected — an exact string match is used. A malformed anchor coexisting with a correct one would leave the malformed anchor in the output silently."
+    },
+    {
+      "claim": "No Hidden Mutation: Duplicate (module_id, order) pairs hard-fail. The compiler ensures uniqueness of identity.",
+      "location": "packages/bundler/src/utils.rs — process_css; packages/bundler/src/bundle.rs — collect_graph_style_blocks",
+      "assessment": "contradicted",
+      "notes": "No check for duplicate (module_id, order) pairs exists anywhere in the read files. process_css iterates blocks without uniqueness validation. collect_graph_style_blocks extends blocks from multiple modules without dedup or collision detection."
+    },
+    {
+      "claim": "No Hidden Mutation: Duplicate content preserved — if two different modules emit identical CSS, both are included.",
+      "location": "packages/bundler/src/utils.rs — process_css (clean_content.push without dedup)",
+      "assessment": "satisfied",
+      "notes": "No deduplication of content is performed. Identical CSS from different modules both appear in final concatenation."
+    },
+    {
+      "claim": "No Hidden Mutation: No reordering based on specificity or file names. No implicit optimization or minification in extraction phase.",
+      "location": "packages/bundler/src/utils.rs — process_css (join in input order, no minification)",
+      "assessment": "satisfied",
+      "notes": "process_css concatenates via clean_content.join(\"\\n\\n\") preserving input order. No specificity sorting, no file-name sorting, no minification. Minification flag in bundle.rs applies only to JS via Rolldown, not CSS."
+    },
+    {
+      "claim": "Compiler Determinism: All module IDs normalized to forward slashes (/) regardless of OS.",
+      "location": "packages/bundler/src/utils.rs — clean_path (exists but unused in CSS path); packages/bundler/src/bundle.rs — collect_graph_style_blocks / resolve_relative_specifier (uses std::fs::canonicalize)",
+      "assessment": "contradicted",
+      "notes": "clean_path normalizes backslashes to forward slashes but is NOT called in the CSS collection pipeline. collect_graph_style_blocks and resolve_relative_specifier use std::fs::canonicalize which returns OS-native separators (backslashes on Windows). ExtractedStyleBlock.module_id would contain backslashes on Windows, breaking cross-OS hash stability."
+    },
+    {
+      "claim": "Compiler Determinism: Expression extraction order is deterministic (left-to-right, depth-first). __zenith_expr array order matches source appearance exactly.",
+      "location": "packages/bundler/src/utils.rs — generate_virtual_entry; packages/bundler/src/plugin/zenith_loader.rs — compile_zen_source (tests confirm order)",
+      "assessment": "satisfied",
+      "notes": "generate_virtual_entry iterates output.expressions in order. Test compile_zen_source_multiple_expressions confirms [props.a, props.b] matches source order. Compiler internals not in provided files but test evidence supports the claim."
+    },
+    {
+      "claim": "Runtime Parity: zenith dev uses the exact same zenith-bundler binary and pipeline as zenith build. No fast path bypasses.",
+      "location": "packages/bundler/src/bundle.rs — execute_bundle (single function for all modes)",
+      "assessment": "satisfied",
+      "notes": "execute_bundle is the sole bundling entry point. is_dev only affects HMR footer injection (zenith_loader.rs transform hook) and minification default. CSS pipeline is identical in dev and prod."
+    },
+    {
+      "claim": "Runtime Parity: zenith:css:<page> and zenith:entry:<page> virtual modules are sealed. User code cannot mock or override.",
+      "location": "packages/bundler/src/utils.rs — reject_external_zenith_import / is_zenith_virtual_id / VIRTUAL_PREFIX",
+      "assessment": "satisfied",
+      "notes": "Virtual modules use \\0 prefix preventing filesystem resolution. reject_external_zenith_import blocks specifiers starting with \\0 or containing encoded variants (\\0zenith:, %00zenith:). resolve_id in zenith_loader.rs only intercepts \\0zenith: prefixed IDs."
+    },
+    {
+      "claim": "Bundle hash is byte-stable across environments (implied by CSS output being a pure function).",
+      "location": "packages/bundler/src/utils.rs — process_css (sorted_hashes.sort() before bundle hash)",
+      "assessment": "partial",
+      "notes": "Bundle hash uses sorted(style_hashes).join('|') making it order-independent. This means if topological order changes (producing different content) but the same blocks are present, the filename stays the same while content changes — potential browser cache staleness. The test test_topo_sort_preservation explicitly validates this as intended behavior. Combined with the module-ID backslash issue (claim 7), cross-OS hash stability is not guaranteed."
+    }
+  ],
+  "update": {
+    "record_id": "rec_task_01KY3YSQ8AY0422AMXAE1ZMZKG",
+    "expected_revision": 1,
+    "patch": {
+      "next": "Read compiler-side style block extraction (zenith_compiler::script::ExtractedStyleBlock and compile_structured_with_source) to verify upstream LF normalization, module ID canonicalization, and whether duplicate (module_id, order) identity is enforced at the compiler layer"
+    },
+    "reason": "Three claims are contradicted or partially satisfied in the bundler layer. The compiler layer (not yet read) may enforce duplicate identity checks and module ID normalization upstream, which would close those gaps. Need to verify before concluding whether the contract is fully upheld or genuinely violated."
+  },
+  "stopping_point": "Stopped after tracing all DETERMINISM.md claims to the five provided bundler files. Did not read compiler source files (zenith_compiler crate) which are not listed in repository evidence and may implement upstream normalization and duplicate identity enforcement.",
+  "completed": [
+    "Read contracts/DETERMINISM.md and enumerated all CSS and compiler determinism claims",
+    "Traced topological ordering to bundle.rs::collect_graph_style_blocks (DFS post-order)",
+    "Traced anchor enforcement to utils.rs::process_css (count check only)",
+    "Traced LF normalization to upstream callers (compile_zen_source, extract_style_blocks_from_html)",
+    "Identified missing duplicate (module_id, order) hard-fail check in bundler layer",
+    "Identified missing forward-slash normalization in CSS collection path (clean_path unused)",
+    "Traced virtual module sealing to reject_external_zenith_import",
+    "Confirmed runtime parity via single execute_bundle entry point",
+    "Identified bundle hash order-independence as potential cache-staleness risk"
+  ]
+}
+```

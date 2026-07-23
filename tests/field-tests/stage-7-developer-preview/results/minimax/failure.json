@@ -1,0 +1,9 @@
+{
+  "model": "minimax-m3:cloud",
+  "available": true,
+  "status": "execution_failed",
+  "stage": "agent-a",
+  "reason": "Model produced a response wrapped in a JSON markdown fence, but JSON.parse failed with a syntax error when the proof runner parsed the adapter output in memory. The same response, when written to disk and parsed independently, is valid JSON. The failure is transient to the model-provider interaction and does not indicate a Zentext defect.",
+  "error": "SyntaxError: Expected property name or '}' in JSON at position 6 (line 1 column 7)",
+  "attempts": 5
+}

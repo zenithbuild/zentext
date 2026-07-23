@@ -32,20 +32,19 @@ Document the exact code paths implementing each determinism invariant and whethe
   - `packages/bundler/src/bundler_html_emit.rs`
   - `packages/bundler/tests/css_determinism.rs`
   - `packages/bundler/src/plugin/zenith_loader.rs`
+  - `packages/bundler/src/bundle.rs`
   - `AGENTS.md`
 - **Blockers:** none initially.
 
-## Agent A prompt
+## Shared context
 
-See `prompts/agent-a.md`.
+All agents receive:
 
-## Agent B prompt
+- The Zentext repack of current project memory.
+- The contents of the files listed above under "Repository evidence".
+- Agent-specific instructions.
 
-See `prompts/agent-b.md`.
-
-## Agent C prompt
-
-See `prompts/agent-c.md`.
+See `prompts/shared-system.md`, `prompts/repository-evidence.md`, `prompts/agent-a.md`, `prompts/agent-b.md`, and `prompts/agent-c.md`.
 
 ## Mutation contract
 

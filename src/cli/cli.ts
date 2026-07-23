@@ -18,6 +18,9 @@ import {
   repack,
   show,
   status,
+  taskCreate,
+  taskShow,
+  taskUpdate,
 } from "./commands.js";
 
 function parseArgs(argv: string[]): {
@@ -153,6 +156,46 @@ async function main(): Promise<void> {
           maxSize: typeof maxSizeRaw === "number" ? maxSizeRaw : undefined,
           out: typeof flags.out === "string" ? flags.out : undefined,
         });
+        break;
+      }
+      case "task": {
+        const subcommand = positional[0] ?? "";
+        switch (subcommand) {
+          case "create": {
+            if (typeof flags.title !== "string" || flags.title.trim() === "") {
+              throw new CliError("Usage: zentext task create --title <text> [--goal <text>] [--summary <text>] [--status active|blocked|done|canceled]", 1);
+            }
+            result = await taskCreate(cwd, {
+              title: flags.title,
+              goal: typeof flags.goal === "string" ? flags.goal : undefined,
+              summary: typeof flags.summary === "string" ? flags.summary : undefined,
+              status: typeof flags.status === "string" ? flags.status : undefined,
+            });
+            break;
+          }
+          case "show": {
+            result = await taskShow(cwd);
+            break;
+          }
+          case "update": {
+            result = await taskUpdate(cwd, {
+              title: typeof flags.title === "string" ? flags.title : undefined,
+              summary: typeof flags.summary === "string" ? flags.summary : undefined,
+              status: typeof flags.status === "string" ? flags.status : undefined,
+              note: typeof flags.note === "string" ? flags.note : undefined,
+              nextAction: typeof flags["next-action"] === "string" ? flags["next-action"] : undefined,
+            });
+            break;
+          }
+          default: {
+            throw new CliError(
+              `Unknown task subcommand: ${subcommand}
+
+Usage: zentext task {create|show|update} ...`,
+              1,
+            );
+          }
+        }
         break;
       }
       case "handoff": {

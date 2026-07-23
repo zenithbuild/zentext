@@ -13,6 +13,9 @@ import {
   list,
   show,
   status,
+  taskCreate,
+  taskShow,
+  taskUpdate,
 } from "../src/cli/commands.js";
 import { SqliteStore } from "../src/store/sqlite-store.js";
 import { createMemoryWriter } from "../src/domain/memory-writer.js";
@@ -508,6 +511,94 @@ describe("Zentext CLI — handoff commands", () => {
     expect(parsed.current).toBe(true);
     store.close();
   });
+  it("task create creates an active task", async () => {
+    await init(tempProject);
+    const result = await taskCreate(tempProject, {
+      title: "Investigate CSS determinism",
+      goal: "Confirm ordering and hashing",
+    });
+    expect(result.exitCode).toBe(0);
+    expect(result.output).toContain("Created task");
+    expect(result.output).toContain("Investigate CSS determinism");
+    expect(result.output).toContain("Status: active");
+  });
+
+  it("task create rejects an invalid status", async () => {
+    await init(tempProject);
+    try {
+      await taskCreate(tempProject, {
+        title: "Investigate CSS determinism",
+        goal: "Confirm ordering and hashing",
+        status: "invalid",
+      });
+      expect.fail("expected taskCreate to throw");
+    } catch (err) {
+      expect(err).toBeInstanceOf(CliError);
+      expect((err as CliError).exitCode).toBe(1);
+      expect((err as Error).message).toContain("Invalid task status");
+    }
+  });
+
+  it("task show displays the active task", async () => {
+    await init(tempProject);
+    await taskCreate(tempProject, { title: "T1", goal: "G1" });
+    const result = await taskShow(tempProject);
+    expect(result.exitCode).toBe(0);
+    expect(result.output).toContain("TASK: T1");
+    expect(result.output).toContain("status:     active");
+  });
+
+  it("task show guides the user when no tasks exist", async () => {
+    await init(tempProject);
+    const result = await taskShow(tempProject);
+    expect(result.exitCode).toBe(0);
+    expect(result.output).toContain("No tasks exist");
+    expect(result.output).toContain("zentext task create --title");
+  });
+
+  it("task update advances task revision", async () => {
+    await init(tempProject);
+    const created = await taskCreate(tempProject, { title: "T1", goal: "G1" });
+    const taskId = created.output.split("Created task ")[1].split("\n")[0];
+
+    const result = await taskUpdate(tempProject, {
+      summary: "Updated objective",
+      note: "Making progress",
+      nextAction: "Run tests",
+    });
+    expect(result.exitCode).toBe(0);
+    expect(result.output).toContain("Updated task");
+    expect(result.output).toContain("revision:   2");
+    expect(result.output).toContain("Updated objective");
+    expect(result.output).toContain("note: Making progress");
+    expect(result.output).toContain("next_action: Run tests");
+  });
+
+  it("handoff create fails with guidance when no active task exists", async () => {
+    await init(tempProject);
+    try {
+      await handoffCreate(tempProject, {
+        from: "agent:A",
+        stoppingPoint: "Read contract.",
+        nextAction: "Run tests.",
+      });
+      expect.fail("expected handoffCreate to throw");
+    } catch (err) {
+      expect(err).toBeInstanceOf(CliError);
+      expect((err as CliError).exitCode).toBe(1);
+      expect((err as Error).message).toContain("no active or blocked task");
+      expect((err as Error).message).toContain("zentext task create --title");
+    }
+  });
+
+  it("status guides the user when no active task exists", async () => {
+    await init(tempProject);
+    const result = await status(tempProject);
+    expect(result.exitCode).toBe(0);
+    expect(result.output).toContain("No active task recorded yet");
+    expect(result.output).toContain("zentext task create --title");
+  });
+
   it("CLI module does not expose unapproved write CLI commands", async () => {
     const commands = await import("../src/cli/commands.js");
     expect(commands.init).toBeTypeOf("function");
@@ -517,6 +608,9 @@ describe("Zentext CLI — handoff commands", () => {
     expect(commands.repack).toBeTypeOf("function");
     expect(commands.handoffShow).toBeTypeOf("function");
     expect(commands.handoffCreate).toBeTypeOf("function");
+    expect(commands.taskCreate).toBeTypeOf("function");
+    expect(commands.taskShow).toBeTypeOf("function");
+    expect(commands.taskUpdate).toBeTypeOf("function");
     expect("add" in commands).toBe(false);
     expect("edit" in commands).toBe(false);
     expect("audit" in commands).toBe(false);

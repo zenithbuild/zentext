@@ -2,33 +2,27 @@
 
 ## Credential and secret scan
 
-Ran:
-
 ```bash
 rg -i 'api[_-]?key|apikey|secret|token|password|credential|auth[_-]?token|bearer|private[_-]?key' \
-  tests/field-tests/stage-7-developer-preview src/proof 2>/dev/null
+  tests/field-tests/stage-7-developer-preview/
 ```
 
 Result: no credentials, secrets, or tokens found in committed artifacts.
+"Tailwind Tokens" appears as a false positive because it refers to design tokens, not authentication tokens.
 
-## Absolute paths
+## Absolute path scan
 
-- `src/proof/stage7-run.ts` default repository path changed from an absolute user path to `./zenith-framework`.
-- Field-test result files do not contain absolute filesystem paths.
-- Zentext records store `project_id` (derived hash) and `project_name` only.
+```bash
+rg -i 'Users/judahsullivan|/Users/judahsullivan/zenith/framework' \
+  tests/field-tests/stage-7-developer-preview/ \
+  src/proof/stage7-run.ts
+```
 
-## Authenticated state
+Result: no absolute personal paths found in committed artifacts.
 
-- The Stage 7 proof uses Ollama on `localhost:11434`.
-- No Antigravity CLI, API keys, or browser sessions were used.
-- No credentials were read or stored.
+## Guarantees
 
-## Zenith repository access
-
-- The Zenith Framework repository was read-only.
-- No commits, pushes, or source modifications occurred.
-
-## Tarball contents
-
-- `dist/proof` is excluded from the published package.
-- Field-test artifact directories are not included in the npm package `files` array.
+- No API keys, tokens, passwords, or credential files were read or stored.
+- The Zenith Framework repository path was supplied only as a runtime argument to the proof runner.
+- No Zenith source files were modified.
+- No npm authentication state was committed.

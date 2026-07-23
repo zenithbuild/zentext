@@ -1,12 +1,12 @@
 Zentext context loaded.
 
-Active task: Verify Zenith CSS determinism contract
-Task ID: rec_task_01KY3JQXBE2YZJKV7JXVA2HGV0
+Active task: Verify CSS determinism contract
+Task ID: rec_task_01KY3Y896HCXNDZFBHWXQFHV2N
 Task revision: 3
 Previous agent: agent:B
-Completed: Acknowledged handoff and recorded blocker preventing compiler source inspection
-Stopping point: Acknowledged Zentext handoff and identified lack of repository file access as the immediate blocker before inspecting packages/compiler.
-Next action: Obtain read access to packages/compiler source files, then inspect CSS block emission, CRLF normalization, and duplicate validation
+Completed: Verified that strict anchor enforcement is contradicted by fallback paths in bundle.rs and bundler_html_emit.rs.
+Stopping point: Assessed strict anchor enforcement against bundle.rs and bundler_html_emit.rs. Stopped before tracing the origin of ExtractedStyleBlock in the compiler/loader pipeline.
+Next action: Trace how compiled.style_blocks is populated and how the CSS cache / loader collect graph-wide style blocks, using only files listed in the repository evidence.
 Blockers: none
 
 I will continue from this stopping point without restarting completed work.

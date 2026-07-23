@@ -8,74 +8,120 @@ into useful context so that when you switch from one AI coding agent to another,
 the next agent picks up where the last one left off without you re-explaining the
 project from scratch.
 
-## Repo state
+## Developer Preview install
 
-This repository is **planning/docs only.**
+Officially supported on Node.js `>=22.13 <25` (Node 22.13+ and Node 24.x).
+Node 26 is experimentally tolerated but emits `EBADENGINE`; Node 20 and earlier
+are unsupported for this Developer Preview.
 
-- No implementation exists yet.
-- No MCP server is built.
-- No CLI is built.
-- No UI exists.
-- No cloud service exists.
+If better-sqlite3 install scripts are blocked, supported Node releases fall back
+to the built-in `node:sqlite` module.
 
-The documents in [`docs/`](./docs) are the source of truth for product direction,
-MVP scope, monetization, cloud boundary, self-hosting model, risks, and open
-decisions. Future implementation work should be driven from these docs, and any
-drift from them should be a conscious, recorded decision.
+```bash
+# Try without installing
+npx zentext@next init
 
-Before product code starts, Zentext has a manual Stage 0.5 field-test gate:
-validate the agent handoff workflow with a temporary `AGENT_SYNC.md` in a real
-project, then patch the planning contracts if the workflow exposes a bad
-assumption. See
-[`docs/field-tests/agent-sync-field-test.md`](./docs/field-tests/agent-sync-field-test.md).
+# Or install globally
+npm install -g zentext@next
+zentext init
+```
 
-## MVP target
+## Quick start
 
-The MVP is a **local MCP memory layer + thin CLI.**
+```bash
+# In a project directory
+zentext init
+zentext status
 
-- The MCP server is the agent interface (agents read and write project memory).
-- The CLI is the human/fallback interface (inspect, edit, hand off, repack context).
-- The local memory store is the product core.
+# Start a task before recording a handoff
+zentext task create --title "Implement login route" --goal "Add password-based authentication"
 
-The MVP is **not** an app, a dashboard, a cloud service, an editor plugin, an
-agent runner, or a universal chat UI.
+# Create a handoff when switching agents
+zentext handoff create \
+  --from "codex" \
+  --stopping-point "Implemented login route; need password hashing next." \
+  --next-action "Add bcrypt password hashing to /api/login." \
+  --completed "Scaffolded auth routes" \
+  --files-changed "src/routes/login.ts"
 
-## Important: Zentext is separate from Zenith Framework
+# A fresh agent can load the handoff
+zentext handoff acknowledge
 
-Zentext is a **standalone product repo** and is not part of the Zenith Framework
-repository (`zenithbuild/framework`). Do not modify Zenith Framework files for
-Zentext work.
+# Update the task as work progresses
+zentext task update --summary "Password hashing implemented" --next-action "Wire login into UI"
 
-The Zenith Framework may eventually be used to build a future UI for Zentext, but
-UI is explicitly out of scope for the current phase. See
-[`docs/staged-roadmap.md`](./docs/staged-roadmap.md).
+# Validate it is still current
+zentext handoff validate
+```
 
-## Critical constraint
+## What Zentext is
 
-Zentext **cannot** transfer hidden model state from one AI system to another. It
-can only preserve *external* project memory and repack that memory into useful
-context for another agent. This limitation is permanent and must be stated honestly
-in all documentation and messaging.
+- A local SQLite memory store tied to a project.
+- A deterministic repack engine that turns memory into agent context.
+- A thin read-only MCP adapter (`memory.read`, `memory.list`, `memory.query`, `memory.repack`).
+- A CLI for humans and fallback use.
+- Structured handoffs with revision-safe stale detection.
 
-## Docs index
+## What Zentext is not
 
-| Document | Purpose |
-|----------|---------|
-| [docs/product-overview.md](./docs/product-overview.md) | What Zentext is, the problem, what it is not, target users |
-| [docs/mvp-specification.md](./docs/mvp-specification.md) | MVP definition, scope, success/failure criteria, demo flow |
-| [docs/memory-schema.md](./docs/memory-schema.md) | Baseline structured memory record types |
-| [docs/mcp-tools.md](./docs/mcp-tools.md) | Proposed MCP tool surface |
-| [docs/cli-reference.md](./docs/cli-reference.md) | Thin CLI commands and non-MCP fallback |
-| [docs/context-repacking.md](./docs/context-repacking.md) | How memory becomes agent-ready context |
-| [docs/cloud-boundary.md](./docs/cloud-boundary.md) | What cloud may and may not host |
-| [docs/monetization.md](./docs/monetization.md) | Pricing model and pricing units |
-| [docs/self-hosting.md](./docs/self-hosting.md) | Open-source and enterprise self-hosting |
-| [docs/staged-roadmap.md](./docs/staged-roadmap.md) | Four-stage plan and triggers |
-| [docs/field-tests/agent-sync-field-test.md](./docs/field-tests/agent-sync-field-test.md) | Manual pre-coding field test for agent handoff behavior |
-| [docs/risks-and-antipatterns.md](./docs/risks-and-antipatterns.md) | Risks and anti-patterns to avoid |
-| [docs/open-decisions.md](./docs/open-decisions.md) | Decision registry for accepted Stage 1 decisions and unresolved later gates |
+- A chat UI or app.
+- A model provider or agent runner.
+- Cloud-first or dependent on network sync.
+- A way to transfer hidden model state between agents.
+- Part of the Zenith Framework.
 
-## Status
+## Developer Preview limitations
 
-Planning. Docs only. See [`docs/staged-roadmap.md`](./docs/staged-roadmap.md) for
-the path from here to implementation.
+- General-purpose write tools (`zentext add`, `zentext edit`) and MCP write tools are not in this preview. The Developer Preview exposes `zentext task create`, `zentext task show`, `zentext task update`, and `zentext handoff create` so a normal user can record and continue work without importing the store module directly.
+- Multi-agent handoffs are validated against local Ollama models; provider flakiness may affect some models.
+- Enterprise features (cloud, sync, auth, vector search) are out of scope for this release.
+
+## Documentation
+
+- [docs/handoffs.md](./docs/handoffs.md) — structured agent handoffs
+- [docs/switching-agents.md](./docs/switching-agents.md) — how to hand off between agents
+- [docs/tester-onboarding.md](./docs/tester-onboarding.md) — full tester workflow
+- [docs/mcp.md](./docs/mcp.md) — MCP adapter usage
+- [docs/continuation.md](./docs/continuation.md) — current architecture, release
+  state, limitations, and continuation commands
+
+## Troubleshooting
+
+### "Could not locate the bindings file" or native binding errors
+
+better-sqlite3 needs its install script to download or compile a native binding.
+Some npm configurations (such as LavaMoat `allow-scripts`) block lifecycle scripts by default.
+
+Options:
+
+1. Allow better-sqlite3 scripts and reinstall:
+
+   ```bash
+   npm install-scripts approve better-sqlite3
+   npm install -g zentext@next
+   ```
+
+2. Override the restriction for a single npx run (Node 22+ only):
+
+   ```bash
+   npm_config_allow_scripts=better-sqlite3 npx zentext@next init
+   ```
+
+3. Use Node 22, 24, or 26 and allow the built-in `node:sqlite` fallback to activate by blocking scripts:
+
+   ```bash
+   npm_config_ignore_scripts=true npx zentext@next init
+   ```
+
+## Report problems
+
+Open an issue at https://github.com/zenithbuild/zentext/issues and include:
+
+- `zentext --version` output
+- Node version (`node --version`)
+- The command you ran
+- What you expected and what happened
+
+## License
+
+MIT — see [LICENSE](./LICENSE).

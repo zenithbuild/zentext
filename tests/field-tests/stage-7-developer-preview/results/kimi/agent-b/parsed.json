@@ -1,28 +1,28 @@
 {
   "understanding": {
-    "current_goal": "Trace Zenith CSS determinism contract claims to implementation",
-    "latest_decision": "Compiler pre-sorts CSS blocks by dependency depth before process_css is called",
-    "active_task": "rec_task_01KY3JQXBE2YZJKV7JXVA2HGV0",
-    "next_action": "Inspect packages/compiler source for ordering, CRLF normalization, and duplicate rejection"
+    "current_goal": "Trace the Zenith CSS determinism contract (especially strict anchor enforcement) to the actual bundler implementation and identify any contradictions.",
+    "latest_decision": "Use topological sort for CSS (accepted): CSS blocks are ordered by dependency depth via compiler sort.",
+    "active_task": "rec_task_01KY3Y896HCXNDZFBHWXQFHV2N",
+    "next_action": "Trace how compiled.style_blocks is populated and how the CSS cache / loader collect graph-wide style blocks, using only files listed in the repository evidence."
   },
   "findings": [
     {
-      "claim": "Compiler source is accessible for inspection",
-      "location": "packages/compiler",
+      "claim": "Strict Anchor Enforcement — HTML template must contain exactly one <!-- ZENITH_STYLES_ANCHOR --> and the bundler hard-fails if the anchor is missing, multiple, or malformed.",
+      "location": "packages/bundler/src/bundle.rs (process_css fallback) and packages/bundler/src/bundler_html_emit.rs (inject_stylesheet_link_once)",
       "assessment": "contradicted",
-      "notes": "No file-access tooling available in this session; cannot open packages/compiler to verify style_block emission order, CRLF normalization before hashing, or duplicate (module_id, order) rejection."
+      "notes": "DETERMINISM.md §1.3 says the bundler must hard-fail on a missing anchor, but the implementation contains explicit fallback paths that do not. In bundle.rs, when compiled.style_blocks is empty but graph-collected effective_style_blocks is non-empty and the HTML lacks an anchor, the code runs process_css with a synthetic anchor, discards the injected HTML, and returns the original compiled.html unchanged — silently allowing a missing anchor for legacy fragment-only pages. Separately, bundler_html_emit.rs::inject_stylesheet_link_once treats anchor_count == 0 as a fallback case: it replaces a single existing stylesheet link, injects into <head>, or prepends the CSS link, and only errors if there are multiple anchors, multiple stylesheets with zero anchors, or the final link count is not exactly one. Thus a missing anchor does not uniformly hard-fail, contradicting the contract's strict enforcement claim."
     }
   ],
   "update": {
-    "record_id": "rec_task_01KY3JQXBE2YZJKV7JXVA2HGV0",
+    "record_id": "rec_task_01KY3Y896HCXNDZFBHWXQFHV2N",
     "expected_revision": 2,
     "patch": {
-      "next": "Obtain read access to packages/compiler source files, then inspect CSS block emission, CRLF normalization, and duplicate validation"
+      "next": "Trace how compiled.style_blocks is populated and how the CSS cache / loader collect graph-wide style blocks, using only files listed in the repository evidence."
     },
-    "reason": "Cannot inspect compiler internals without file access; verification of the three open claims is blocked until source files are readable"
+    "reason": "The anchor-enforcement contradiction is now verified from the provided bundler sources. The next open question is the provenance and ordering of ExtractedStyleBlock values before they reach process_css."
   },
-  "stopping_point": "Acknowledged Zentext handoff and identified lack of repository file access as the immediate blocker before inspecting packages/compiler.",
+  "stopping_point": "Assessed strict anchor enforcement against bundle.rs and bundler_html_emit.rs. Stopped before tracing the origin of ExtractedStyleBlock in the compiler/loader pipeline.",
   "completed": [
-    "Acknowledged handoff and recorded blocker preventing compiler source inspection"
+    "Verified that strict anchor enforcement is contradicted by fallback paths in bundle.rs and bundler_html_emit.rs."
   ]
 }

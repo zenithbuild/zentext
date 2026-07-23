@@ -6,9 +6,9 @@
  * On open: read user_version, run all migrations with a higher number.
  */
 
-import type { Database } from "better-sqlite3";
+import type { SqliteDatabase } from "./sqlite-binding.js";
 
-export type MigrationFn = (db: Database) => void;
+export type MigrationFn = (db: SqliteDatabase) => void;
 
 /**
  * Ordered list of migrations. Index 0 = migration #1.
@@ -16,7 +16,7 @@ export type MigrationFn = (db: Database) => void;
  */
 export const MIGRATIONS: readonly MigrationFn[] = [
   // Migration #1: initial schema
-  (db: Database): void => {
+  (db: SqliteDatabase): void => {
     db.exec(`
       CREATE TABLE IF NOT EXISTS records (
         id              TEXT PRIMARY KEY,
@@ -67,14 +67,14 @@ export const MIGRATIONS: readonly MigrationFn[] = [
     `);
   },
   // Future migrations go here (append only):
-  // (db: Database): void => { ... },
+  // (db: SqliteDatabase): void => { ... },
 ];
 
 /**
  * Run all pending migrations on a database.
  * Reads PRAGMA user_version and applies migrations in order.
  */
-export function runMigrations(db: Database): void {
+export function runMigrations(db: SqliteDatabase): void {
   const currentVersion = db.pragma("user_version", { simple: true }) as number;
   const targetVersion = MIGRATIONS.length;
 
@@ -94,6 +94,6 @@ export function runMigrations(db: Database): void {
 /**
  * Get the current schema version (migration count).
  */
-export function getSchemaVersion(db: Database): number {
+export function getSchemaVersion(db: SqliteDatabase): number {
   return db.pragma("user_version", { simple: true }) as number;
 }

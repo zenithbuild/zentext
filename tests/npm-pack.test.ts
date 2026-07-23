@@ -3,6 +3,9 @@ import { mkdtempSync, rmSync, existsSync, writeFileSync } from "node:fs";
 import { join, basename } from "node:path";
 import { tmpdir } from "node:os";
 import { execSync } from "node:child_process";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
 
 const REPO_ROOT = process.cwd();
 
@@ -90,7 +93,7 @@ describe("npm package validation", () => {
 
   it("produces a tarball from npm pack", () => {
     expect(existsSync(tarballPath)).toBe(true);
-    expect(basename(tarballPath)).toMatch(/^zentext-\d+\.\d+\.\d+\.tgz$/);
+    expect(basename(tarballPath)).toMatch(/^zentext-\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?\.tgz$/);
   });
 
   it("tarball does not include dist/proof", () => {
@@ -107,10 +110,63 @@ describe("npm package validation", () => {
     expect(entries.some((e) => e.endsWith("dist/mcp/bin.js"))).toBe(true);
   });
 
+  it("tarball includes public documentation and excludes private build inputs", () => {
+    const listing = execSync(`tar -tzf ${tarballPath}`, { encoding: "utf8" });
+    const entries = listing.split("\n");
+    const required = [
+      "package/README.md",
+      "package/LICENSE",
+      "package/docs/mcp.md",
+      "package/docs/handoffs.md",
+      "package/docs/switching-agents.md",
+      "package/docs/tester-onboarding.md",
+      "package/docs/continuation.md",
+      "package/docs/portability-audit.md",
+      "package/docs/recovery-runbook.md",
+    ];
+
+    for (const path of required) {
+      expect(entries).toContain(path);
+    }
+
+    expect(entries.some((e) => e.startsWith("package/src/"))).toBe(false);
+    expect(entries.some((e) => e.startsWith("package/tests/"))).toBe(false);
+    expect(entries.some((e) => /\.(?:sqlite|sqlite-wal|sqlite-shm|tgz)$/.test(e))).toBe(false);
+    expect(entries.some((e) => /(?:^|\/)\.env(?:\.|$)/.test(e))).toBe(false);
+  });
+
   it("installed zentext --help works", () => {
     const out = runInstalled(["--help"]);
     expect(out).toContain("Zentext CLI");
     expect(out).toContain("handoff");
+  });
+
+  it("installed zentext-mcp completes initialize and tools/list", () => {
+    const script = join(installDir, "mcp-smoke.mjs");
+    const mcpBin = join(installDir, "node_modules", "zentext", "dist", "mcp", "bin.js");
+    writeFileSync(
+      script,
+      `
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+
+const client = new Client({ name: "zentext-package-smoke", version: "1.0.0" });
+const transport = new StdioClientTransport({ command: process.execPath, args: [${JSON.stringify(mcpBin)}] });
+await client.connect(transport);
+const result = await client.listTools();
+console.log(result.tools.map((tool) => tool.name).sort().join(","));
+await client.close();
+`,
+      "utf8",
+    );
+
+    const out = execSync(`node ${script}`, {
+      cwd: installDir,
+      encoding: "utf8",
+      stdio: "pipe",
+      timeout: 30_000,
+    });
+    expect(out.trim()).toBe("memory.list,memory.query,memory.read,memory.repack");
   });
 
   it("installed zentext init works in a fresh project", () => {
@@ -140,42 +196,18 @@ describe("npm package validation", () => {
     rmSync(home, { recursive: true, force: true });
   });
 
-  it("installed zentext handoff acknowledge works after creation", () => {
+  it("installed public task and handoff workflow rejects stale state", () => {
     const project = mkdtempSync(join(tmpdir(), "zentext-consumer-proj-"));
     const home = mkdtempSync(join(tmpdir(), "zentext-install-home-"));
     runInstalled(["init"], { cwd: project, home });
 
-    const seedHome = home;
-    const scriptPath = join(project, "seed.mjs");
-    writeFileSync(
-      scriptPath,
-      `
-import { SqliteStore } from "${installDir}/node_modules/zentext/dist/index.js";
-const project = process.cwd();
-const store = new SqliteStore();
-const meta = await store.initProjectStore(project);
-console.log("seed project_id", meta.projectId);
-const task = store.createRecord({ type: "task", title: "Verify CSS determinism", goal: "Trace contract", status: "active", author: "agent:A" });
-console.log("seed task_id", task.id);
-console.log("seed list", store.listRecords({ type: "task" }).length);
-store.close();
-`,
-      "utf8",
+    const create = runInstalled(
+      ["task", "create", "--title", "Verify CSS determinism", "--goal", "Trace contract"],
+      { cwd: project, home },
     );
-    const seedEnv: Record<string, string> = { PATH: process.env.PATH ?? "" };
-    for (const [key, value] of Object.entries(process.env)) {
-      if (value !== undefined && !key.toLowerCase().startsWith("npm_config_")) {
-        seedEnv[key] = value;
-      }
-    }
-    seedEnv.HOME = seedHome;
-    const seedOut = execSync(`node ${scriptPath}`, { cwd: project, env: seedEnv, encoding: "utf8" });
-    // Verify seed worked by listing tasks through the installed CLI.
-    const statusOut = runInstalled(["status"], { cwd: project, home });
-    const listOut = runInstalled(["list", "--type", "task"], { cwd: project, home });
-    if (!listOut.includes("Verify CSS determinism")) {
-      throw new Error(`Seed did not create task. Seed output: ${seedOut}. List output: ${listOut}`);
-    }
+    expect(create).toContain("Created task");
+    const task = runInstalled(["task", "show"], { cwd: project, home });
+    expect(task).toContain("Verify CSS determinism");
 
     runInstalled(
       [
@@ -193,10 +225,207 @@ store.close();
       { cwd: project, home },
     );
 
+    const shown = runInstalled(["handoff", "show"], { cwd: project, home });
+    expect(shown).toContain("Read contract.");
+    const valid = runInstalled(["handoff", "validate"], { cwd: project, home });
+    expect(valid).toContain("Handoff is current");
     const ack = runInstalled(["handoff", "acknowledge"], { cwd: project, home });
     expect(ack).toContain("Zentext context loaded.");
     expect(ack).toContain("Active task: Verify CSS determinism");
+
+    runInstalled(["task", "update", "--summary", "Contract reviewed", "--note", "Continue"], {
+      cwd: project,
+      home,
+    });
+
+    try {
+      runInstalled(["handoff", "validate"], { cwd: project, home });
+      throw new Error("Expected stale handoff validation to fail");
+    } catch (error) {
+      expect((error as { status?: number }).status).toBe(4);
+    }
+    try {
+      runInstalled(["handoff", "acknowledge"], { cwd: project, home });
+      throw new Error("Expected stale handoff acknowledgement to fail");
+    } catch (error) {
+      expect((error as { status?: number }).status).toBe(4);
+      expect((error as { stdout?: string }).stdout).not.toContain("Zentext context loaded.");
+    }
     rmSync(project, { recursive: true, force: true });
     rmSync(home, { recursive: true, force: true });
   });
+
+  it("installed zentext init works when better-sqlite3 scripts are blocked on Node 22+", () => {
+    const project = mkdtempSync(join(tmpdir(), "zentext-blocked-scripts-proj-"));
+    const home = mkdtempSync(join(tmpdir(), "zentext-blocked-scripts-home-"));
+    const blockedInstallDir = mkdtempSync(join(tmpdir(), "zentext-blocked-scripts-install-"));
+
+    // Determine whether node:sqlite fallback is available on this runtime.
+    let nodeSqliteAvailable = false;
+    try {
+      const mod = require("node:sqlite") as typeof import("node:sqlite");
+      nodeSqliteAvailable = !!mod.DatabaseSync;
+    } catch {
+      nodeSqliteAvailable = false;
+    }
+
+    if (!nodeSqliteAvailable) {
+      // No fallback exists below Node 22; skip this regression test.
+      rmSync(project, { recursive: true, force: true });
+      rmSync(home, { recursive: true, force: true });
+      rmSync(blockedInstallDir, { recursive: true, force: true });
+      return;
+    }
+
+    writeFileSync(
+      join(blockedInstallDir, "package.json"),
+      JSON.stringify({ name: "blocked-consumer", version: "1.0.0", type: "module", private: true }, null, 2),
+      "utf8",
+    );
+
+    const blockedEnv: Record<string, string> = {};
+    for (const [key, value] of Object.entries(process.env)) {
+      if (value !== undefined && !key.toLowerCase().startsWith("npm_config_")) {
+        blockedEnv[key] = value;
+      }
+    }
+    blockedEnv.HOME = home;
+    blockedEnv.npm_config_ignore_scripts = "true";
+
+    execSync(`npm install --save ${tarballPath}`, {
+      cwd: blockedInstallDir,
+      env: blockedEnv,
+      stdio: "pipe",
+      timeout: 120_000,
+    });
+
+    const bin = join(blockedInstallDir, "node_modules", ".bin", "zentext");
+    const initOut = execSync(`HOME=${home} node ${bin} init`, {
+      cwd: project,
+      env: blockedEnv,
+      encoding: "utf8",
+      stdio: "pipe",
+    });
+    expect(initOut).toContain("State:   created");
+
+    const statusOut = execSync(`HOME=${home} node ${bin} status`, {
+      cwd: project,
+      env: blockedEnv,
+      encoding: "utf8",
+      stdio: "pipe",
+    });
+    expect(statusOut).toContain("Project:");
+    expect(statusOut).toContain("Record counts:");
+
+    rmSync(project, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+    rmSync(blockedInstallDir, { recursive: true, force: true });
+  }, 180_000);
+
+  it("installed public task workflow works when better-sqlite3 scripts are blocked on Node 22+", () => {
+    const project = mkdtempSync(join(tmpdir(), "zentext-public-workflow-proj-"));
+    const home = mkdtempSync(join(tmpdir(), "zentext-public-workflow-home-"));
+    const installDir = mkdtempSync(join(tmpdir(), "zentext-public-workflow-install-"));
+
+    let nodeSqliteAvailable = false;
+    try {
+      const mod = require("node:sqlite") as typeof import("node:sqlite");
+      nodeSqliteAvailable = !!mod.DatabaseSync;
+    } catch {
+      nodeSqliteAvailable = false;
+    }
+
+    if (!nodeSqliteAvailable) {
+      rmSync(project, { recursive: true, force: true });
+      rmSync(home, { recursive: true, force: true });
+      rmSync(installDir, { recursive: true, force: true });
+      return;
+    }
+
+    writeFileSync(
+      join(installDir, "package.json"),
+      JSON.stringify({ name: "public-workflow-consumer", version: "1.0.0", type: "module", private: true }, null, 2),
+      "utf8",
+    );
+
+    const env: Record<string, string> = {};
+    for (const [key, value] of Object.entries(process.env)) {
+      if (value !== undefined && !key.toLowerCase().startsWith("npm_config_")) {
+        env[key] = value;
+      }
+    }
+    env.HOME = home;
+    env.npm_config_ignore_scripts = "true";
+
+    execSync(`npm install --save ${tarballPath}`, {
+      cwd: installDir,
+      env,
+      stdio: "pipe",
+      timeout: 120_000,
+    });
+
+    const bin = join(installDir, "node_modules", ".bin", "zentext");
+
+    function runInstalled(args: string[]) {
+      const quoted = args.map((a) => (a.includes(" ") ? `"${a}"` : a)).join(" ");
+      return execSync(`HOME=${home} node ${bin} ${quoted}`, {
+        cwd: project,
+        env,
+        encoding: "utf8",
+        stdio: "pipe",
+      });
+    }
+
+    runInstalled(["init"]);
+    const taskOut = runInstalled(["task", "create", "--title", "Investigate CSS determinism", "--goal", "Confirm ordering"]);
+    expect(taskOut).toContain("Created task");
+    expect(taskOut).toContain("Status: active");
+    expect(runInstalled(["task", "show"])).toContain("Investigate CSS determinism");
+
+    const handoffOut = runInstalled([
+      "handoff", "create",
+      "--from", "kimi",
+      "--stopping-point", "Read contract and implementation.",
+      "--next-action", "Run css_determinism tests.",
+      "--completed", "Read contract",
+      "--files-changed", "None",
+      "--verification", "contracts/DETERMINISM.md",
+    ]);
+    expect(handoffOut).toContain("Previous agent: kimi");
+    expect(handoffOut).toContain("Stored handoff record:");
+    expect(runInstalled(["handoff", "show"])).toContain("Read contract and implementation.");
+    expect(runInstalled(["handoff", "validate"])).toContain("Handoff is current");
+
+    const ackOut = runInstalled(["handoff", "acknowledge"]);
+    expect(ackOut).toContain("Zentext context loaded.");
+    expect(ackOut).toContain("Investigate CSS determinism");
+
+    const updateOut = runInstalled(["task", "update", "--summary", "Updated", "--note", "Progress"]);
+    expect(updateOut).toContain("Updated task");
+    expect(updateOut).toContain("revision:   2");
+
+    let staleValidateExit = 0;
+    try {
+      runInstalled(["handoff", "validate"]);
+    } catch (e) {
+      staleValidateExit = (e as { status?: number }).status ?? 1;
+    }
+    expect(staleValidateExit).toBe(4);
+
+    let staleAckExit = 0;
+    let staleAckOut = "";
+    try {
+      staleAckOut = runInstalled(["handoff", "acknowledge"]);
+    } catch (e) {
+      staleAckExit = (e as { status?: number; stdout?: string }).status ?? 1;
+      staleAckOut = (e as { stdout?: string }).stdout ?? "";
+    }
+    expect(staleAckExit).toBe(4);
+    expect(staleAckOut).toContain("Handoff rejected");
+    expect(staleAckOut).not.toContain("Zentext context loaded.");
+
+    rmSync(project, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+    rmSync(installDir, { recursive: true, force: true });
+  }, 180_000);
 });
