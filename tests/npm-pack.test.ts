@@ -110,10 +110,62 @@ describe("npm package validation", () => {
     expect(entries.some((e) => e.endsWith("dist/mcp/bin.js"))).toBe(true);
   });
 
+  it("tarball includes public documentation and excludes private build inputs", () => {
+    const listing = execSync(`tar -tzf ${tarballPath}`, { encoding: "utf8" });
+    const entries = listing.split("\n");
+    const required = [
+      "package/README.md",
+      "package/LICENSE",
+      "package/docs/mcp.md",
+      "package/docs/handoffs.md",
+      "package/docs/switching-agents.md",
+      "package/docs/tester-onboarding.md",
+      "package/docs/continuation.md",
+      "package/docs/portability-audit.md",
+    ];
+
+    for (const path of required) {
+      expect(entries).toContain(path);
+    }
+
+    expect(entries.some((e) => e.startsWith("package/src/"))).toBe(false);
+    expect(entries.some((e) => e.startsWith("package/tests/"))).toBe(false);
+    expect(entries.some((e) => /\.(?:sqlite|sqlite-wal|sqlite-shm|tgz)$/.test(e))).toBe(false);
+    expect(entries.some((e) => /(?:^|\/)\.env(?:\.|$)/.test(e))).toBe(false);
+  });
+
   it("installed zentext --help works", () => {
     const out = runInstalled(["--help"]);
     expect(out).toContain("Zentext CLI");
     expect(out).toContain("handoff");
+  });
+
+  it("installed zentext-mcp completes initialize and tools/list", () => {
+    const script = join(installDir, "mcp-smoke.mjs");
+    const mcpBin = join(installDir, "node_modules", "zentext", "dist", "mcp", "bin.js");
+    writeFileSync(
+      script,
+      `
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+
+const client = new Client({ name: "zentext-package-smoke", version: "1.0.0" });
+const transport = new StdioClientTransport({ command: process.execPath, args: [${JSON.stringify(mcpBin)}] });
+await client.connect(transport);
+const result = await client.listTools();
+console.log(result.tools.map((tool) => tool.name).sort().join(","));
+await client.close();
+`,
+      "utf8",
+    );
+
+    const out = execSync(`node ${script}`, {
+      cwd: installDir,
+      encoding: "utf8",
+      stdio: "pipe",
+      timeout: 30_000,
+    });
+    expect(out.trim()).toBe("memory.list,memory.query,memory.read,memory.repack");
   });
 
   it("installed zentext init works in a fresh project", () => {

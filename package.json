@@ -41,6 +41,8 @@
     "docs/handoffs.md",
     "docs/switching-agents.md",
     "docs/tester-onboarding.md",
+    "docs/continuation.md",
+    "docs/portability-audit.md",
     "LICENSE",
     "!dist/proof"
   ],
