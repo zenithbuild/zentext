@@ -123,6 +123,9 @@ canonical repository inputs.
   recovery documents. They are now included and asserted by packaging tests.
 - Package validation did not exercise the installed MCP protocol surface. It
   now verifies `initialize` and `tools/list` over stdio.
+- The runnable Stage 2 proof imported compiled modules through an absolute path
+  on the original laptop. Its imports are now relative to the repository, and
+  the proof passes on both supported Node releases.
 - Environment files were not explicitly ignored. `.env` and `.env.*` are now
   ignored while a deliberately sanitized `.env.example` remains eligible for
   source control.

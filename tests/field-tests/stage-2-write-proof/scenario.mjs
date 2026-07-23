@@ -6,9 +6,9 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { SqliteStore } from "/Users/judahsullivan/zenith/zentext/dist/store/sqlite-store.js";
-import { createMemoryWriter } from "/Users/judahsullivan/zenith/zentext/dist/domain/memory-writer.js";
-import { repack } from "/Users/judahsullivan/zenith/zentext/dist/repack/engine.js";
+import { SqliteStore } from "../../../dist/store/sqlite-store.js";
+import { createMemoryWriter } from "../../../dist/domain/memory-writer.js";
+import { repack } from "../../../dist/repack/engine.js";
 
 const tempHome = mkdtempSync(join(tmpdir(), "zentext-stage2-proof-"));
 process.env.HOME = tempHome;
