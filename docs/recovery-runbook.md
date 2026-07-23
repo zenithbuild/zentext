@@ -8,7 +8,7 @@ recovery codes, private keys, tokens, or local database contents.
 
 ## Current access and release baseline
 
-- GitHub account `judahsullivan` is an administrator of the `zenithbuild`
+- GitHub account `judahbsullivan` is an administrator of the `zenithbuild`
   organization and has administrator access to `zenithbuild/zentext`.
 - npm lists `judahsullivan` as an owner of the public `zentext` package.
 - This machine is not currently authenticated to npm: `npm whoami` returns an
