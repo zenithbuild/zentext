@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "scenario_id": "m1-regional-total-continuation",
+  "execution_status": "not-run",
+  "surfaces": {
+    "continue_human": "not-run",
+    "continue_json": "not-run",
+    "continue_markdown": "not-run",
+    "continue_prompt": "not-run",
+    "export_json": "not-run",
+    "export_markdown": "not-run",
+    "export_prompt": "not-run",
+    "prompt_template": "not-run"
+  },
+  "repeated_values": {
+    "completed": [],
+    "files_changed": [],
+    "blockers": [],
+    "verification": [],
+    "notes": []
+  },
+  "isolation": {
+    "fresh_project_per_run": false,
+    "isolated_home_per_run": false,
+    "tool_a_exited_before_receiver": false,
+    "prior_conversation_available": null,
+    "shared_provider_session": null,
+    "answer_carried_in_memory": null
+  },
+  "revision_evidence": {
+    "before": null,
+    "after": null,
+    "handoff_revision": null,
+    "validation_exit_code": null,
+    "continuation_exit_code": null,
+    "stale_rejected": false
+  },
+  "participants": [],
+  "failures": [],
+  "limitations": [
+    "Baseline contract only; continuation surfaces and real participant executions are pending."
+  ]
+}
+
