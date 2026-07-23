@@ -1,173 +1,86 @@
-# CLI Reference
-
-The Zentext CLI is the human and fallback interface. It lets a developer inspect,
-edit, hand off, and repack project memory without an agent in the loop, and it
-serves as the non-MCP fallback for agents without MCP support.
-
-This document is conceptual. It defines commands, purposes, example invocations,
-expected behavior, and MVP/future status. It is not final syntax or implementation.
-
-## Design principles
-
-- **Human-readable first.** Output should be readable in a terminal without an
-  agent.
-- **Fallback for non-MCP agents.** `zentext repack` emits a pasteable payload so
-  any agent — even one without MCP — can receive Zentext context.
-- **No secrets in output.** The CLI never prints or accepts secrets.
-- **Local only (MVP).** No network calls in the MVP CLI.
-
-## Commands
-
-### zentext init
-
-**Purpose:** Initialize a local Zentext memory store for the current project.
-
-**Example invocation:** `zentext init`
-
-**Expected behavior:** Creates a local store for the project, records project
-metadata, and prints next steps (how to point an MCP-compatible agent at the
-server, how to use the CLI). Idempotent: re-running on an initialized project is a
-no-op or a confirm prompt.
-
-**MVP status:** MVP.
-
----
-
-### zentext status
-
-**Purpose:** Show the current state of the project memory: active task, open
-blockers, latest handoff, record counts, and last-updated timestamps.
-
-**Example invocation:** `zentext status`
-
-**Expected behavior:** Prints a compact summary suitable for a quick glance before
-switching agents.
-
-**MVP status:** MVP.
-
----
-
-### zentext show
-
-**Purpose:** Show a single memory record in full, by id.
-
-**Example invocation:** `zentext show rec_01HZ...`
-
-**Expected behavior:** Prints the full record in a readable format.
-
-**MVP status:** MVP.
-
----
-
-### zentext list
-
-**Purpose:** List memory records, optionally filtered by type.
-
-**Example invocation:** `zentext list --type decision`
-
-**Expected behavior:** Prints a summarized table (id, type, title, status,
-updated_at).
-
-**MVP status:** MVP.
-
----
-
-### zentext add
-
-**Purpose:** Create a structured memory record from the human side.
-
-**Example invocation:** `zentext add decision`
-
-**Expected behavior:** Captures required fields via flags and/or an editor and
-creates one of the Stage 1 human-authored record types: `task`, `decision`,
-`blocker`, `validation`, `policy`, or `custom`. Generated fields such as `id`,
-`project`, timestamps, and revision are assigned by Zentext.
-
-`zentext add log` is not a primary Stage 1 command. Logs are mostly agent/system
-written through `memory.write`; humans can correct logs with `zentext edit` or use
-`custom` for manual notes that do not fit the baseline types.
-
-**MVP status:** MVP.
-
----
-
-### zentext handoff
-
-**Purpose:** Create a handoff record from the human side, summarizing the current
-session for the next agent or teammate.
-
-**Example invocation:** `zentext handoff`
-
-**Expected behavior:** Opens an editor (or interactive prompt) to capture context,
-state, next, open questions, and completed items. Creates a handoff record and marks
-it as the latest.
-
-**MVP status:** MVP.
-
----
-
-### zentext repack
-
-**Purpose:** Generate a focused, agent-ready context payload from current project
-memory and print it to stdout (or write to a file with `--out`).
-
-**Example invocation:** `zentext repack --focus auth --out .zentext/context.md`
-
-**Expected behavior:** Produces a structured markdown payload (see
-[`context-repacking.md`](./context-repacking.md)) following the default priority
-order. This is the non-MCP fallback: paste the output into any agent's prompt.
-
-**MVP status:** MVP.
-
----
-
-### zentext edit
-
-**Purpose:** Edit an existing record (human-authored correction, status change,
-resolution).
-
-**Example invocation:** `zentext edit rec_01HZ...`
-
-**Expected behavior:** Opens the record in an editor for manual editing. Useful for
-correcting agent-written records or resolving a blocker from the human side.
-
-**MVP status:** MVP.
-
----
-
-### zentext audit
-
-**Purpose:** Audit the memory store for staleness, inconsistencies, and potential
-issues (e.g., unresolved blockers older than a threshold, records missing
-recommended fields, records that look like they may contain secrets, and
-age/status/completed-task/manual staleness). Reference-based staleness (records
-referencing code that has since changed) is a Stretch goal, not MVP behavior.
-
-**Example invocation:** `zentext audit`
-
-**Expected behavior:** Prints a report flagging stale or suspicious records and
-suggests cleanup actions.
-
-**MVP status:** MVP.
-
-## Non-MCP fallback
-
-For agents that do not support MCP (or where MCP integration is unreliable),
-`zentext repack` is the bridge:
-
-1. Run `zentext repack` (optionally with `--focus` and `--out`).
-2. The command emits a structured markdown context payload.
-3. Paste the payload into the agent's prompt, or reference the output file if the
-   agent can read files.
-
-This ensures Zentext works with any agent, not only MCP-compatible ones, without
-requiring per-agent integrations.
-
-## Out of scope for the MVP CLI
-
-- No cloud sync commands.
-- No auth/login commands.
-- No team/workspace management commands.
-- No dashboard or TUI.
-- No secret management commands.
-- No agent execution commands.
+# CLI reference
+
+The Zentext CLI is the implemented human and non-MCP interface for local project
+memory. Commands operate on the current project's store under
+`~/.zentext/projects/<project-id>/store.sqlite`; they do not call a cloud
+service.
+
+## Project and record inspection
+
+```sh
+zentext init
+zentext status
+zentext show <record-id>
+zentext list [--type <type>] [--status <status>] [--limit <number>]
+```
+
+`init` is idempotent. `status`, `show`, and `list` are read-only.
+
+## Task workflow
+
+```sh
+zentext task create --title <text> [--goal <text>] [--summary <text>]
+  [--status active|blocked|done|canceled]
+zentext task show
+zentext task update [--title <text>] [--summary <text>] [--status <status>]
+  [--note <text> ...] [--next-action <text>]
+```
+
+`--note` is repeatable. Values remain separate and retain invocation order;
+commas inside one value are not separators.
+
+## Handoff workflow
+
+```sh
+zentext handoff create --from <agent> --stopping-point <text>
+  --next-action <text> [--completed <text> ...] [--blockers <text> ...]
+  [--files-changed <path> ...] [--verification <text> ...]
+  [--previous-response <text>]
+zentext handoff show [--json]
+zentext handoff validate [--json]
+zentext handoff acknowledge [--json]
+```
+
+`--completed`, `--blockers`, `--files-changed`, and `--verification` are
+repeatable and ordered. Handoff validation compares the recorded task revision
+with the live task revision. Stale handoffs return exit code 4.
+
+## Validated continuation
+
+```sh
+zentext continue
+zentext continue --json
+zentext continue --markdown
+zentext continue --prompt
+```
+
+`continue` resolves the project, active or blocked task, and current handoff,
+then validates project identity, task identity, and task revision. It is
+read-only and never acknowledges a handoff merely because it was displayed.
+
+All four modes render the same canonical continuation view:
+
+- default: readable terminal text;
+- `--json`: JSON-only standard output with ordered arrays and validation state;
+- `--markdown`: portable Markdown;
+- `--prompt`: provider-neutral instruction plus the portable state.
+
+The modes are mutually exclusive. Unknown options fail with exit code 1. A
+missing store returns exit code 2, missing actionable task or handoff returns 3,
+stale state returns 4, and malformed canonical state returns 5.
+
+## Context repacking
+
+```sh
+zentext repack [--focus <text>] [--max-size <characters>] [--out <path>]
+```
+
+Repacking produces deterministic Markdown from selected project records. Use
+`--out` to write it to a file; otherwise it is printed to standard output.
+
+## Current boundaries
+
+The Developer Preview does not implement general `add`, `edit`, or `audit`
+commands, MCP mutations, provider-specific continuation adapters, cloud sync,
+authentication, orchestration, or hidden model-state transfer. Zentext carries
+explicit external project records only.

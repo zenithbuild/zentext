@@ -8,12 +8,14 @@
 
 import {
   CliError,
+  continueProject,
   handoffAcknowledge,
   handoffCreate,
   handoffShow,
   handoffValidate,
   init,
   list,
+  parseContinuationFormat,
   printUsage,
   repack,
   show,
@@ -87,6 +89,15 @@ async function main(): Promise<void> {
       }
       case "status": {
         result = await status(cwd);
+        break;
+      }
+      case "continue": {
+        if (positional.length > 0) {
+          throw new CliError("Usage: zentext continue [--json | --markdown | --prompt]", 1);
+        }
+        result = await continueProject(cwd, {
+          format: parseContinuationFormat(flags),
+        });
         break;
       }
       case "show": {

@@ -55,3 +55,20 @@ export {
 export { SqliteStore, StoreValidationError, StoreNotFoundError } from "./store/sqlite-store.js";
 export { deriveProjectId, deriveProjectName, normalizeGitUrl, getGitOriginUrl } from "./store/project-id.js";
 export { runMigrations, getSchemaVersion, MIGRATIONS } from "./store/migrations.js";
+
+export {
+  CONTINUATION_SCHEMA_VERSION,
+  buildContinuationView,
+  ContinuationInvalidError,
+  ContinuationNotFoundError,
+  ContinuationStaleError,
+  type ContinuationView,
+} from "./continuation.js";
+export {
+  renderContinuation,
+  renderContinuationHuman,
+  renderContinuationMarkdown,
+  renderContinuationPrompt,
+  renderStaleContinuation,
+  type ContinuationFormat,
+} from "./continuation-format.js";

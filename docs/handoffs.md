@@ -88,11 +88,24 @@ zentext handoff acknowledge --json
 # Check whether the handoff is current against the live task revision
 zentext handoff validate
 zentext handoff validate --json
+
+# Load the active task and handoff through one validated continuation view
+zentext continue
+zentext continue --json
+zentext continue --markdown
+zentext continue --prompt
 ```
 
 `--completed`, `--blockers`, `--files-changed`, and `--verification` are
 repeatable. Each occurrence is stored as a separate value in invocation order;
 commas inside a value are not treated as separators.
+
+`zentext continue` is read-only: displaying a handoff does not acknowledge or
+mutate it. It selects the active or blocked task and the current `latest`
+handoff, validates their project, task id, and revision, then renders one
+canonical view. Completed or canceled tasks and archived or superseded handoffs
+are not actionable continuation state. A stale handoff is refused with exit
+code 4.
 
 ## Startup acknowledgement
 

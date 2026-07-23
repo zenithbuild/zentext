@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 
 import {
   CliError,
+  continueProject,
   handoffAcknowledge,
   handoffCreate,
   handoffShow,
@@ -650,6 +651,7 @@ describe("Zentext CLI — handoff commands", () => {
     const commands = await import("../src/cli/commands.js");
     expect(commands.init).toBeTypeOf("function");
     expect(commands.status).toBeTypeOf("function");
+    expect(commands.continueProject).toBeTypeOf("function");
     expect(commands.show).toBeTypeOf("function");
     expect(commands.list).toBeTypeOf("function");
     expect(commands.repack).toBeTypeOf("function");

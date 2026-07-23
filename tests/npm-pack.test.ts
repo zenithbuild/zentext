@@ -118,6 +118,7 @@ describe("npm package validation", () => {
       "package/LICENSE",
       "package/docs/mcp.md",
       "package/docs/handoffs.md",
+      "package/docs/cli-reference.md",
       "package/docs/switching-agents.md",
       "package/docs/tester-onboarding.md",
       "package/docs/continuation.md",
@@ -232,6 +233,20 @@ await client.close();
     const ack = runInstalled(["handoff", "acknowledge"], { cwd: project, home });
     expect(ack).toContain("Zentext context loaded.");
     expect(ack).toContain("Active task: Verify CSS determinism");
+    const continuation = runInstalled(["continue"], { cwd: project, home });
+    expect(continuation).toContain("Zentext continuation — validated current");
+    expect(continuation).toContain("Exact next action:");
+    const continuationJson = JSON.parse(
+      runInstalled(["continue", "--json"], { cwd: project, home }),
+    );
+    expect(continuationJson.validation.status).toBe("current");
+    expect(continuationJson.handoff.completed).toEqual(["Read contract"]);
+    expect(runInstalled(["continue", "--markdown"], { cwd: project, home })).toContain(
+      "# Zentext continuation",
+    );
+    expect(runInstalled(["continue", "--prompt"], { cwd: project, home })).toContain(
+      "external project memory",
+    );
 
     runInstalled(["task", "update", "--summary", "Contract reviewed", "--note", "Continue"], {
       cwd: project,
@@ -250,6 +265,15 @@ await client.close();
     } catch (error) {
       expect((error as { status?: number }).status).toBe(4);
       expect((error as { stdout?: string }).stdout).not.toContain("Zentext context loaded.");
+    }
+    try {
+      runInstalled(["continue", "--json"], { cwd: project, home });
+      throw new Error("Expected stale continuation to fail");
+    } catch (error) {
+      expect((error as { status?: number }).status).toBe(4);
+      const parsed = JSON.parse((error as { stdout: string }).stdout);
+      expect(parsed.continuation).toBeNull();
+      expect(parsed.validation.status).toBe("stale");
     }
     rmSync(project, { recursive: true, force: true });
     rmSync(home, { recursive: true, force: true });

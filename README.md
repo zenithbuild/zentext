@@ -47,8 +47,13 @@ zentext handoff create \
   --files-changed "tests/routes/login.test.ts" \
   --verification "npm test -- login"
 
-# A fresh agent can load the handoff
-zentext handoff acknowledge
+# A fresh agent loads one validated continuation view
+zentext continue
+
+# The same canonical state is available as JSON, Markdown, or prompt text
+zentext continue --json
+zentext continue --markdown
+zentext continue --prompt
 
 # Update the task as work progresses
 zentext task update --summary "Password hashing implemented" --next-action "Wire login into UI"
@@ -64,6 +69,8 @@ zentext handoff validate
 - A thin read-only MCP adapter (`memory.read`, `memory.list`, `memory.query`, `memory.repack`).
 - A CLI for humans and fallback use.
 - Structured handoffs with revision-safe stale detection.
+- A read-only `zentext continue` entry point with human, JSON, Markdown, and
+  tool-neutral prompt output over one validated continuation model.
 
 ## What Zentext is not
 

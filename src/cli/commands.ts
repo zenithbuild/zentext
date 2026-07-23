@@ -26,6 +26,18 @@ import {
 } from "../handoff.js";
 import { createMemoryWriter, MemoryWriterConflictError } from "../domain/memory-writer.js";
 import { repack as repackEngine } from "../repack/engine.js";
+import {
+  buildContinuationView,
+  ContinuationInvalidError,
+  ContinuationNotFoundError,
+  ContinuationStaleError,
+} from "../continuation.js";
+import {
+  renderContinuation,
+  renderStaleContinuation,
+  type ContinuationFormat,
+} from "../continuation-format.js";
+import type { FlagValue } from "./args.js";
 
 export class CliError extends Error {
   constructor(
@@ -35,6 +47,31 @@ export class CliError extends Error {
     super(message);
     this.name = "CliError";
   }
+}
+
+export function parseContinuationFormat(
+  flags: Record<string, FlagValue>,
+): ContinuationFormat {
+  const supported = new Set(["json", "markdown", "prompt"]);
+  const unsupported = Object.keys(flags).filter((key) => !supported.has(key));
+  if (unsupported.length > 0) {
+    throw new CliError(`Unsupported option for zentext continue: --${unsupported[0]}`, 1);
+  }
+
+  const modes = (["json", "markdown", "prompt"] as const).filter((key) => {
+    const value = flags[key];
+    if (value !== undefined && value !== true) {
+      throw new CliError(`--${key} does not accept a value`, 1);
+    }
+    return value === true;
+  });
+  if (modes.length > 1) {
+    throw new CliError(
+      "Choose only one continuation output mode: --json, --markdown, or --prompt",
+      1,
+    );
+  }
+  return modes[0] ?? "human";
 }
 
 function getStoreDbPath(cwd: string): string {
@@ -362,6 +399,37 @@ export async function handoffValidate(
   }
 }
 
+export async function continueProject(
+  cwd: string,
+  options: { format?: ContinuationFormat } = {},
+): Promise<{ output: string; exitCode: number }> {
+  const format = options.format ?? "human";
+  const store = await openStore(cwd);
+  try {
+    const meta = await store.openProjectStore(cwd);
+    try {
+      const view = buildContinuationView(store, meta);
+      return { output: renderContinuation(view, format), exitCode: 0 };
+    } catch (error) {
+      if (error instanceof ContinuationStaleError) {
+        return {
+          output: renderStaleContinuation(error, format),
+          exitCode: 4,
+        };
+      }
+      if (error instanceof ContinuationNotFoundError) {
+        throw new CliError(error.message, 3);
+      }
+      if (error instanceof ContinuationInvalidError) {
+        throw new CliError(error.message, 5);
+      }
+      throw error;
+    }
+  } finally {
+    store.close();
+  }
+}
+
 export async function taskCreate(
   cwd: string,
   options: {
@@ -554,11 +622,12 @@ Create a task first:
 }
 
 export function printUsage(): string {
-  return `Zentext CLI — Phase 2 read/inspect commands
+  return `Zentext CLI — local project memory commands
 
 Usage:
   zentext init
   zentext status
+  zentext continue [--json | --markdown | --prompt]
   zentext task {create|show|update}
   zentext show <id>
   zentext list [--type <type>] [--status <status>] [--limit <n>]
@@ -567,6 +636,7 @@ Usage:
 Commands:
   init    Initialize the local project store
   status  Show a concise overview of the project memory
+  continue  Load the validated current task and handoff without changing state
   task    Create, show, or update the current task
   show    Display a single record by id
   list    List records, optionally filtered
@@ -588,6 +658,12 @@ Handoff subcommands:
     [--completed <text> ...] [--blockers <text> ...] [--files-changed <text> ...]
     [--verification <text> ...] [--previous-response <text>]
 
+Continuation output:
+  zentext continue            Human-readable validated continuation
+  zentext continue --json     Stable machine-readable continuation
+  zentext continue --markdown Portable Markdown continuation
+  zentext continue --prompt   Tool-neutral continuation prompt
+
 Options:
   --type     Filter by record type (task, decision, blocker, ...)
   --status   Filter by record status
@@ -595,7 +671,9 @@ Options:
   --focus    Prioritize records matching this topic
   --max-size Character budget for the output (default 12000)
   --out      Write the payload to a file instead of stdout
-  --json     Output handoff commands as JSON
+  --json     Output supported commands as JSON
+  --markdown Output continuation as portable Markdown
+  --prompt   Output a tool-neutral continuation prompt
 
 Repeatable options:
   --note, --completed, --blockers, --files-changed, and --verification may be
