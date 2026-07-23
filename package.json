@@ -46,6 +46,7 @@
     "docs/continuation-prompt.md",
     "docs/portability-audit.md",
     "docs/recovery-runbook.md",
+    "docs/demo/portable-continuation",
     "LICENSE",
     "!dist/proof"
   ],

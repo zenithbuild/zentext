@@ -1,12 +1,30 @@
 # Zentext
 
-A local-first shared context and memory layer for AI coding agents.
+> **AI sessions are temporary. Project memory should not be.**
 
-Zentext preserves external project memory — task state, architecture decisions,
-blockers, handoffs, validation results, and policies — and repacks that memory
-into useful context so that when you switch from one AI coding agent to another,
-the next agent picks up where the last one left off without you re-explaining the
-project from scratch.
+Zentext is a local-first persistent project memory layer for AI coding agents.
+It stores tasks, handoffs, decisions, blockers, validations, revisions, and
+policies outside any individual AI session, so project state survives when you
+close one tool and continue in another.
+
+SQLite structured records are canonical. CLI output, JSON, Markdown, portable
+prompts, and the optional read-only MCP server are views over the same validated
+state. Zentext does not transfer hidden model state or depend on conversation
+history.
+
+## Why Structured Project Memory
+
+An exported summary captures one moment. As work continues, that text can become
+stale without knowing it.
+
+Zentext maintains canonical, evolving project state instead. Tasks have
+revisions. Handoffs identify the exact revision they continue. Completed work,
+changed files, blockers, verification, stopping points, and next actions remain
+separate structured values. When the task advances, Zentext rejects the old
+handoff rather than presenting an outdated summary as current.
+
+That distinction makes the project memory portable without making a specific AI
+tool, prompt format, or provider the source of truth.
 
 ## Developer Preview install
 
@@ -66,6 +84,23 @@ zentext task update --summary "Password hashing implemented" --next-action "Wire
 # Validate it is still current
 zentext handoff validate
 ```
+
+## Portable continuation demo
+
+**Sessions are temporary. Project memory is not.** This demo installs the packed
+npm package, lets Tool A record structured work and exit, then starts a fresh
+Tool B with only a portable Zentext continuation and the project files. Tool B
+recovers the state, continues from the exact next action, and advances the
+canonical task revision. Zentext then rejects the original handoff as stale.
+
+See the [complete executable demo](./docs/demo/portable-continuation/README.md),
+the [exact validated-continuation checkpoint](./docs/demo/portable-continuation/checkpoints/03-validated-continuation.txt),
+the [fresh-tool checkpoint](./docs/demo/portable-continuation/checkpoints/05-fresh-tool-continuation.txt),
+the [stale-rejection checkpoint](./docs/demo/portable-continuation/checkpoints/06-stale-handoff-rejection.txt),
+and the [full automatically sanitized transcript](./docs/demo/portable-continuation/transcript.txt).
+
+This is external project-memory continuation—not hidden model-state transfer and
+not conversation migration.
 
 ## What Zentext is
 

@@ -125,6 +125,17 @@ describe("npm package validation", () => {
       "package/docs/continuation-prompt.md",
       "package/docs/portability-audit.md",
       "package/docs/recovery-runbook.md",
+      "package/docs/demo/portable-continuation/README.md",
+      "package/docs/demo/portable-continuation/run-demo.mjs",
+      "package/docs/demo/portable-continuation/tool-a.mjs",
+      "package/docs/demo/portable-continuation/fresh-tool.mjs",
+      "package/docs/demo/portable-continuation/transcript.txt",
+      "package/docs/demo/portable-continuation/checkpoints/01-initialization.txt",
+      "package/docs/demo/portable-continuation/checkpoints/02-task-and-handoff.txt",
+      "package/docs/demo/portable-continuation/checkpoints/03-validated-continuation.txt",
+      "package/docs/demo/portable-continuation/checkpoints/04-portable-prompt-export.txt",
+      "package/docs/demo/portable-continuation/checkpoints/05-fresh-tool-continuation.txt",
+      "package/docs/demo/portable-continuation/checkpoints/06-stale-handoff-rejection.txt",
     ];
 
     for (const path of required) {

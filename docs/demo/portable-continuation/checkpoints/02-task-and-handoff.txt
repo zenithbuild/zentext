@@ -1,0 +1,38 @@
+=== 2. TOOL A CREATES THE TASK AND WORKS ===
+
+$ zentext task create --title 'Complete the portable health route' --goal 'Return status 200 and the exact required response body.'
+Created task rec_task_01KY7WQCHY6QM1G37V70XZW0N2
+Title: Complete the portable health route
+Status: active
+[exit 0]
+
+$ zentext handoff create --from tool-a --completed 'Added the health-route skeleton.' --completed 'Added and passed the status-code test.' --files-changed src/health-route.mjs --files-changed test/health-route.test.mjs --blockers 'The exact response body is not implemented or tested.' --verification 'node --check src/health-route.mjs passed.' --verification 'node --test passed the status-code test.' --stopping-point 'Status 200 is implemented and verified; body remains '\''pending'\''.' --next-action 'Read requirements/health-response.txt, implement the exact response body, and add its assertion.'
+Handoff: zentext-portable-demo
+Project ID: c85ef34c5e8fc297
+Previous agent: tool-a
+Created: 2026-07-23T16:25:19.626Z
+
+Active task: Complete the portable health route
+  Task ID:      rec_task_01KY7WQCHY6QM1G37V70XZW0N2
+  Task revision: 2
+  Task status:   active
+
+Completed work:
+  - Added the health-route skeleton.
+  - Added and passed the status-code test.
+
+Stopping point: Status 200 is implemented and verified; body remains 'pending'.
+Next action: Read requirements/health-response.txt, implement the exact response body, and add its assertion.
+
+Blockers: The exact response body is not implemented or tested.
+
+Files changed:
+  - src/health-route.mjs
+  - test/health-route.test.mjs
+
+Verification:
+  - node --check src/health-route.mjs passed.
+  - node --test passed the status-code test.
+
+Stored handoff record: rec_handoff_01KY7WQD0BXHYEGRDSSMQC0TXQ
+[exit 0]

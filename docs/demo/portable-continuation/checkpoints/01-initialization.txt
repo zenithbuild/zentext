@@ -1,0 +1,11 @@
+=== 1. INITIALIZATION ===
+
+$ zentext init
+Project: zentext-portable-demo
+ID:      c85ef34c5e8fc297
+Store:   <demo-workspace>/home/.zentext/projects/c85ef34c5e8fc297
+Schema:  v1
+State:   created
+
+Next: run `zentext status` to see the current project memory.
+[exit 0]
