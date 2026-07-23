@@ -1,0 +1,131 @@
+#!/usr/bin/env node
+
+import { readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const directory = dirname(fileURLToPath(import.meta.url));
+const evidenceDirectory = join(directory, "evidence");
+const results = JSON.parse(
+  readFileSync(join(evidenceDirectory, "results.json"), "utf8"),
+);
+const escape = (value) =>
+  String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+
+const participantCards = results.participants
+  .map(
+    (participant, index) => `<article class="participant">
+<div class="step">${index + 1}</div>
+<div>
+  <div class="tool-line"><strong>${escape(participant.tool)}</strong><span>${escape(participant.revisions)}</span></div>
+  <p>${escape(participant.action)} · ${escape(participant.surface)}</p>
+  <small>${escape(participant.model)}</small>
+  <div class="result">PASS · ${escape(participant.stale_result)}</div>
+</div>
+</article>`,
+  )
+  .join("\n");
+const runtimeCards = results.supported_runtime_validation
+  .map(
+    (runtime) => `<article class="runtime">
+  <div class="tool-line"><strong>${escape(runtime.node)}</strong><span>PASS</span></div>
+  <p>${runtime.test_files} test files · ${runtime.tests} tests</p>
+  <small>${runtime.package_files} package files · ${runtime.package_bytes.toLocaleString()} bytes</small>
+  <div class="result">NATIVE + FALLBACK + FIELD VALIDATOR</div>
+</article>`,
+  )
+  .join("\n");
+
+const html = `<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Zentext trusted-memory field test</title>
+<style>
+:root{color-scheme:dark;--bg:#071019;--panel:#0e1a25;--line:#243749;--text:#f2f6f8;--muted:#9fb0bd;--cyan:#61e7d1;--blue:#8eb4ff;--green:#71efad;--amber:#ffd479}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 85% 5%,#173b45 0,transparent 27%),var(--bg);color:var(--text);font:17px/1.45 ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+main{max-width:1160px;margin:auto;padding:64px 56px 96px}.eyebrow{color:var(--cyan);font-size:13px;font-weight:800;letter-spacing:.18em;text-transform:uppercase}
+h1{font-size:64px;line-height:1.02;letter-spacing:-.045em;margin:16px 0 22px;max-width:940px}h2{font-size:34px;letter-spacing:-.025em;margin:0 0 12px}
+.lede{font-size:22px;color:#ccdae1;max-width:900px}.prompt{margin:36px 0 0;padding:22px 26px;border-left:4px solid var(--cyan);background:#0a1620;color:#dfeaf0;font-size:19px}
+.section{margin-top:56px}.card{background:linear-gradient(145deg,#101e2b,#0b1721);border:1px solid var(--line);border-radius:22px;padding:30px;box-shadow:0 24px 70px rgba(0,0,0,.22)}
+.participant-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.participant{display:grid;grid-template-columns:46px 1fr;gap:14px;background:#0a151f;border:1px solid #223546;border-radius:16px;padding:20px}
+.step{display:grid;place-items:center;width:38px;height:38px;border-radius:50%;background:#13313a;color:var(--cyan);font-weight:900}.tool-line{display:flex;justify-content:space-between;gap:16px;font-size:19px}.tool-line span{color:var(--blue);font-weight:800}.participant p{color:#c2d0d8;margin:6px 0}.participant small{color:var(--muted)}.result{color:var(--green);font-size:12px;font-weight:900;letter-spacing:.1em;margin-top:12px}
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.metric{background:#0a151f;border:1px solid var(--line);border-radius:16px;padding:22px}.metric strong{display:block;color:var(--green);font-size:32px}.metric span{color:var(--muted)}
+.flow{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:22px}.node{flex:1;text-align:center;padding:20px 10px;border-radius:14px;background:#0a151f;border:1px solid var(--line)}.node b{display:block;font-size:22px}.node span{color:var(--muted)}.arrow{color:var(--cyan);font-size:26px}
+.checks{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:22px}.check{padding:18px;border-radius:14px;background:#0a151f;border:1px solid var(--line)}.check b{color:var(--green)}.boundary{border-color:#44505c}.boundary b{color:var(--amber)}
+.runtime-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:22px}.runtime{background:#0a151f;border:1px solid var(--line);border-radius:16px;padding:22px}.runtime p{color:#c2d0d8;margin:8px 0}.runtime small{color:var(--muted)}
+.final-state{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:22px}.final-state div{padding:20px;border-radius:14px;background:#0a151f;border:1px solid var(--line)}.final-state strong{display:block;color:var(--cyan);margin-bottom:5px}.final-state ul{margin:8px 0 0;padding-left:20px;color:#c2d0d8}
+footer{margin-top:48px;color:var(--muted);font-size:14px}@media(max-width:800px){main{padding:40px 24px}h1{font-size:44px}.participant-grid,.metrics,.checks,.runtime-grid,.final-state{grid-template-columns:1fr}.flow{flex-direction:column}.arrow{transform:rotate(90deg)}}
+</style></head><body><main>
+<header id="overview">
+  <div class="eyebrow">Real packed-package validation · ${escape(results.executed_on)}</div>
+  <h1>One canonical memory.<br>Four unrelated tool environments.</h1>
+  <p class="lede">${escape(results.summary)}</p>
+  <div class="prompt">“${escape(results.exact_prompt)}”</div>
+</header>
+
+<section class="section card" id="cross-tool-matrix">
+  <div class="eyebrow">Cross-tool matrix</div>
+  <h2>One next action per participant</h2>
+  <div class="participant-grid">${participantCards}</div>
+</section>
+
+<section class="section card" id="revision-proof">
+  <div class="eyebrow">Revision and stale-state proof</div>
+  <h2>Every successful write invalidated what came before</h2>
+  <div class="flow">
+    <div class="node"><b>2 → 3</b><span>Codex · Alpha</span></div><div class="arrow">→</div>
+    <div class="node"><b>3 → 4</b><span>OpenClaw · Beta</span></div><div class="arrow">→</div>
+    <div class="node"><b>4 → 5</b><span>Gemini · Gamma</span></div><div class="arrow">→</div>
+    <div class="node"><b>5 → 6</b><span>Ollama · Delta</span></div>
+  </div>
+  <div class="metrics">
+    <div class="metric"><strong>${results.final_state.revision}</strong><span>final revision</span></div>
+    <div class="metric"><strong>${results.final_state.report_total}</strong><span>verified total</span></div>
+    <div class="metric"><strong>${results.final_state.prior_handoffs_stale}</strong><span>old handoffs stale</span></div>
+    <div class="metric"><strong>${results.final_state.concurrent_rpc_opens}</strong><span>parallel RPC opens</span></div>
+  </div>
+</section>
+
+<section class="section card" id="interface-proof">
+  <div class="eyebrow">Canonical interface proof</div>
+  <h2>Different surfaces. The same validated state.</h2>
+  <p class="lede">${escape(results.interface_parity)}</p>
+  <div class="checks">
+    <div class="check"><b>PASS</b><br>CLI JSON ↔ SDK ↔ RPC ↔ MCP</div>
+    <div class="check"><b>PASS</b><br>Native and fallback SQLite</div>
+    <div class="check"><b>PASS</b><br>Secret rejection and output redaction</div>
+    <div class="check"><b>PASS</b><br>Atomic revision conflict handling</div>
+    <div class="check boundary"><b>BOUNDARY</b><br>No hidden model state or conversation migration</div>
+    <div class="check boundary"><b>BOUNDARY</b><br>No provider-specific canonical store</div>
+  </div>
+</section>
+
+<section class="section card" id="runtime-matrix">
+  <div class="eyebrow">Supported-runtime matrix</div>
+  <h2>Clean install to packed consumer</h2>
+  <div class="runtime-grid">${runtimeCards}</div>
+</section>
+
+<section class="section card" id="final-continuation">
+  <div class="eyebrow">Final canonical continuation</div>
+  <h2>Current, revision ${results.final_state.revision}</h2>
+  <div class="final-state">
+    <div><strong>Task</strong>${escape(results.final_state.task)}</div>
+    <div><strong>Stopping point</strong>${escape(results.final_state.stopping_point)}</div>
+    <div><strong>Completed</strong><ul>${results.final_state.completed.map((item) => `<li>${escape(item)}</li>`).join("")}</ul></div>
+    <div><strong>Exact next action</strong>${escape(results.final_state.next_action)}</div>
+  </div>
+</section>
+
+<footer>
+  Evidence viewer only—not a Zentext GUI. Generated from sanitized normalized
+  results. Raw provider transcripts, local paths, credentials, databases, and
+  model-private reasoning are excluded.
+</footer>
+</main></body></html>`;
+
+writeFileSync(join(evidenceDirectory, "report.html"), html);

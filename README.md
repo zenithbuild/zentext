@@ -140,12 +140,26 @@ For other local tools, use the [TypeScript SDK](./docs/sdk.md) or
 - A way to transfer hidden model state between agents.
 - Part of the Zenith Framework.
 
+## Cross-tool proof
+
+The current release-readiness fixture installed a real packed package and
+advanced one canonical project from revision `2` to `6` through four unrelated
+environments: Codex Desktop, OpenClaw with Kimi, Antigravity with Gemini, and an
+Ollama-hosted GLM model. Each participant received no earlier conversation,
+explained the recovered state, completed one next action, recorded progress,
+and made its consumed handoff stale.
+
+At revision `6`, CLI JSON, the TypeScript SDK, NDJSON RPC, and MCP returned
+semantically equal continuation state. See the
+[procedure, normalized evidence, and browser report](https://github.com/zenithbuild/zentext/tree/main/tests/field-tests/trusted-memory-cross-tool).
+
 ## Developer Preview limitations
 
 - General-purpose write tools (`zentext add`, `zentext edit`) and MCP write tools are not in this preview. The Developer Preview exposes `zentext task create`, `zentext task show`, `zentext task update`, and `zentext handoff create` so a normal user can record and continue work without importing the store module directly.
-- The official M1 field test validates serial continuation across Codex CLI,
-  Gemini through Antigravity CLI, and Kimi through Ollama. Provider availability
-  remains external to Zentext and can still fail independently.
+- The official M1 proof and the newer trusted-memory release-readiness proof
+  validate serial continuation across unrelated tools. They do not prove
+  orchestration, concurrent-agent coordination, hidden-state transfer, or
+  universal provider availability.
 - Enterprise features (cloud, sync, auth, vector search) are out of scope for this release.
 
 ## Documentation

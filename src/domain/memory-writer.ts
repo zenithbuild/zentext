@@ -15,6 +15,7 @@ import type {
 } from "../types/records.js";
 import { ALLOWED_STATUSES, DEFAULT_STATUSES } from "../types/records.js";
 import { assertSafeExternalInput } from "../safety.js";
+import { StoreRevisionConflictError } from "../store/sqlite-store.js";
 import {
   parseCreateRecordInput,
   parseRecordPatch,
@@ -168,11 +169,19 @@ class MemoryWriterImpl implements MemoryWriter {
       return existing;
     }
 
-    return this.store.withTransaction(() => {
-      return this.store.updateRecord(updateInput, {
-        allowSecretOverride: options.allowSecretOverride,
+    try {
+      return this.store.withTransaction(() => {
+        return this.store.updateRecord(updateInput, {
+          allowSecretOverride: options.allowSecretOverride,
+          expectedRevision: options.expectedRevision ?? existing.revision,
+        });
       });
-    });
+    } catch (error) {
+      if (error instanceof StoreRevisionConflictError) {
+        throw new MemoryWriterConflictError(error.message, error.currentRevision);
+      }
+      throw error;
+    }
   }
 
   supersedeRecord(

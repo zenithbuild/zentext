@@ -21,6 +21,8 @@ export interface StoreMeta {
 
 export interface StoreWriteOptions {
   allowSecretOverride?: boolean;
+  /** Atomically reject the write unless the stored record is at this revision. */
+  expectedRevision?: number;
 }
 
 export interface Store {

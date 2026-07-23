@@ -274,4 +274,39 @@ describe("structured stdio RPC", () => {
     expect(stderr).toContain("INVALID_INPUT");
     expect(stdout).not.toContain("zentext rpc:");
   });
+
+  it("handles partial frames and binary-like input without corrupting stdout framing", async () => {
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const diagnostics = new PassThrough();
+    let stdout = "";
+    let stderr = "";
+    output.on("data", (chunk) => {
+      stdout += chunk.toString();
+    });
+    diagnostics.on("data", (chunk) => {
+      stderr += chunk.toString();
+    });
+
+    const framed = request("partial", "project.open", { cwd: tempProject });
+    const splitAt = Math.floor(framed.length / 2);
+    const running = runRpcServer(input, output, diagnostics);
+    input.write(framed.slice(0, splitAt));
+    input.write(framed.slice(splitAt));
+    input.write("\n");
+    input.write(Buffer.from([0xff, 0xfe, 0x0a]));
+    input.end();
+    await running;
+
+    const lines = stdout.trim().split("\n").map((line) => JSON.parse(line));
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toMatchObject({ id: "partial", ok: true });
+    expect(lines[1]).toMatchObject({
+      id: null,
+      ok: false,
+      error: { code: "INVALID_INPUT" },
+    });
+    expect(stderr).toContain("INVALID_INPUT");
+    expect(stdout).not.toContain("\u001b");
+  });
 });

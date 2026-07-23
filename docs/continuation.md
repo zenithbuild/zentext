@@ -1,6 +1,6 @@
 # Zentext continuation guide
 
-Last verified: 2026-07-22
+Last verified: 2026-07-23
 
 This document is the durable starting point for continuing Zentext from a new
 machine. It describes the implemented repository and published package, not the
@@ -225,8 +225,9 @@ Historical or regenerable artifacts:
 
 ## Current roadmap position
 
-M1 is implemented on PR #63. The active dependency-correct batch spans
-**M2: Validation and Trust Boundaries** and **M3: Integration Surface**:
+M1 was merged through PR #63. Draft PR #64 implements the dependency-correct
+batch spanning **M2: Validation and Trust Boundaries** and **M3: Integration
+Surface**:
 
 1. #27 — formal input schemas
 2. #28 — I/O sanitization
@@ -238,4 +239,12 @@ M1 is implemented on PR #63. The active dependency-correct batch spans
 8. #34 — structured stdio RPC
 
 Provider-formatting adapters in #35 remain a later presentation layer; the
-Codex proof calls the provider-neutral RPC interface directly.
+Codex, OpenClaw, Gemini, and Ollama proofs call the provider-neutral skill,
+SDK, or RPC interfaces directly. Their successful use does not complete #35.
+
+The authoritative packed-package release-readiness evidence is under
+`tests/field-tests/trusted-memory-cross-tool/`. One canonical fixture advanced
+from revision `2` to `6` across four unrelated environments. CLI JSON,
+TypeScript SDK, NDJSON RPC, and MCP returned semantically equal final state,
+and each of the four consumed handoffs was stale after its participant's
+write.

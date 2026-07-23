@@ -8,6 +8,7 @@ import {
 } from "../src/safety.js";
 import {
   CreateRecordInputSchema,
+  RecordProvenanceSchema,
   StructuredHandoffSchema,
   TaskUpdateInputSchema,
 } from "../src/schemas.js";
@@ -70,6 +71,17 @@ describe("formal schemas", () => {
         files_changed: [],
         verification: [],
         created_at: "not-a-timestamp",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("rejects incomplete or malformed provenance", () => {
+    expect(
+      RecordProvenanceSchema.safeParse({
+        source_environment: "codex",
+        captured_at: "not-a-timestamp",
+        project_id: "not-a-project-id",
+        task_revision: 0,
       }).success,
     ).toBe(false);
   });

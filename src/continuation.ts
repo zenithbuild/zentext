@@ -30,6 +30,7 @@ export interface ContinuationView {
     next_action: string | null;
   };
   handoff: {
+    record_id: string;
     previous_agent: string;
     created_at: string;
     based_on_task_revision: number;
@@ -80,7 +81,10 @@ export class ContinuationStaleError extends Error {
   }
 }
 
-function pickLatestHandoff(store: Store): StructuredHandoff {
+function pickLatestHandoff(store: Store): {
+  recordId: string;
+  handoff: StructuredHandoff;
+} {
   const latest = store
     .listRecords({ type: "handoff", status: "latest" })
     .filter((record) => !record.superseded_by)
@@ -97,7 +101,10 @@ function pickLatestHandoff(store: Store): StructuredHandoff {
   }
 
   try {
-    return recordToHandoff(latest);
+    return {
+      recordId: latest.id,
+      handoff: recordToHandoff(latest),
+    };
   } catch (error) {
     if (error instanceof HandoffValidationError) {
       throw new ContinuationInvalidError(`Invalid current handoff: ${error.message}`);
@@ -128,7 +135,8 @@ function taskNextAction(task: TaskRecord): string | null {
 }
 
 export function buildContinuationView(store: Store, meta: StoreMeta): ContinuationView {
-  const handoff = pickLatestHandoff(store);
+  const latest = pickLatestHandoff(store);
+  const handoff = latest.handoff;
   if (handoff.project_id !== meta.projectId) {
     throw new ContinuationInvalidError(
       "The current handoff belongs to a different project and cannot be continued.",
@@ -194,6 +202,7 @@ export function buildContinuationView(store: Store, meta: StoreMeta): Continuati
       next_action: taskNextAction(task),
     },
     handoff: {
+      record_id: latest.recordId,
       previous_agent: handoff.previous_agent,
       created_at: handoff.created_at,
       based_on_task_revision: handoff.active_task.revision,

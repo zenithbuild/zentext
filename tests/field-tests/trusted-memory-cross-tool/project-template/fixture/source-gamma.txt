@@ -1,0 +1,4 @@
+region=Gamma
+urban=19
+rural=12
+expected=31

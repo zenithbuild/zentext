@@ -39,6 +39,7 @@ import { assertSafeExternalInput, redactForOutput } from "./safety.js";
 import {
   SqliteStore,
   StoreNotFoundError,
+  StoreRevisionConflictError,
   StoreValidationError,
 } from "./store/sqlite-store.js";
 import { ZodError } from "zod";
@@ -137,6 +138,11 @@ function mapError(error: unknown): never {
   }
   if (error instanceof StoreValidationError) {
     throw new ZentextError("INVALID_INPUT", error.message);
+  }
+  if (error instanceof StoreRevisionConflictError) {
+    throw new ZentextError("REVISION_CONFLICT", error.message, {
+      current_revision: error.currentRevision,
+    });
   }
   if (error instanceof ContinuationStaleError) {
     throw new ZentextError("STALE_STATE", error.message, {

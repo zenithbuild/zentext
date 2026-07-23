@@ -91,6 +91,7 @@ describe("validated continuation view", () => {
       "Inspected source-a.txt",
       "Verified 17 + 11 = 28",
     ]);
+    expect(first.handoff.record_id).toMatch(/^rec_handoff_/);
     expect(first.handoff.accepted_decisions).toEqual([
       "Keep fixture labels ordered: Preserve source order in the final report.",
     ]);

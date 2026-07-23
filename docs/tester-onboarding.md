@@ -172,8 +172,11 @@ Try one of the following:
 - `npx zentext@next` installs a prerelease tagged `next`, not the stable `latest`.
 - General write commands (`zentext add`, `zentext edit`) are not in this preview.
 - MCP write tools are not in this preview.
-- The Codex packed helper proof is automated, but its fresh desktop UI field
-  result must be recorded separately and must not be inferred from unit tests.
+- The repository contains a normalized native Codex desktop result plus
+  OpenClaw, Gemini, and Ollama participants under
+  `tests/field-tests/trusted-memory-cross-tool/`. Provider availability and
+  behavior remain external dependencies; deterministic package tests must not
+  be presented as substitutes for those real executions.
 - Cloud, sync, auth, UI, and vector search are not in this preview.
 
 ## Reporting problems

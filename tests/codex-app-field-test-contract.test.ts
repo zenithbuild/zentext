@@ -41,6 +41,8 @@ describe("Codex app field-test contract", () => {
     expect(skill).toContain("validation.status: \"current\"");
     expect(skill).toContain("Do not repeat completed work");
     expect(skill).toContain("record-progress");
+    expect(skill).toContain("actual-tool-or-environment");
+    expect(skill).toContain("One continuation request must not silently become an unbounded work");
     expect(deterministicResult).toMatchObject({
       result: "passed",
       starting_revision: 2,

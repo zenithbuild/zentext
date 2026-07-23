@@ -38,24 +38,32 @@ After work, Codex records progress using the starting revision. A successful
 write advances the task and creates a new handoff; validation of the original
 handoff returns `current: false`.
 
-## Manual field test
+## Verified field test
 
-The reproducible fixture and evidence contract live in
-`tests/field-tests/codex-app-memory/`. The unavoidable UI steps are:
+The release-readiness fixture and normalized evidence live in
+`tests/field-tests/trusted-memory-cross-tool/`. The 2026-07-23 run used:
 
-1. open the generated isolated fixture folder in Codex;
-2. create a fresh task;
-3. submit the exact prompt above;
-4. preserve the sanitized tool calls and recovered-state explanation;
-5. verify the fixture change, ending revision, and stale result.
+1. a packed `zentext@0.1.0-dev.2` artifact installed into an isolated fixture;
+2. a fresh native Codex desktop task opened directly on that persistent fixture;
+3. the exact prompt above with no Tool A conversation;
+4. the project-local skill and packed NDJSON RPC helper;
+5. a single Alpha project change followed by `npm run verify`;
+6. one revision-safe progress write, a canonical re-read, and validation of the
+   consumed handoff as stale.
 
-The repository records the packed deterministic helper run and pending Codex
-UI result under `tests/field-tests/codex-app-memory/results/`. Passing the
-helper run is not presented as a native Codex pass.
+Codex Desktop `26.721.30844` with `gpt-5.6-sol` at `xhigh` recovered revision
+`2`, explained the complete recorded state before editing, completed only the
+Alpha action, advanced the task to revision `3`, and stopped before Beta. The
+exact revision-2 handoff then validated as `current: false`.
 
 Do not provide the new task with Tool A's conversation or private transcript.
 The repository, Zentext store, project-local skill, and prompt are the only
 allowed context.
+
+See the [cross-tool procedure](../../tests/field-tests/trusted-memory-cross-tool/README.md)
+and [normalized Codex evidence](../../tests/field-tests/trusted-memory-cross-tool/evidence/codex-desktop.md).
+The older `tests/field-tests/codex-app-memory/` helper proof remains useful
+deterministic evidence, but it is no longer the latest native-app result.
 
 ## Unsupported claims
 

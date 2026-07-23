@@ -50,6 +50,7 @@ describe("stable memory interface and SDK", () => {
     const start = await project.getContinuation();
     const prior = await project.getCurrentHandoff();
     expect(prior).not.toBeNull();
+    expect(start.handoff.record_id).toBe(prior!.record_id);
     expect(start.task.revision).toBe(1);
 
     const result = await project.recordProgress({
@@ -160,6 +161,92 @@ describe("stable memory interface and SDK", () => {
     expect(records).toHaveLength(1);
     expect(records[0].type).toBe("task");
     expect(records[0].title).toBe("Complete the portable report");
+    project.close();
+  });
+
+  it("allows exactly one concurrent or duplicate write for a shared revision", async () => {
+    const first = await openProject({ cwd: tempProject });
+    const second = await openProject({ cwd: tempProject });
+    const current = await first.getContinuation();
+    const input = {
+      task_id: current.task.id,
+      expected_revision: current.task.revision,
+      source_environment: "concurrency-test",
+      summary: "One compare-and-swap update may succeed.",
+    };
+
+    const outcomes = await Promise.allSettled([
+      first.updateTask(input),
+      second.updateTask(input),
+    ]);
+    expect(outcomes.filter((entry) => entry.status === "fulfilled")).toHaveLength(1);
+    const rejected = outcomes.find(
+      (entry): entry is PromiseRejectedResult => entry.status === "rejected",
+    );
+    expect(rejected?.reason).toMatchObject({ code: "REVISION_CONFLICT" });
+
+    first.close();
+    second.close();
+    const reopened = await openProject({ cwd: tempProject });
+    const task = await reopened.getActiveTask();
+    expect(task?.revision).toBe(current.task.revision + 1);
+    reopened.close();
+  });
+
+  it("leaves canonical state readable and unchanged after a rejected write", async () => {
+    const project = await openProject({ cwd: tempProject });
+    const before = await project.getContinuation();
+    const beforeRecords = await project.queryMemory({ query: "", limit: 100 });
+
+    await expect(
+      project.recordProgress({
+        task_id: before.task.id,
+        expected_revision: before.task.revision,
+        source_environment: "failure-test",
+        completed: ["This must not persist"],
+        changed_files: ["work/report.md"],
+        verification: [
+          {
+            check: "Rejected secret fixture",
+            result: "failed",
+            summary: "password=correct-horse-battery-staple",
+          },
+        ],
+        stopping_point: "The unsafe write must be rejected.",
+        next_action: "Confirm canonical state did not change.",
+      }),
+    ).rejects.toMatchObject({ code: "SECRET_DETECTED" });
+
+    const after = await project.getContinuation();
+    const afterRecords = await project.queryMemory({ query: "", limit: 100 });
+    expect(after).toEqual(before);
+    expect(afterRecords).toEqual(beforeRecords);
+    project.close();
+  });
+
+  it("requires an explicit secret override and redacts every returned view", async () => {
+    const project = await openProject({ cwd: tempProject });
+    const before = await project.getContinuation();
+    const syntheticSecret = "api_key=synthetic-release-readiness-value";
+
+    const updated = await project.updateTask({
+      task_id: before.task.id,
+      expected_revision: before.task.revision,
+      source_environment: "override-test",
+      notes: [syntheticSecret],
+      allow_secret_override: true,
+    });
+    expect(updated.notes).toEqual(["[REDACTED]"]);
+    expect(updated.provenance?.secret_override_used).toBe(true);
+
+    const active = await project.getActiveTask();
+    const queried = await project.queryMemory({
+      query: "synthetic-release-readiness",
+      type: "task",
+      limit: 10,
+    });
+    expect(JSON.stringify(active)).not.toContain(syntheticSecret);
+    expect(JSON.stringify(queried)).not.toContain(syntheticSecret);
     project.close();
   });
 });

@@ -57,6 +57,16 @@ export class StoreNotFoundError extends Error {
   }
 }
 
+export class StoreRevisionConflictError extends Error {
+  constructor(
+    message: string,
+    public readonly currentRevision: number,
+  ) {
+    super(message);
+    this.name = "StoreRevisionConflictError";
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -280,8 +290,8 @@ export class SqliteStore implements Store {
 
     // Open or create the database
     this.db = openDatabase(dbPath);
-    this.db.pragma("journal_mode = WAL");
     this.db.pragma("busy_timeout = 5000");
+    this.db.pragma("journal_mode = WAL");
 
     // Run migrations
     runMigrations(this.db);
@@ -322,8 +332,8 @@ export class SqliteStore implements Store {
     }
 
     this.db = openDatabase(dbPath);
-    this.db.pragma("journal_mode = WAL");
     this.db.pragma("busy_timeout = 5000");
+    this.db.pragma("journal_mode = WAL");
 
     // Run any pending migrations
     runMigrations(this.db);
@@ -360,8 +370,8 @@ export class SqliteStore implements Store {
     }
 
     this.db = openDatabase(dbPath);
-    this.db.pragma("journal_mode = WAL");
     this.db.pragma("busy_timeout = 5000");
+    this.db.pragma("journal_mode = WAL");
 
     runMigrations(this.db);
 
@@ -721,6 +731,7 @@ export class SqliteStore implements Store {
       payload_json: JSON.stringify(updatedPayload),
     };
 
+    const expectedRevision = options.expectedRevision ?? existing.revision;
     const updateSql = this.db!.prepare(`
       UPDATE records SET
         title = @title,
@@ -734,7 +745,7 @@ export class SqliteStore implements Store {
         supersedes_json = @supersedes_json,
         superseded_by = @superseded_by,
         payload_json = @payload_json
-      WHERE id = ?
+      WHERE id = ? AND revision = ?
     `);
 
     const insertHistory = this.db!.prepare(`
@@ -759,7 +770,18 @@ export class SqliteStore implements Store {
     } as AnyRecord;
 
     const tx = this.db!.transaction(() => {
-      updateSql.run(updateRow, input.id);
+      const updateResult = updateSql.run(
+        updateRow,
+        input.id,
+        expectedRevision,
+      );
+      if (updateResult.changes !== 1) {
+        const current = this.getRecord(input.id);
+        throw new StoreRevisionConflictError(
+          `Expected revision ${expectedRevision}, but current revision is ${current?.revision ?? existing.revision}.`,
+          current?.revision ?? existing.revision,
+        );
+      }
       insertHistory.run(input.id, newRevision, "update", now, author, JSON.stringify(updatedRecord));
     });
     tx();
