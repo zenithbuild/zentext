@@ -23,6 +23,7 @@ const home = join(workspace, "home");
 const npmCache = join(workspace, "npm-cache");
 const checkpointsDir = join(demoDir, "checkpoints");
 const transcriptPath = join(demoDir, "transcript.txt");
+const present = !process.argv.includes("--quiet");
 
 const checkpointFiles = {
   init: "01-initialization.txt",
@@ -57,6 +58,9 @@ function record(lines, checkpoint) {
   transcript.push(normalized, "");
   if (checkpoint) {
     checkpoints[checkpoint].push(normalized, "");
+    if (present) {
+      process.stdout.write(`${normalized}\n\n`);
+    }
   }
 }
 
@@ -307,8 +311,8 @@ rmSync(workspace, { recursive: true, force: true });
 process.stdout.write(
   [
     "Portable continuation demo passed.",
-    `Transcript: ${transcriptPath}`,
-    `Screenshot checkpoints: ${checkpointsDir}`,
+    `Transcript: ${sanitize(transcriptPath)}`,
+    `Screenshot checkpoints: ${sanitize(checkpointsDir)}`,
     "",
   ].join("\n"),
 );

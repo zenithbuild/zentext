@@ -25,8 +25,8 @@ Recovered state explained before changing anything.
 Continued from the exact next action: implemented body='ok'.
 Repeated Tool A's completed work: no.
 
-✔ health route returns status 200 (0.719125ms)
-✔ health route returns the required body (0.061167ms)
+✔ health route returns status 200 (0.921709ms)
+✔ health route returns the required body (0.079625ms)
 ℹ tests 2
 ℹ suites 0
 ℹ pass 2
@@ -34,7 +34,7 @@ Repeated Tool A's completed work: no.
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 93.476584
+ℹ duration_ms 92.289666
 
 Progress update written for Zentext.
 [exit 0]

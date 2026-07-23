@@ -32,7 +32,7 @@ $ zentext handoff export --format prompt
 - Project: zentext-portable-demo
 - Project ID: `c85ef34c5e8fc297`
 - Task: Complete the portable health route
-- Task ID: `rec_task_01KY7WQCHY6QM1G37V70XZW0N2`
+- Task ID: `rec_task_01KY7Z1FYSQ90DWBRK71SJ2MHM`
 - Goal: Return status 200 and the exact required response body.
 - Status: active
 - Task revision: 2

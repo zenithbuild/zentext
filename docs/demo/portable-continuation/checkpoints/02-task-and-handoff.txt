@@ -1,7 +1,7 @@
 === 2. TOOL A CREATES THE TASK AND WORKS ===
 
 $ zentext task create --title 'Complete the portable health route' --goal 'Return status 200 and the exact required response body.'
-Created task rec_task_01KY7WQCHY6QM1G37V70XZW0N2
+Created task rec_task_01KY7Z1FYSQ90DWBRK71SJ2MHM
 Title: Complete the portable health route
 Status: active
 [exit 0]
@@ -10,10 +10,10 @@ $ zentext handoff create --from tool-a --completed 'Added the health-route skele
 Handoff: zentext-portable-demo
 Project ID: c85ef34c5e8fc297
 Previous agent: tool-a
-Created: 2026-07-23T16:25:19.626Z
+Created: 2026-07-23T17:05:47.952Z
 
 Active task: Complete the portable health route
-  Task ID:      rec_task_01KY7WQCHY6QM1G37V70XZW0N2
+  Task ID:      rec_task_01KY7Z1FYSQ90DWBRK71SJ2MHM
   Task revision: 2
   Task status:   active
 
@@ -34,5 +34,5 @@ Verification:
   - node --check src/health-route.mjs passed.
   - node --test passed the status-code test.
 
-Stored handoff record: rec_handoff_01KY7WQD0BXHYEGRDSSMQC0TXQ
+Stored handoff record: rec_handoff_01KY7Z1GDHVGTTW9J32BK1V3QM
 [exit 0]

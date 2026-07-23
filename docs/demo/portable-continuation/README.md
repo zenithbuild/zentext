@@ -36,6 +36,10 @@ npm run build
 node docs/demo/portable-continuation/run-demo.mjs
 ```
 
+The six presentation checkpoints play in the terminal as the real commands
+complete. Use `--quiet` when only the final pass/fail summary is needed in
+automation.
+
 The script:
 
 1. packs `zentext@0.1.0-dev.2` into a temporary directory;
@@ -57,6 +61,7 @@ screenshot checkpoints remain.
 
 - [Full transcript](./transcript.txt)
 - [Screenshot checkpoints](./checkpoints/)
+- [45–60 second recording plan](./recording-plan.md)
 
 Command text is derived from the actual process invocation, and output is
 captured directly from stdout/stderr. The automatic sanitizer replaces only the

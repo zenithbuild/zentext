@@ -1,16 +1,16 @@
 # Zentext
 
-> **AI sessions are temporary. Project memory should not be.**
+> **AI sessions end. Your project memory shouldn't.**
 
-Zentext is a local-first persistent project memory layer for AI coding agents.
-It stores tasks, handoffs, decisions, blockers, validations, revisions, and
-policies outside any individual AI session, so project state survives when you
-close one tool and continue in another.
+Zentext keeps work from disappearing when an AI coding session ends. It stores
+what was done, where work stopped, and exactly what comes next outside any one
+tool—so a fresh tool can recover validated project context instead of making
+you explain everything again.
 
-SQLite structured records are canonical. CLI output, JSON, Markdown, portable
-prompts, and the optional read-only MCP server are views over the same validated
-state. Zentext does not transfer hidden model state or depend on conversation
-history.
+Project memory stays local and structured in SQLite. CLI output, JSON, Markdown,
+portable prompts, and the optional read-only MCP server are views over that same
+canonical state. Zentext does not transfer hidden model state or depend on
+conversation history.
 
 ## Why Structured Project Memory
 
@@ -87,11 +87,11 @@ zentext handoff validate
 
 ## Portable continuation demo
 
-**Sessions are temporary. Project memory is not.** This demo installs the packed
-npm package, lets Tool A record structured work and exit, then starts a fresh
-Tool B with only a portable Zentext continuation and the project files. Tool B
-recovers the state, continues from the exact next action, and advances the
-canonical task revision. Zentext then rejects the original handoff as stale.
+**AI sessions end. Your project memory shouldn't.** This demo installs the
+packed npm package, lets Tool A record structured work and exit, then starts a
+fresh Tool B with only a portable Zentext continuation and the project files.
+Tool B recovers the state, continues from the exact next action, and advances
+the canonical task revision. Zentext then rejects the original handoff as stale.
 
 See the [complete executable demo](./docs/demo/portable-continuation/README.md),
 the [exact validated-continuation checkpoint](./docs/demo/portable-continuation/checkpoints/03-validated-continuation.txt),

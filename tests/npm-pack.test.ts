@@ -129,6 +129,7 @@ describe("npm package validation", () => {
       "package/docs/demo/portable-continuation/run-demo.mjs",
       "package/docs/demo/portable-continuation/tool-a.mjs",
       "package/docs/demo/portable-continuation/fresh-tool.mjs",
+      "package/docs/demo/portable-continuation/recording-plan.md",
       "package/docs/demo/portable-continuation/transcript.txt",
       "package/docs/demo/portable-continuation/checkpoints/01-initialization.txt",
       "package/docs/demo/portable-continuation/checkpoints/02-task-and-handoff.txt",
