@@ -129,6 +129,7 @@ describe("npm package validation", () => {
       "package/docs/sdk.md",
       "package/docs/rpc.md",
       "package/docs/safety.md",
+      "package/docs/environment-formatters.md",
       "package/docs/integrations/codex-app.md",
       "package/docs/demo/portable-continuation/README.md",
       "package/docs/demo/portable-continuation/run-demo.mjs",
@@ -346,6 +347,31 @@ console.log(JSON.stringify({
     expect(runInstalled(["continue", "--prompt"], { cwd: project, home })).toContain(
       "external project memory",
     );
+    for (const environment of [
+      "generic",
+      "codex",
+      "claude-code",
+      "ollama-host",
+    ]) {
+      const adapted = runInstalled(["continue", "--for", environment], {
+        cwd: project,
+        home,
+      });
+      expect(adapted).toContain(
+        `Formatter: zentext.environment/${environment}@1.0`,
+      );
+      expect(adapted).toContain(`"record_id":`);
+      expect(adapted).toContain(`"next_action": "Compare build outputs."`);
+    }
+    expect(
+      runInstalled(["continue", "--for", "claude"], { cwd: project, home }),
+    ).toContain("zentext.environment/claude-code@1.0");
+    expect(
+      runInstalled(["continue", "--for", "ollama"], { cwd: project, home }),
+    ).toContain("zentext.environment/ollama-host@1.0");
+    expect(
+      JSON.parse(runInstalled(["continue", "--json"], { cwd: project, home })),
+    ).toEqual(continuationJson);
     const exportJson = JSON.parse(
       runInstalled(["handoff", "export", "--format", "json"], { cwd: project, home }),
     );
@@ -542,6 +568,23 @@ console.log(JSON.stringify({
     expect(runInstalled(["continue", "--markdown"])).toContain("# Zentext continuation");
     expect(runInstalled(["continue", "--prompt"])).toContain(
       "Tool-neutral Zentext continuation instruction",
+    );
+    expect(runInstalled(["continue", "--for", "generic"])).toContain(
+      "zentext.environment/generic@1.0",
+    );
+    expect(runInstalled(["continue", "--for", "codex", "--compact"])).toContain(
+      "zentext.environment/codex@1.0",
+    );
+    expect(
+      runInstalled([
+        "continue",
+        "--for",
+        "claude-code",
+        "--include-instructions",
+      ]),
+    ).toContain("Tool-neutral continuation contract");
+    expect(runInstalled(["continue", "--for", "ollama-host"])).toContain(
+      "zentext.environment/ollama-host@1.0",
     );
     expect(
       JSON.parse(runInstalled(["handoff", "export", "--format", "json"])).validation.status,

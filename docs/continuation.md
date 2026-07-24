@@ -109,8 +109,8 @@ The Developer Preview exposes:
 - tasks: `task create`, `task show`, `task update`
 - handoffs: `handoff create`, `handoff show`, `handoff validate`,
   `handoff acknowledge`, `handoff export`
-- validated continuation: `continue` with human, JSON, Markdown, and canonical
-  tool-neutral prompt output
+- validated continuation: `continue` with human, JSON, Markdown, canonical
+  tool-neutral prompt output, and versioned environment presentation wrappers
 - machine integration: `rpc` with typed NDJSON requests and responses
 
 Task and handoff mutations flow through the transactional writer. General
@@ -225,9 +225,9 @@ Historical or regenerable artifacts:
 
 ## Current roadmap position
 
-M1 was merged through PR #63. Draft PR #64 implements the dependency-correct
-batch spanning **M2: Validation and Trust Boundaries** and **M3: Integration
-Surface**:
+M1 was merged through PR #63. The dependency-correct trusted-memory batch
+spanning **M2: Validation and Trust Boundaries** and **M3: Integration
+Surface** merged through PR #64:
 
 1. #27 — formal input schemas
 2. #28 — I/O sanitization
@@ -238,9 +238,15 @@ Surface**:
 7. #33 — machine-readable TypeScript SDK
 8. #34 — structured stdio RPC
 
-Provider-formatting adapters in #35 remain a later presentation layer; the
-Codex, OpenClaw, Gemini, and Ollama proofs call the provider-neutral skill,
-SDK, or RPC interfaces directly. Their successful use does not complete #35.
+Issue #35 adds a thin versioned presentation layer over the same
+`ContinuationView`. Canonical formatter identifiers are `generic`, `codex`,
+`claude-code`, and `ollama-host`; `claude` and `ollama` remain aliases. The
+wrappers preserve a complete redacted canonical payload and create no
+environment-specific memory or write path.
+
+OpenClaw and Antigravity/Gemini are not formatter identifiers in #35. Their
+earlier proof used the provider-neutral skill or RPC interfaces directly.
+After #35, the next implementation dependency is #36 project-memory search.
 
 The authoritative packed-package release-readiness evidence is under
 `tests/field-tests/trusted-memory-cross-tool/`. One canonical fixture advanced

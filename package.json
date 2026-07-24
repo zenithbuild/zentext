@@ -52,6 +52,7 @@
     "docs/sdk.md",
     "docs/rpc.md",
     "docs/safety.md",
+    "docs/environment-formatters.md",
     "docs/integrations/codex-app.md",
     "docs/demo/portable-continuation",
     "LICENSE",
