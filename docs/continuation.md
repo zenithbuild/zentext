@@ -23,16 +23,17 @@ repacked context that Zentext explicitly persists or exports.
 - Package: public, unscoped npm package `zentext`
 - Canonical published Developer Preview: `0.1.0-dev.2`
 - npm dist-tags: both `latest` and `next` resolve to `0.1.0-dev.2`
-- Repository package version on the Developer Preview branch: `0.1.0-dev.2`
+- Repository release-candidate version: `0.1.0-dev.3` (not yet published)
 - License: MIT
 - Binaries: `zentext` and `zentext-mcp`
 - Publish configuration: npm tag `next`
 
-The published versions are `0.1.0-dev.0`, `0.1.0-dev.1`, and
-`0.1.0-dev.2`. The first two are historical previews; new validation and
-continuation work must use `0.1.0-dev.2` or a later version. The original
-pre-publish reports remain useful point-in-time evidence, but their readiness
-language is not the current registry status.
+The published versions remain `0.1.0-dev.0`, `0.1.0-dev.1`, and
+`0.1.0-dev.2`. The first two are historical previews. Version
+`0.1.0-dev.3` is a release candidate until the release PR is merged, its exact
+validated tarball is published, and the registry-installed smoke test passes.
+The original pre-publish reports remain useful point-in-time evidence, but
+their readiness language is not the current registry status.
 
 Verify registry state without changing it:
 
@@ -238,6 +239,11 @@ Surface** merged through PR #64:
 7. #33 — machine-readable TypeScript SDK
 8. #34 — structured stdio RPC
 
+All eight trusted-memory issues are closed. Release `0.1.0-dev.3` is merged,
+tagged, and available as a GitHub prerelease; npm publication remains blocked
+on the required interactive OTP, so npm `next` and `latest` still resolve to
+`0.1.0-dev.2`.
+
 Issue #35 adds a thin versioned presentation layer over the same
 `ContinuationView`. Canonical formatter identifiers are `generic`, `codex`,
 `claude-code`, and `ollama-host`; `claude` and `ollama` remain aliases. The
@@ -254,3 +260,6 @@ from revision `2` to `6` across four unrelated environments. CLI JSON,
 TypeScript SDK, NDJSON RPC, and MCP returned semantically equal final state,
 and each of the four consumed handoffs was stale after its participant's
 write.
+
+Deterministic Node 22 and Node 24 validation is enforced by
+`.github/workflows/ci.yml`. See [the CI and manual release gates](./ci.md).

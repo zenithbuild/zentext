@@ -3,7 +3,7 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { isAbsolute, join, resolve } from "node:path";
+import { basename, isAbsolute, join, resolve } from "node:path";
 
 const tarballArgument = process.argv[2];
 if (!tarballArgument) {
@@ -189,7 +189,7 @@ try {
   const results = [runMode("normal", false), runMode("fallback", true)];
   process.stdout.write(
     `${JSON.stringify(
-      { node: process.version, tarball: "zentext-0.1.0-dev.2.tgz", results },
+      { node: process.version, tarball: basename(tarball), results },
       null,
       2,
     )}\n`,

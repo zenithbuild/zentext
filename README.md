@@ -190,6 +190,8 @@ semantically equal continuation state. See the
   deterministic presentation adapters and their honest integration boundary
 - [docs/ci.md](./docs/ci.md) — deterministic GitHub CI coverage and manual
   release gates
+- [docs/releases/0.1.0-dev.3.md](./docs/releases/0.1.0-dev.3.md) — current
+  Developer Preview release-candidate notes and limitations
 
 ## Troubleshooting
 
