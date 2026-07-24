@@ -23,15 +23,17 @@ repacked context that Zentext explicitly persists or exports.
 - Package: public, unscoped npm package `zentext`
 - Canonical published Developer Preview: `0.1.0-dev.2`
 - npm dist-tags: both `latest` and `next` resolve to `0.1.0-dev.2`
-- Repository release-candidate version: `0.1.0-dev.3` (not yet published)
+- Merged and tagged repository version: `0.1.0-dev.3` (npm publication
+  awaiting the required interactive OTP)
 - License: MIT
 - Binaries: `zentext` and `zentext-mcp`
 - Publish configuration: npm tag `next`
 
 The published versions remain `0.1.0-dev.0`, `0.1.0-dev.1`, and
 `0.1.0-dev.2`. The first two are historical previews. Version
-`0.1.0-dev.3` is a release candidate until the release PR is merged, its exact
-validated tarball is published, and the registry-installed smoke test passes.
+`0.1.0-dev.3` is merged, tagged, and available as a GitHub prerelease. It does
+not become the published Developer Preview until the exact validated tarball is
+published and the registry-installed smoke test passes.
 The original pre-publish reports remain useful point-in-time evidence, but
 their readiness language is not the current registry status.
 
@@ -200,6 +202,10 @@ The detailed reasoning is retained in `docs/decision-records/`,
 `docs/open-decisions.md`, and `docs/implementation/`. Those files may describe
 the stage when a decision was proposed; this guide records the current result.
 
+The versioned [Zentext memory contract](./spec/README.md) documents record,
+continuation, revision, safety, interface, formatter, and portability behavior.
+The implementation and executable tests remain its conformance oracle.
+
 ## Sources of truth and artifact ownership
 
 Canonical repository artifacts:
@@ -244,7 +250,7 @@ tagged, and available as a GitHub prerelease; npm publication remains blocked
 on the required interactive OTP, so npm `next` and `latest` still resolve to
 `0.1.0-dev.2`.
 
-Issue #35 adds a thin versioned presentation layer over the same
+PR #66 closes issue #35 with a thin versioned presentation layer over the same
 `ContinuationView`. Canonical formatter identifiers are `generic`, `codex`,
 `claude-code`, and `ollama-host`; `claude` and `ollama` remain aliases. The
 wrappers preserve a complete redacted canonical payload and create no

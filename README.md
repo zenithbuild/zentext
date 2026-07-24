@@ -184,6 +184,10 @@ semantically equal continuation state. See the
 - [docs/rpc.md](./docs/rpc.md) — versioned structured stdio protocol
 - [docs/safety.md](./docs/safety.md) — schemas, sanitization, secret detection,
   explicit overrides, and output redaction
+- [docs/product-principles.md](./docs/product-principles.md) — user ownership,
+  portability, optional cloud, deletion, and anti-lock-in boundaries
+- [docs/spec/README.md](./docs/spec/README.md) — versioned Zentext memory
+  contract and conformance boundary
 - [docs/integrations/codex-app.md](./docs/integrations/codex-app.md) —
   project-local Codex skill and acceptance procedure
 - [docs/environment-formatters.md](./docs/environment-formatters.md) — thin,
