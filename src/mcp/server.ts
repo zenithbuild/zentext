@@ -10,6 +10,11 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { redactForOutput } from "../safety.js";
 import { SqliteMemoryStore } from "../memory-interface.js";
 import { ZentextError } from "../errors.js";
+import {
+  MEMORY_SEARCH_MAX_LIMIT,
+  MEMORY_SEARCH_MAX_OFFSET,
+  MEMORY_SEARCH_MAX_QUERY_LENGTH,
+} from "../memory-search.js";
 
 // ---------------------------------------------------------------------------
 // Input schemas
@@ -65,6 +70,21 @@ const QueryInput = z.object({
   status: z.string().optional(),
   limit: z.number().int().positive().optional(),
 }).superRefine(refineStatus);
+
+const SearchInput = z
+  .object({
+    project_id: projectIdSchema,
+    query: z.string().max(MEMORY_SEARCH_MAX_QUERY_LENGTH),
+    record_types: z.array(RecordTypeSchema).max(RECORD_TYPES.length).optional(),
+    statuses: z.array(z.string().min(1).max(64)).max(32).optional(),
+    task_id: recordIdSchema.optional(),
+    min_revision: z.number().int().positive().optional(),
+    max_revision: z.number().int().positive().optional(),
+    include_superseded: z.boolean().optional(),
+    limit: z.number().int().positive().max(MEMORY_SEARCH_MAX_LIMIT).optional(),
+    offset: z.number().int().nonnegative().max(MEMORY_SEARCH_MAX_OFFSET).optional(),
+  })
+  .strict();
 
 const RepackInput = z.object({
   project_id: projectIdSchema,
@@ -216,6 +236,38 @@ export async function memoryQuery(args: z.infer<typeof QueryInput>): Promise<Cal
   }
 }
 
+export async function memorySearch(
+  args: z.infer<typeof SearchInput>,
+): Promise<CallToolResult> {
+  let memory: SqliteMemoryStore | undefined;
+  try {
+    memory = await SqliteMemoryStore.openById(args.project_id);
+    return toolSuccess(
+      await memory.searchMemory({
+        query: args.query,
+        ...(args.record_types ? { record_types: args.record_types as RecordType[] } : {}),
+        ...(args.statuses ? { statuses: args.statuses } : {}),
+        ...(args.task_id ? { task_id: args.task_id } : {}),
+        ...(args.min_revision !== undefined
+          ? { min_revision: args.min_revision }
+          : {}),
+        ...(args.max_revision !== undefined
+          ? { max_revision: args.max_revision }
+          : {}),
+        ...(args.include_superseded !== undefined
+          ? { include_superseded: args.include_superseded }
+          : {}),
+        ...(args.limit !== undefined ? { limit: args.limit } : {}),
+        ...(args.offset !== undefined ? { offset: args.offset } : {}),
+      }),
+    );
+  } catch (err) {
+    return mapToolError(err);
+  } finally {
+    memory?.close();
+  }
+}
+
 export async function memoryRepack(args: z.infer<typeof RepackInput>): Promise<CallToolResult> {
   let store: SqliteStore | undefined;
   try {
@@ -309,6 +361,20 @@ export function createMcpServer(): McpServer {
       annotations: readOnly,
     },
     memoryQuery,
+  );
+
+  server.registerTool(
+    "memory.search",
+    {
+      title: "Search canonical Zentext project memory",
+      description:
+        "Bounded deterministic lexical search across redacted canonical tasks, handoffs, " +
+        "decisions, blockers, validations, notes, referenced files, and provenance. " +
+        "Returns match metadata and stable offset pagination without mutating memory.",
+      inputSchema: SearchInput,
+      annotations: readOnly,
+    },
+    memorySearch,
   );
 
   server.registerTool(

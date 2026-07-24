@@ -16,6 +16,21 @@ zentext list [--type <type>] [--status <status>] [--limit <number>]
 
 `init` is idempotent. `status`, `show`, and `list` are read-only.
 
+## Project-memory search
+
+```sh
+zentext search "CSS determinism"
+zentext search "CSS determinism" --json
+zentext search "CSS determinism" --type task --status active
+zentext search "CSS determinism" --limit 20 --offset 20
+zentext search "CSS determinism" --include-superseded
+```
+
+Search is a bounded deterministic lexical read over redacted canonical
+records. JSON output is one machine-clean `MemorySearchPage`; human output
+shows the same records and match reasons. See
+[`memory-search.md`](./memory-search.md).
+
 ## Task workflow
 
 ```sh
@@ -114,11 +129,12 @@ zentext rpc
 JSON only to standard output. Diagnostics go to standard error. It exposes the
 same validated memory interface as the TypeScript SDK, including continuation
 reads, progress recording, task updates, handoff validation, capability
-discovery, and deterministic queries. See [`rpc.md`](./rpc.md).
+discovery, compatibility queries, and canonical deterministic search. See
+[`rpc.md`](./rpc.md).
 
 ## Current boundaries
 
 The Developer Preview does not implement general `add`, `edit`, or `audit`
-commands, MCP mutations, provider-specific continuation adapters, cloud sync,
-authentication, orchestration, or hidden model-state transfer. Zentext carries
-explicit external project records only.
+commands, MCP mutations, cloud sync, authentication, orchestration, semantic
+retrieval, or hidden model-state transfer. Environment adapters are
+presentation-only. Zentext carries explicit external project records only.

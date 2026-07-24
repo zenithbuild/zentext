@@ -129,6 +129,7 @@ describe("npm package validation", () => {
       "package/docs/sdk.md",
       "package/docs/rpc.md",
       "package/docs/safety.md",
+      "package/docs/memory-search.md",
       "package/docs/product-principles.md",
       "package/docs/spec/README.md",
       "package/docs/spec/zentext-memory-contract/1.0/README.md",
@@ -136,6 +137,8 @@ describe("npm package validation", () => {
       "package/docs/spec/zentext-memory-contract/1.0/continuation-and-revisions.md",
       "package/docs/spec/zentext-memory-contract/1.0/interfaces.md",
       "package/docs/spec/zentext-memory-contract/1.0/formatters-and-portability.md",
+      "package/docs/spec/zentext-memory-contract/1.1/README.md",
+      "package/docs/spec/zentext-memory-contract/1.1/deterministic-search.md",
       "package/docs/environment-formatters.md",
       "package/docs/ci.md",
       "package/docs/integrations/codex-app.md",
@@ -197,7 +200,7 @@ await client.close();
       timeout: 30_000,
     });
     expect(out.trim()).toBe(
-      "memory.continuation,memory.list,memory.query,memory.read,memory.repack",
+      "memory.continuation,memory.list,memory.query,memory.read,memory.repack,memory.search",
     );
   });
 
@@ -228,6 +231,16 @@ await client.close();
       ],
       { cwd: project, home },
     );
+    const cliSearch = JSON.parse(
+      runInstalled(["search", "SDK RPC task", "--json"], {
+        cwd: project,
+        home,
+      }),
+    );
+    expect(cliSearch.results).toHaveLength(2);
+    expect(cliSearch.results.some((result: { title: string }) => result.title === "SDK RPC task")).toBe(
+      true,
+    );
     const script = join(installDir, "sdk-rpc-smoke.mjs");
     const bin = join(installDir, "node_modules", "zentext", "dist", "cli", "cli.js");
     writeFileSync(
@@ -239,24 +252,33 @@ import { openProject } from "zentext";
 const cwd = ${JSON.stringify(project)};
 const opened = await openProject({ cwd });
 const sdk = await opened.getContinuation();
+const sdkSearch = await opened.searchMemory({ query: "SDK RPC task" });
 const projectId = opened.meta.projectId;
 opened.close();
-const request = {
+const continuationRequest = {
   protocol_version: "1.0",
   id: "packed-rpc",
   method: "continuation.get",
   params: { cwd, project_id: projectId }
 };
+const searchRequest = {
+  protocol_version: "1.0",
+  id: "packed-search",
+  method: "memory.search",
+  params: { cwd, project_id: projectId, input: { query: "SDK RPC task" } }
+};
 const rpcRun = spawnSync(process.execPath, [${JSON.stringify(bin)}, "rpc"], {
   cwd,
   env: process.env,
-  input: JSON.stringify(request) + "\\n",
+  input: JSON.stringify(continuationRequest) + "\\n" + JSON.stringify(searchRequest) + "\\n",
   encoding: "utf8"
 });
 if (rpcRun.status !== 0) throw new Error(rpcRun.stderr);
-const rpc = JSON.parse(rpcRun.stdout.trim());
+const [rpc, rpcSearch] = rpcRun.stdout.trim().split("\\n").map(JSON.parse);
 console.log(JSON.stringify({
   same: JSON.stringify(sdk) === JSON.stringify(rpc.result),
+  searchSame: JSON.stringify(sdkSearch) === JSON.stringify(rpcSearch.result),
+  searchCount: sdkSearch.results.length,
   status: sdk.validation.status,
   stdoutLines: rpcRun.stdout.trim().split("\\n").length
 }));
@@ -272,8 +294,10 @@ console.log(JSON.stringify({
     });
     expect(JSON.parse(output)).toEqual({
       same: true,
+      searchSame: true,
+      searchCount: 2,
       status: "current",
-      stdoutLines: 1,
+      stdoutLines: 2,
     });
     rmSync(project, { recursive: true, force: true });
     rmSync(home, { recursive: true, force: true });
@@ -551,6 +575,17 @@ console.log(JSON.stringify({
     expect(taskOut).toContain("Created task");
     expect(taskOut).toContain("Status: active");
     expect(runInstalled(["task", "show"])).toContain("Investigate CSS determinism");
+    const searchOut = JSON.parse(
+      runInstalled([
+        "search",
+        "CSS determinism",
+        "--type",
+        "task",
+        "--json",
+      ]),
+    );
+    expect(searchOut.results).toHaveLength(1);
+    expect(searchOut.results[0].title).toBe("Investigate CSS determinism");
 
     const handoffOut = runInstalled([
       "handoff", "create",

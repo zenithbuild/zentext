@@ -46,6 +46,12 @@ import {
 import type { FlagValue } from "./args.js";
 import { validateHandoffQuality } from "../handoff-quality.js";
 import { redactForOutput } from "../safety.js";
+import { openMemoryStore } from "../memory-interface.js";
+import {
+  renderMemorySearch,
+  type MemorySearchInput,
+} from "../memory-search.js";
+import { ZentextError } from "../errors.js";
 
 export class CliError extends Error {
   constructor(
@@ -345,6 +351,35 @@ export async function list(
     return { output: formatList(rows), exitCode: 0 };
   } finally {
     store.close();
+  }
+}
+
+export async function search(
+  cwd: string,
+  options: MemorySearchInput & { json?: boolean },
+): Promise<{ output: string; exitCode: number }> {
+  let memory: Awaited<ReturnType<typeof openMemoryStore>> | undefined;
+  try {
+    memory = await openMemoryStore({ cwd });
+    const { json = false, ...input } = options;
+    const page = await memory.searchMemory(input);
+    return {
+      output: json ? JSON.stringify(page, null, 2) : renderMemorySearch(page),
+      exitCode: 0,
+    };
+  } catch (error) {
+    if (error instanceof ZentextError) {
+      const exitCode =
+        error.code === "PROJECT_NOT_FOUND"
+          ? 2
+          : ["INVALID_INPUT", "UNSAFE_INPUT", "SECRET_DETECTED"].includes(error.code)
+            ? 1
+            : 5;
+      throw new CliError(error.message, exitCode);
+    }
+    throw error;
+  } finally {
+    memory?.close();
   }
 }
 
@@ -765,6 +800,7 @@ Usage:
   zentext task {create|show|update}
   zentext show <id>
   zentext list [--type <type>] [--status <status>] [--limit <n>]
+  zentext search <query> [--type <type>] [--status <status>] [--limit <n>] [--offset <n>] [--json]
   zentext repack [--focus <text>] [--max-size <chars>] [--out <path>]
 
 Commands:
@@ -775,6 +811,7 @@ Commands:
   task    Create, show, or update the current task
   show    Display a single record by id
   list    List records, optionally filtered
+  search  Search redacted canonical project memory deterministically
   repack   Generate a focused context payload from project memory
   handoff  Structured handoff commands
 
@@ -808,6 +845,9 @@ Options:
   --type     Filter by record type (task, decision, blocker, ...)
   --status   Filter by record status
   --limit    Limit the number of records shown
+  --offset   Skip deterministic search results before returning a page
+  --task-id  Restrict search to records related to one canonical task
+  --include-superseded Include superseded records in search
   --focus    Prioritize records matching this topic
   --max-size Character budget for the output (default 12000)
   --out      Write the payload to a file instead of stdout

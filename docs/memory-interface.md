@@ -5,7 +5,7 @@ memory interface is the provider-neutral domain boundary between canonical
 SQLite records and consumers such as the CLI, TypeScript SDK, stdio RPC, MCP,
 and project-local Codex skill.
 
-Interface version: `1.0`
+Interface version: `1.1`
 Record schema version: `1`
 
 ## Contract
@@ -18,6 +18,7 @@ interface MemoryStore {
   validateHandoff(handoffId?: string): Promise<HandoffValidationResult>;
   recordProgress(input: RecordProgressInput): Promise<ProgressResult>;
   updateTask(input: TaskUpdateInput): Promise<Task>;
+  searchMemory(input: MemorySearchInput): Promise<MemorySearchPage>;
   queryMemory(input: MemoryQueryInput): Promise<MemoryRecord[]>;
   close(): void;
 }
@@ -46,6 +47,10 @@ terminal output, SDK objects, RPC responses, and MCP results are views.
 Projects without a Git origin use the canonical real filesystem path for
 identity; moving them to a different path still produces a different ID.
 
+`searchMemory` is the schema-versioned deterministic lexical retrieval
+contract. `queryMemory` remains available for compatibility. See
+[`memory-search.md`](./memory-search.md).
+
 ## Read and write operations
 
 Read-only:
@@ -54,6 +59,7 @@ Read-only:
 - `getCurrentHandoff`
 - `getContinuation`
 - `validateHandoff`
+- `searchMemory`
 - `queryMemory`
 
 Mutating:
