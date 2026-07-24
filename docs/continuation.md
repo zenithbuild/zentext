@@ -262,8 +262,9 @@ earlier proof used the provider-neutral skill or RPC interfaces directly.
 After #35, issues #36 and #37 add `zentext search` and a shared `searchMemory`
 contract without changing stored schema version 1. CLI, SDK, RPC, and read-only
 MCP use one bounded redacted lexical engine with deterministic, explainable
-relevance and canonical freshness metadata. Revision-aware derived-result
-caching remains issue #38.
+relevance and canonical freshness metadata. Issue #38 adds a bounded
+process-local cache whose keys include the complete canonical state fingerprint
+and active task revision; canonical SQLite state never depends on it.
 
 The authoritative packed-package release-readiness evidence is under
 `tests/field-tests/trusted-memory-cross-tool/`. One canonical fixture advanced

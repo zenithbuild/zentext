@@ -5,10 +5,11 @@ memory behavior.
 
 The current specification is:
 
-- [Zentext memory contract 1.2](./zentext-memory-contract/1.2/README.md)
+- [Zentext memory contract 1.3](./zentext-memory-contract/1.3/README.md)
 
 Previous compatible contracts:
 
+- [Zentext memory contract 1.2](./zentext-memory-contract/1.2/README.md)
 - [Zentext memory contract 1.1](./zentext-memory-contract/1.1/README.md)
 - [Zentext memory contract 1.0](./zentext-memory-contract/1.0/README.md)
 

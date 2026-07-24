@@ -27,6 +27,16 @@ Top-level helpers are also exported:
 - `queryMemory`
 - `searchMemory`
 
+An opened project also exposes `getSearchCacheStats()` for process-local
+diagnostics. Search results never vary based on a hit or miss.
+
+```ts
+const first = await project.searchMemory({ query: "CSS determinism" });
+const second = await project.searchMemory({ query: "CSS determinism" });
+console.log(first.state.active_task_revision);
+console.log(project.getSearchCacheStats()); // one miss, then one hit
+```
+
 ## Recording progress
 
 ```ts
@@ -77,6 +87,6 @@ secrets from returned canonical views, including legacy records.
 ## Schema compatibility
 
 The initial public record schema version is `1`; the memory search schema is
-`2`; and the stable memory interface version is `1.2`. Consumers should use
+`3`; and the stable memory interface version is `1.3`. Consumers should use
 exported TypeScript types and capability
 discovery rather than assume fields added by future versions.

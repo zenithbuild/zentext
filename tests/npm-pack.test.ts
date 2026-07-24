@@ -130,6 +130,7 @@ describe("npm package validation", () => {
       "package/docs/rpc.md",
       "package/docs/safety.md",
       "package/docs/memory-search.md",
+      "package/docs/memory-search-cache.md",
       "package/docs/product-principles.md",
       "package/docs/spec/README.md",
       "package/docs/spec/zentext-memory-contract/1.0/README.md",
@@ -141,6 +142,8 @@ describe("npm package validation", () => {
       "package/docs/spec/zentext-memory-contract/1.1/deterministic-search.md",
       "package/docs/spec/zentext-memory-contract/1.2/README.md",
       "package/docs/spec/zentext-memory-contract/1.2/relevance-and-freshness.md",
+      "package/docs/spec/zentext-memory-contract/1.3/README.md",
+      "package/docs/spec/zentext-memory-contract/1.3/revision-aware-cache.md",
       "package/docs/environment-formatters.md",
       "package/docs/ci.md",
       "package/docs/integrations/codex-app.md",
@@ -255,6 +258,8 @@ const cwd = ${JSON.stringify(project)};
 const opened = await openProject({ cwd });
 const sdk = await opened.getContinuation();
 const sdkSearch = await opened.searchMemory({ query: "SDK RPC task" });
+const sdkSearchAgain = await opened.searchMemory({ query: "SDK RPC task" });
+const cacheStats = opened.getSearchCacheStats();
 const projectId = opened.meta.projectId;
 opened.close();
 const continuationRequest = {
@@ -280,6 +285,8 @@ const [rpc, rpcSearch] = rpcRun.stdout.trim().split("\\n").map(JSON.parse);
 console.log(JSON.stringify({
   same: JSON.stringify(sdk) === JSON.stringify(rpc.result),
   searchSame: JSON.stringify(sdkSearch) === JSON.stringify(rpcSearch.result),
+  repeatedSearchSame: JSON.stringify(sdkSearch) === JSON.stringify(sdkSearchAgain),
+  cacheHit: cacheStats.hits === 1 && cacheStats.misses === 1,
   searchCount: sdkSearch.results.length,
   status: sdk.validation.status,
   stdoutLines: rpcRun.stdout.trim().split("\\n").length
@@ -297,6 +304,8 @@ console.log(JSON.stringify({
     expect(JSON.parse(output)).toEqual({
       same: true,
       searchSame: true,
+      repeatedSearchSame: true,
+      cacheHit: true,
       searchCount: 2,
       status: "current",
       stdoutLines: 2,
@@ -588,6 +597,41 @@ console.log(JSON.stringify({
     );
     expect(searchOut.results).toHaveLength(1);
     expect(searchOut.results[0].title).toBe("Investigate CSS determinism");
+
+    const cacheScript = join(installDir, "fallback-cache-smoke.mjs");
+    writeFileSync(
+      cacheScript,
+      `
+import { openProject } from "zentext";
+const project = await openProject({ cwd: ${JSON.stringify(project)} });
+const first = await project.searchMemory({ query: "CSS determinism" });
+const second = await project.searchMemory({ query: "CSS determinism" });
+const stats = project.getSearchCacheStats();
+project.close();
+console.log(JSON.stringify({
+  same: JSON.stringify(first) === JSON.stringify(second),
+  activeRevision: second.state.active_task_revision,
+  hits: stats.hits,
+  misses: stats.misses
+}));
+`,
+      "utf8",
+    );
+    expect(
+      JSON.parse(
+        execFileSync(process.execPath, [cacheScript], {
+          cwd: installDir,
+          env,
+          encoding: "utf8",
+          stdio: ["ignore", "pipe", "pipe"],
+        }),
+      ),
+    ).toEqual({
+      same: true,
+      activeRevision: 1,
+      hits: 1,
+      misses: 1,
+    });
 
     const handoffOut = runInstalled([
       "handoff", "create",

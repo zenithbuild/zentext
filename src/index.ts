@@ -128,7 +128,15 @@ export {
   type MemorySearchVerificationConfidence,
   type MemorySearchResult,
   type MemorySearchPage,
+  type MemorySearchState,
 } from "./memory-search.js";
+export {
+  MEMORY_SEARCH_CACHE_KEY_VERSION,
+  MEMORY_SEARCH_CACHE_MAX_ENTRIES,
+  MEMORY_SEARCH_CACHE_MAX_BYTES,
+  MEMORY_SEARCH_CACHE_MAX_TRACKED_PROJECTS,
+  type MemorySearchCacheStats,
+} from "./memory-search-cache.js";
 export {
   ZENTEXT_SCHEMA_VERSION,
   CreateRecordInputSchema,

@@ -62,7 +62,8 @@ the SDK's `getContinuation`, and MCP `memory.continuation`.
 `memory.search` is additive to RPC 1.0. Its `input` object uses the contract in
 [`memory-search.md`](./memory-search.md); CLI, SDK, RPC, and MCP return the same
 `MemorySearchPage`, including the schema-versioned ranking tuple and freshness
-explanation.
+explanation. Search schema 3 also identifies the exact canonical state
+snapshot; RPC never exposes cache hit/miss diagnostics as semantic output.
 
 ## Safety
 

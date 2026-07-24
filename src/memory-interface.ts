@@ -37,11 +37,19 @@ import {
 } from "./schemas.js";
 import { assertSafeExternalInput, redactForOutput } from "./safety.js";
 import {
+  deriveMemorySearchState,
   MemorySearchInputSchema,
   searchMemoryRecords,
   type MemorySearchInput,
   type MemorySearchPage,
 } from "./memory-search.js";
+import {
+  createMemorySearchCacheKey,
+  getCachedMemorySearch,
+  getMemorySearchCacheStats,
+  setCachedMemorySearch,
+  type MemorySearchCacheStats,
+} from "./memory-search-cache.js";
 import {
   SqliteStore,
   StoreNotFoundError,
@@ -56,7 +64,7 @@ import type {
 } from "./types/records.js";
 import type { StoreMeta } from "./types/store.js";
 
-export const MEMORY_INTERFACE_VERSION = "1.2";
+export const MEMORY_INTERFACE_VERSION = "1.3";
 
 export interface CurrentHandoff {
   record_id: string;
@@ -89,6 +97,7 @@ export interface MemoryStore {
   recordProgress(input: RecordProgressInput): Promise<ProgressResult>;
   updateTask(input: TaskUpdateInput): Promise<TaskRecord>;
   searchMemory(input: MemorySearchInput): Promise<MemorySearchPage>;
+  getSearchCacheStats(): MemorySearchCacheStats;
   queryMemory(input: MemoryQueryInput): Promise<AnyRecord[]>;
   close(): void;
 }
@@ -525,13 +534,33 @@ export class SqliteMemoryStore implements MemoryStore {
     try {
       const parsed = MemorySearchInputSchema.parse(input);
       assertSafeExternalInput(parsed);
-      const safeRecords = redactForOutput(this.store.listRecords()) as AnyRecord[];
-      return redactForOutput(
-        searchMemoryRecords(safeRecords, parsed, this.meta.projectId),
+      const records = this.store.listRecords();
+      const state = deriveMemorySearchState(records, this.meta.projectId);
+      const key = createMemorySearchCacheKey(
+        this.meta.projectId,
+        state,
+        parsed,
       );
+      const cached = getCachedMemorySearch(this.meta.projectId, key);
+      if (cached) return cached;
+      const safeRecords = redactForOutput(records) as AnyRecord[];
+      const page = redactForOutput(
+        searchMemoryRecords(safeRecords, parsed, this.meta.projectId, state),
+      );
+      setCachedMemorySearch(
+        this.meta.projectId,
+        key,
+        state.fingerprint,
+        page,
+      );
+      return page;
     } catch (error) {
       mapError(error);
     }
+  }
+
+  getSearchCacheStats(): MemorySearchCacheStats {
+    return getMemorySearchCacheStats(this.meta.projectId);
   }
 
   close(): void {
