@@ -199,6 +199,10 @@ The detailed reasoning is retained in `docs/decision-records/`,
 `docs/open-decisions.md`, and `docs/implementation/`. Those files may describe
 the stage when a decision was proposed; this guide records the current result.
 
+The versioned [Zentext memory contract](./spec/README.md) documents record,
+continuation, revision, safety, interface, formatter, and portability behavior.
+The implementation and executable tests remain its conformance oracle.
+
 ## Sources of truth and artifact ownership
 
 Canonical repository artifacts:

@@ -52,6 +52,8 @@
     "docs/sdk.md",
     "docs/rpc.md",
     "docs/safety.md",
+    "docs/product-principles.md",
+    "docs/spec",
     "docs/integrations/codex-app.md",
     "docs/demo/portable-continuation",
     "LICENSE",
