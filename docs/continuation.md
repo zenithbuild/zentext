@@ -110,8 +110,8 @@ The Developer Preview exposes:
 - tasks: `task create`, `task show`, `task update`
 - handoffs: `handoff create`, `handoff show`, `handoff validate`,
   `handoff acknowledge`, `handoff export`
-- validated continuation: `continue` with human, JSON, Markdown, and canonical
-  tool-neutral prompt output
+- validated continuation: `continue` with human, JSON, Markdown, canonical
+  tool-neutral prompt output, and versioned environment presentation wrappers
 - machine integration: `rpc` with typed NDJSON requests and responses
 
 Task and handoff mutations flow through the transactional writer. General
@@ -239,13 +239,20 @@ Surface** merged through PR #64:
 7. #33 — machine-readable TypeScript SDK
 8. #34 — structured stdio RPC
 
-All eight issues are closed. Release candidate `0.1.0-dev.3` packages that
-foundation, while npm `next` and `latest` remain on `0.1.0-dev.2` until an
-authenticated release completes.
+All eight trusted-memory issues are closed. Release `0.1.0-dev.3` is merged,
+tagged, and available as a GitHub prerelease; npm publication remains blocked
+on the required interactive OTP, so npm `next` and `latest` still resolve to
+`0.1.0-dev.2`.
 
-Provider-formatting adapters in #35 are the next presentation layer; the
-Codex, OpenClaw, Gemini, and Ollama proofs call the provider-neutral skill,
-SDK, or RPC interfaces directly. Their successful use does not complete #35.
+Issue #35 adds a thin versioned presentation layer over the same
+`ContinuationView`. Canonical formatter identifiers are `generic`, `codex`,
+`claude-code`, and `ollama-host`; `claude` and `ollama` remain aliases. The
+wrappers preserve a complete redacted canonical payload and create no
+environment-specific memory or write path.
+
+OpenClaw and Antigravity/Gemini are not formatter identifiers in #35. Their
+earlier proof used the provider-neutral skill or RPC interfaces directly.
+After #35, the next implementation dependency is #36 project-memory search.
 
 The authoritative packed-package release-readiness evidence is under
 `tests/field-tests/trusted-memory-cross-tool/`. One canonical fixture advanced

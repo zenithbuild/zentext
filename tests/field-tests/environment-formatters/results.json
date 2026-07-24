@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "executed_on": "2026-07-24",
+  "status": "passed_with_external_limitations",
+  "package": {
+    "version": "0.1.0-dev.2",
+    "source": "packed issue #35 branch artifact",
+    "sha256": "18f871936e15b74bec5c3f3d617a96f782bdc35a463e8bb8c528a794b54cf6f6"
+  },
+  "fixture": {
+    "project_id": "a81f479fe8003359",
+    "task_id": "rec_task_01KY8T4RNYEFGHRHW6AX77K3FX",
+    "task_revision": 2,
+    "handoff_id": "rec_handoff_01KY8T4RXJ4YCGF57NVM15138S",
+    "handoff_revision": 2,
+    "stopping_point": "Alpha and Beta are verified; Gamma is intentionally untouched.",
+    "next_action": "Inspect fixture/gamma.txt and record Gamma."
+  },
+  "deterministic": {
+    "environment_ids": [
+      "generic",
+      "codex",
+      "claude-code",
+      "ollama-host"
+    ],
+    "canonical_payload_parity": "pass",
+    "package_install": "pass",
+    "prior_session_state": false
+  },
+  "environments": [
+    {
+      "id": "generic",
+      "surface": "independent Node.js canonical-block parser",
+      "runtime": "Node.js 22.23.1",
+      "result": "pass",
+      "response_contract": "exact canonical payload"
+    },
+    {
+      "id": "codex",
+      "surface": "Codex CLI 0.144.5, ephemeral read-only execution",
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "xhigh",
+      "prior_session_state": false,
+      "result": "pass",
+      "response_contract": "exact requested JSON object",
+      "response": {
+        "formatter": "zentext.environment/codex@1.0",
+        "project_id": "a81f479fe8003359",
+        "task_id": "rec_task_01KY8T4RNYEFGHRHW6AX77K3FX",
+        "task_revision": 2,
+        "handoff_id": "rec_handoff_01KY8T4RXJ4YCGF57NVM15138S",
+        "handoff_revision": 2,
+        "stopping_point": "Alpha and Beta are verified; Gamma is intentionally untouched.",
+        "next_action": "Inspect fixture/gamma.txt and record Gamma."
+      },
+      "limitations": [
+        "The CLI reported unrelated local model-cache warnings on stderr.",
+        "This is a Codex CLI consumption smoke, not a hosted plugin claim."
+      ]
+    },
+    {
+      "id": "claude-code",
+      "surface": "Claude Code CLI",
+      "result": "unavailable",
+      "reason": "The claude executable is not installed in the test environment.",
+      "native_integration_claimed": false
+    },
+    {
+      "id": "ollama-host",
+      "surface": "Ollama 0.32.1 local host",
+      "prior_session_state": false,
+      "result": "semantic_pass_with_response_shape_failures",
+      "attempts": [
+        {
+          "model": "glm-5.2:cloud",
+          "mode": "default CLI",
+          "semantic_values": "correct",
+          "response_contract": "failed",
+          "reason": "Visible reasoning and terminal-control output preceded the JSON."
+        },
+        {
+          "model": "glm-5.2:cloud",
+          "mode": "structured CLI and local HTTP API",
+          "semantic_values": "correct",
+          "response_contract": "failed",
+          "reason": "The model wrapped the JSON in Markdown fences despite structured-output settings."
+        },
+        {
+          "model": "kimi-k2.7-code:cloud",
+          "mode": "local HTTP API with JSON schema and thinking disabled",
+          "semantic_values": "exact full canonical continuation",
+          "response_contract": "valid JSON but different requested shape",
+          "result": "semantic pass"
+        }
+      ],
+      "native_integration_claimed": false
+    }
+  ],
+  "conclusion": {
+    "formatter_semantic_parity": "pass",
+    "codex_consumption": "pass",
+    "claude_code_consumption": "unavailable",
+    "ollama_host_consumption": "semantic pass",
+    "provider_response_shape": "externally variable",
+    "provider_specific_memory_added": false
+  }
+}

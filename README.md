@@ -74,6 +74,12 @@ zentext continue --json
 zentext continue --markdown
 zentext continue --prompt
 
+# Optional presentation wrappers over the same canonical state
+zentext continue --for generic
+zentext continue --for codex
+zentext continue --for claude-code
+zentext continue --for ollama-host
+
 # Or export the same validated handoff state for another interface
 zentext handoff export --format markdown
 zentext handoff export --format json
@@ -180,6 +186,8 @@ semantically equal continuation state. See the
   explicit overrides, and output redaction
 - [docs/integrations/codex-app.md](./docs/integrations/codex-app.md) —
   project-local Codex skill and acceptance procedure
+- [docs/environment-formatters.md](./docs/environment-formatters.md) — thin,
+  deterministic presentation adapters and their honest integration boundary
 - [docs/ci.md](./docs/ci.md) — deterministic GitHub CI coverage and manual
   release gates
 - [docs/releases/0.1.0-dev.3.md](./docs/releases/0.1.0-dev.3.md) — current

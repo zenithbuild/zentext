@@ -77,6 +77,17 @@ export {
   TOOL_NEUTRAL_CONTINUATION_INSTRUCTIONS,
   renderToolNeutralContinuationPrompt,
 } from "./continuation-prompt.js";
+export {
+  ENVIRONMENT_FORMATTER_VERSION,
+  ENVIRONMENT_FORMATTER_IDS,
+  UnsupportedEnvironmentFormatterError,
+  resolveEnvironmentFormatterId,
+  getEnvironmentFormatterDescriptor,
+  renderEnvironmentContinuation,
+  type EnvironmentFormatterId,
+  type EnvironmentFormatterDescriptor,
+  type EnvironmentFormatterOptions,
+} from "./environment-formatters.js";
 
 export {
   openProject,
