@@ -4,9 +4,9 @@ Zentext search is a local lexical read over canonical, redacted project
 records. It does not call a model, create an embedding, traverse a graph, read
 source files, or depend on a network service.
 
-Search schema version: `1`
+Search schema version: `2`
 
-Strategy: `lexical-updated-v1`
+Strategy: `lexical-relevance-freshness-v2`
 
 ## CLI
 
@@ -14,6 +14,7 @@ Strategy: `lexical-updated-v1`
 zentext search "CSS determinism"
 zentext search "CSS determinism" --json
 zentext search "CSS determinism" --type task --status active
+zentext search "CSS determinism" --freshness current-only
 zentext search "CSS determinism" --limit 20 --offset 20
 zentext search "CSS determinism" --include-superseded
 ```
@@ -61,7 +62,8 @@ existing `memory.query` compatibility method is unchanged.
 | `statuses` | Optional statuses valid for at least one selected type. |
 | `task_id` | Optional exact task scope using task identity or provenance. |
 | `min_revision`, `max_revision` | Optional inclusive record-revision bounds. |
-| `include_superseded` | Include records with `superseded_by`; default false. |
+| `include_superseded` | Include records replaced by another record or explicitly marked superseded; default false. |
+| `freshness_mode` | `prefer-current` (default), `current-only`, or `historical-only`. |
 | `limit` | Page size, default 20 and maximum 100. |
 | `offset` | Stable-result offset, default 0 and maximum 10,000. |
 
@@ -101,17 +103,56 @@ Every page contains:
 - canonical record ID, type, status, revision, timestamps, refs, and redacted
   provenance; and
 - match kind, matching fields, terms, and a redacted excerpt capped at 240
-  characters.
+  characters; and
+- an explainable freshness classification, ranking tuple, named ranking
+  components, and stable reason codes.
 
-Issue #36 deliberately orders matches by:
+## Freshness semantics
+
+Freshness is canonical state evidence, not wall-clock recency:
+
+- `current`: the record remains operative by status or revision;
+- `stale`: the selected latest handoff's task revision differs from the live
+  task;
+- `superseded`: a newer record or explicit superseded status replaces it;
+- `historical`: terminal, archived, event, or older-revision evidence; and
+- `unknown`: canonical fields are insufficient to decide.
+
+An accepted decision or open blocker does not become stale merely because the
+task revision advances. Its explicit status remains authoritative. Validation
+evidence tied to an older task revision is historical. Logs are historical
+events. Unknown evidence remains unknown rather than being guessed current.
+
+`prefer-current` retains useful history. `current-only` returns only current
+records. `historical-only` returns historical, stale, and—when
+`include_superseded` is true—superseded records.
+
+## Explainable ordering
+
+The strategy compares this tuple lexicographically in descending order:
 
 ```text
-updated_at descending
-then canonical record ID ascending
+freshness priority
+active-task relationship
+lexical match quality
+verification confidence
+direct-file match
+record-type priority
+canonical task revision
+record revision
+valid canonical updated_at epoch
 ```
 
-This is deterministic recency ordering, not relevance ranking. Issue #37
-defines the explainable relevance and freshness tuple.
+Canonical record ID ascending is the final tie-breaker. Freshness priorities
+are current 4, unknown 3, historical 2, stale 1, and superseded 0. Match
+priorities are exact 3, phrase 2, and all-tokens 1. Record-type priorities are
+task 8, handoff 7, decision 6, blocker 5, validation 4, policy 3, log 2, and
+custom 1.
+
+The tuple uses integers, not a floating score or hidden heuristic. Every result
+returns its tuple and component reasons. Current state therefore cannot be
+outranked by stale state merely because stale text happens to be a closer
+lexical match.
 
 ## Safety and isolation
 

@@ -77,6 +77,6 @@ secrets from returned canonical views, including legacy records.
 ## Schema compatibility
 
 The initial public record schema version is `1`; the memory search schema is
-`1`; and the stable memory interface version is `1.1`. Consumers should use
+`2`; and the stable memory interface version is `1.2`. Consumers should use
 exported TypeScript types and capability
 discovery rather than assume fields added by future versions.

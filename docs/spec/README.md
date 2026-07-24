@@ -5,10 +5,11 @@ memory behavior.
 
 The current specification is:
 
-- [Zentext memory contract 1.1](./zentext-memory-contract/1.1/README.md)
+- [Zentext memory contract 1.2](./zentext-memory-contract/1.2/README.md)
 
 Previous compatible contracts:
 
+- [Zentext memory contract 1.1](./zentext-memory-contract/1.1/README.md)
 - [Zentext memory contract 1.0](./zentext-memory-contract/1.0/README.md)
 
 The name describes a product contract, not an industry standard. Zentext will
@@ -26,6 +27,7 @@ Implementation constants may version different layers independently:
 - stored record schema;
 - continuation view schema;
 - MemoryStore interface;
+- project-memory search schema and strategy;
 - NDJSON RPC protocol and response schema; and
 - environment formatter contract.
 

@@ -9,13 +9,30 @@ import {
   type RecordType,
 } from "./types/records.js";
 
-export const MEMORY_SEARCH_SCHEMA_VERSION = 1;
-export const MEMORY_SEARCH_STRATEGY = "lexical-updated-v1" as const;
+export const MEMORY_SEARCH_SCHEMA_VERSION = 2;
+export const MEMORY_SEARCH_STRATEGY =
+  "lexical-relevance-freshness-v2" as const;
 export const MEMORY_SEARCH_MAX_QUERY_LENGTH = 512;
 export const MEMORY_SEARCH_DEFAULT_LIMIT = 20;
 export const MEMORY_SEARCH_MAX_LIMIT = 100;
 export const MEMORY_SEARCH_MAX_OFFSET = 10_000;
 export const MEMORY_SEARCH_EXCERPT_LENGTH = 240;
+export const MEMORY_SEARCH_FRESHNESS_MODES = [
+  "prefer-current",
+  "current-only",
+  "historical-only",
+] as const;
+export const MEMORY_SEARCH_RANKING_TUPLE = [
+  "freshness",
+  "active_task_relationship",
+  "match_quality",
+  "verification_confidence",
+  "direct_file_match",
+  "record_type_priority",
+  "task_revision",
+  "record_revision",
+  "updated_at_epoch_ms",
+] as const;
 
 const allStatuses = new Set(Object.values(ALLOWED_STATUSES).flat());
 
@@ -31,6 +48,9 @@ export const MemorySearchInputSchema = z
     min_revision: z.number().int().positive().optional(),
     max_revision: z.number().int().positive().optional(),
     include_superseded: z.boolean().default(false),
+    freshness_mode: z
+      .enum(MEMORY_SEARCH_FRESHNESS_MODES)
+      .default("prefer-current"),
     limit: z
       .number()
       .int()
@@ -86,6 +106,18 @@ export const MemorySearchInputSchema = z
 export type MemorySearchInput = z.input<typeof MemorySearchInputSchema>;
 export type ParsedMemorySearchInput = z.output<typeof MemorySearchInputSchema>;
 export type MemorySearchMatchKind = "exact" | "phrase" | "tokens";
+export type MemorySearchFreshness =
+  | "current"
+  | "unknown"
+  | "historical"
+  | "stale"
+  | "superseded";
+export type MemorySearchVerificationConfidence =
+  | "passed"
+  | "supported"
+  | "inconclusive"
+  | "failed"
+  | "none";
 
 export interface MemorySearchMatch {
   kind: MemorySearchMatchKind;
@@ -112,6 +144,29 @@ export interface MemorySearchResult {
   provenance?: RecordProvenance;
   superseded_by?: string;
   match: MemorySearchMatch;
+  ranking: {
+    tuple: [
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+    ];
+    freshness: MemorySearchFreshness;
+    freshness_reason: string;
+    active_task_relationship: boolean;
+    match_quality: MemorySearchMatchKind;
+    verification_confidence: MemorySearchVerificationConfidence;
+    direct_file_match: boolean;
+    record_type_priority: number;
+    task_revision: number | null;
+    updated_at_valid: boolean;
+    reasons: string[];
+  };
 }
 
 export interface MemorySearchPage {
@@ -130,6 +185,11 @@ export interface MemorySearchPage {
     min_revision?: number;
     max_revision?: number;
     include_superseded: boolean;
+    freshness_mode: (typeof MEMORY_SEARCH_FRESHNESS_MODES)[number];
+  };
+  ranking: {
+    tuple_order: typeof MEMORY_SEARCH_RANKING_TUPLE;
+    active_task_id: string | null;
   };
   page: {
     offset: number;
@@ -318,11 +378,301 @@ function matchRecord(
   };
 }
 
-function sortDeterministically(a: AnyRecord, b: AnyRecord): number {
+function sortByCanonicalRecency(a: AnyRecord, b: AnyRecord): number {
   if (a.updated_at > b.updated_at) return -1;
   if (a.updated_at < b.updated_at) return 1;
   if (a.id < b.id) return -1;
   if (a.id > b.id) return 1;
+  return 0;
+}
+
+interface TaskReference {
+  id: string;
+  revision: number;
+}
+
+interface SearchContext {
+  recordsById: Map<string, AnyRecord>;
+  activeTaskId: string | null;
+  currentHandoffId: string | null;
+}
+
+function handoffTaskReference(record: AnyRecord): TaskReference | null {
+  if (record.type !== "handoff") return null;
+  const structured = record.structured_handoff;
+  if (!structured || typeof structured !== "object") return null;
+  const activeTask = (structured as Record<string, unknown>).active_task;
+  if (!activeTask || typeof activeTask !== "object") return null;
+  const id = (activeTask as Record<string, unknown>).id;
+  const revision = (activeTask as Record<string, unknown>).revision;
+  return typeof id === "string" &&
+    typeof revision === "number" &&
+    Number.isSafeInteger(revision) &&
+    revision > 0
+    ? { id, revision }
+    : null;
+}
+
+function resolveSearchContext(records: AnyRecord[]): SearchContext {
+  const recordsById = new Map(records.map((record) => [record.id, record]));
+  const selectedHandoff = records
+    .filter(
+      (record) =>
+        record.type === "handoff" &&
+        record.status === "latest" &&
+        !record.superseded_by,
+    )
+    .sort(sortByCanonicalRecency)[0];
+  const referencedTask = selectedHandoff
+    ? handoffTaskReference(selectedHandoff)
+    : null;
+  const task = referencedTask ? recordsById.get(referencedTask.id) : undefined;
+  const activeTask =
+    task?.type === "task" &&
+    !task.superseded_by &&
+    ["active", "blocked"].includes(task.status)
+      ? task
+      : records
+          .filter(
+            (record) =>
+              record.type === "task" &&
+              !record.superseded_by &&
+              ["active", "blocked"].includes(record.status),
+          )
+          .sort(sortByCanonicalRecency)[0];
+
+  return {
+    recordsById,
+    activeTaskId: activeTask?.id ?? null,
+    currentHandoffId: selectedHandoff?.id ?? null,
+  };
+}
+
+function recordTaskRevision(record: AnyRecord): number | null {
+  if (record.type === "task") return record.revision;
+  const handoffReference = handoffTaskReference(record);
+  if (handoffReference) return handoffReference.revision;
+  return record.provenance?.task_revision ?? null;
+}
+
+function classifyFreshness(
+  record: AnyRecord,
+  context: SearchContext,
+): { freshness: MemorySearchFreshness; reason: string } {
+  if (record.superseded_by) {
+    return { freshness: "superseded", reason: "superseded-by-record" };
+  }
+  if (record.status === "superseded") {
+    return { freshness: "superseded", reason: "status:superseded" };
+  }
+
+  switch (record.type) {
+    case "task":
+      return ["active", "blocked"].includes(record.status)
+        ? { freshness: "current", reason: `task-status:${record.status}` }
+        : { freshness: "historical", reason: `task-status:${record.status}` };
+    case "decision":
+      return ["accepted", "proposed"].includes(record.status)
+        ? { freshness: "current", reason: `decision-status:${record.status}` }
+        : { freshness: "historical", reason: `decision-status:${record.status}` };
+    case "blocker":
+      return record.status === "open"
+        ? { freshness: "current", reason: "blocker-status:open" }
+        : { freshness: "historical", reason: `blocker-status:${record.status}` };
+    case "handoff": {
+      if (
+        record.id !== context.currentHandoffId ||
+        record.status !== "latest"
+      ) {
+        return {
+          freshness: "historical",
+          reason:
+            record.status === "latest"
+              ? "handoff:not-selected-latest"
+              : `handoff-status:${record.status}`,
+        };
+      }
+      const reference = handoffTaskReference(record);
+      if (!reference) {
+        return { freshness: "unknown", reason: "handoff:missing-task-revision" };
+      }
+      const task = context.recordsById.get(reference.id);
+      if (!task || task.type !== "task") {
+        return { freshness: "unknown", reason: "handoff:missing-task" };
+      }
+      if (reference.revision !== task.revision) {
+        return { freshness: "stale", reason: "handoff:task-revision-mismatch" };
+      }
+      if (
+        task.superseded_by ||
+        !["active", "blocked"].includes(task.status)
+      ) {
+        return { freshness: "historical", reason: "handoff:task-not-actionable" };
+      }
+      return { freshness: "current", reason: "handoff:task-revision-current" };
+    }
+    case "validation": {
+      const taskId = record.provenance?.task_id;
+      const taskRevision = record.provenance?.task_revision;
+      if (!taskId || taskRevision === undefined) {
+        return { freshness: "unknown", reason: "validation:no-task-revision" };
+      }
+      const task = context.recordsById.get(taskId);
+      if (!task || task.type !== "task") {
+        return { freshness: "unknown", reason: "validation:missing-task" };
+      }
+      if (taskRevision === task.revision) {
+        return { freshness: "current", reason: "validation:task-revision-current" };
+      }
+      if (taskRevision < task.revision) {
+        return {
+          freshness: "historical",
+          reason: "validation:older-task-revision",
+        };
+      }
+      return { freshness: "unknown", reason: "validation:future-task-revision" };
+    }
+    case "log":
+      return { freshness: "historical", reason: "log:event-record" };
+    case "policy":
+      return record.status === "active"
+        ? { freshness: "current", reason: "policy-status:active" }
+        : { freshness: "historical", reason: `policy-status:${record.status}` };
+    case "custom":
+      return record.status === "active"
+        ? { freshness: "current", reason: "custom-status:active" }
+        : { freshness: "historical", reason: `custom-status:${record.status}` };
+  }
+}
+
+const freshnessPriority: Record<MemorySearchFreshness, number> = {
+  current: 4,
+  unknown: 3,
+  historical: 2,
+  stale: 1,
+  superseded: 0,
+};
+
+const matchPriority: Record<MemorySearchMatchKind, number> = {
+  exact: 3,
+  phrase: 2,
+  tokens: 1,
+};
+
+const typePriority: Record<RecordType, number> = {
+  task: 8,
+  handoff: 7,
+  decision: 6,
+  blocker: 5,
+  validation: 4,
+  policy: 3,
+  log: 2,
+  custom: 1,
+};
+
+function verificationConfidence(record: AnyRecord): {
+  confidence: MemorySearchVerificationConfidence;
+  priority: number;
+} {
+  if (record.type === "validation") {
+    if (record.result === "passed") {
+      return { confidence: "passed", priority: 3 };
+    }
+    if (record.result === "inconclusive") {
+      return { confidence: "inconclusive", priority: 2 };
+    }
+    return { confidence: "failed", priority: 1 };
+  }
+  if ((record.provenance?.verification?.length ?? 0) > 0) {
+    return { confidence: "supported", priority: 2 };
+  }
+  return { confidence: "none", priority: 0 };
+}
+
+const canonicalTimestamp =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u;
+
+function timestampRank(value: string): { rank: number; valid: boolean } {
+  if (!canonicalTimestamp.test(value)) return { rank: 0, valid: false };
+  const rank = Date.parse(value);
+  return Number.isFinite(rank) && new Date(rank).toISOString() === value
+    ? { rank, valid: true }
+    : { rank: 0, valid: false };
+}
+
+function buildRanking(
+  record: AnyRecord,
+  match: MemorySearchMatch,
+  context: SearchContext,
+): MemorySearchResult["ranking"] {
+  const freshness = classifyFreshness(record, context);
+  const activeTaskRelationship =
+    context.activeTaskId !== null &&
+    belongsToTask(record, context.activeTaskId);
+  const verification = verificationConfidence(record);
+  const directFileMatch = match.fields.some(
+    (field) =>
+      field === "refs.files" ||
+      field === "provenance.files_inspected",
+  );
+  const taskRevision = recordTaskRevision(record);
+  const updatedAt = timestampRank(record.updated_at);
+  const tuple: MemorySearchResult["ranking"]["tuple"] = [
+    freshnessPriority[freshness.freshness],
+    activeTaskRelationship ? 1 : 0,
+    matchPriority[match.kind],
+    verification.priority,
+    directFileMatch ? 1 : 0,
+    typePriority[record.type],
+    taskRevision ?? 0,
+    record.revision,
+    updatedAt.rank,
+  ];
+
+  return {
+    tuple,
+    freshness: freshness.freshness,
+    freshness_reason: freshness.reason,
+    active_task_relationship: activeTaskRelationship,
+    match_quality: match.kind,
+    verification_confidence: verification.confidence,
+    direct_file_match: directFileMatch,
+    record_type_priority: typePriority[record.type],
+    task_revision: taskRevision,
+    updated_at_valid: updatedAt.valid,
+    reasons: [
+      `freshness:${freshness.freshness}`,
+      freshness.reason,
+      activeTaskRelationship ? "active-task:related" : "active-task:unrelated",
+      `match:${match.kind}`,
+      `verification:${verification.confidence}`,
+      directFileMatch ? "file:direct-match" : "file:no-direct-match",
+      `record-type:${record.type}`,
+    ],
+  };
+}
+
+function freshnessAllowed(
+  freshness: MemorySearchFreshness,
+  mode: ParsedMemorySearchInput["freshness_mode"],
+): boolean {
+  if (mode === "current-only") return freshness === "current";
+  if (mode === "historical-only") {
+    return ["historical", "stale", "superseded"].includes(freshness);
+  }
+  return true;
+}
+
+function compareRanked(
+  a: { record: AnyRecord; ranking: MemorySearchResult["ranking"] },
+  b: { record: AnyRecord; ranking: MemorySearchResult["ranking"] },
+): number {
+  for (let index = 0; index < a.ranking.tuple.length; index += 1) {
+    const difference = b.ranking.tuple[index]! - a.ranking.tuple[index]!;
+    if (difference !== 0) return difference;
+  }
+  if (a.record.id < b.record.id) return -1;
+  if (a.record.id > b.record.id) return 1;
   return 0;
 }
 
@@ -335,9 +685,10 @@ export function searchMemoryRecords(
   const terms = [...new Set(normalizedQuery.split(" ").filter(Boolean))];
   const selectedTypes = [...(input.record_types ?? [])].sort();
   const selectedStatuses = [...(input.statuses ?? [])].sort();
+  const projectRecords = records.filter((record) => record.project === projectId);
+  const context = resolveSearchContext(projectRecords);
 
-  const matched = records
-    .filter((record) => record.project === projectId)
+  const matched = projectRecords
     .filter(
       (record) =>
         selectedTypes.length === 0 || selectedTypes.includes(record.type),
@@ -346,7 +697,11 @@ export function searchMemoryRecords(
       (record) =>
         selectedStatuses.length === 0 || selectedStatuses.includes(record.status),
     )
-    .filter((record) => input.include_superseded || !record.superseded_by)
+    .filter(
+      (record) =>
+        input.include_superseded ||
+        (!record.superseded_by && record.status !== "superseded"),
+    )
     .filter(
       (record) =>
         input.min_revision === undefined || record.revision >= input.min_revision,
@@ -356,17 +711,25 @@ export function searchMemoryRecords(
         input.max_revision === undefined || record.revision <= input.max_revision,
     )
     .filter((record) => !input.task_id || belongsToTask(record, input.task_id))
-    .sort(sortDeterministically)
     .map((record) => ({ record, match: matchRecord(record, normalizedQuery, terms) }))
     .filter(
       (
         entry,
       ): entry is { record: AnyRecord; match: MemorySearchMatch } =>
         entry.match !== null,
-    );
+    )
+    .map(({ record, match }) => ({
+      record,
+      match,
+      ranking: buildRanking(record, match, context),
+    }))
+    .filter(({ ranking }) =>
+      freshnessAllowed(ranking.freshness, input.freshness_mode),
+    )
+    .sort(compareRanked);
 
   const pageEntries = matched.slice(input.offset, input.offset + input.limit);
-  const results = pageEntries.map(({ record, match }) => ({
+  const results = pageEntries.map(({ record, match, ranking }) => ({
     id: record.id,
     project: record.project,
     type: record.type,
@@ -381,6 +744,7 @@ export function searchMemoryRecords(
     ...(record.provenance ? { provenance: record.provenance } : {}),
     ...(record.superseded_by ? { superseded_by: record.superseded_by } : {}),
     match,
+    ranking,
   }));
 
   return {
@@ -403,6 +767,11 @@ export function searchMemoryRecords(
         ? { max_revision: input.max_revision }
         : {}),
       include_superseded: input.include_superseded,
+      freshness_mode: input.freshness_mode,
+    },
+    ranking: {
+      tuple_order: MEMORY_SEARCH_RANKING_TUPLE,
+      active_task_id: context.activeTaskId,
     },
     page: {
       offset: input.offset,
@@ -428,7 +797,9 @@ export function renderMemorySearch(page: MemorySearchPage): string {
       `${result.type} ${result.id}`,
       `  ${result.title}`,
       `  Status: ${result.status} · revision ${result.revision}`,
+      `  Freshness: ${result.ranking.freshness} (${result.ranking.freshness_reason})`,
       `  Match: ${result.match.kind} in ${result.match.fields.join(", ")}`,
+      `  Why: ${result.ranking.reasons.join(", ")}`,
       `  ${result.match.excerpt.text}`,
     );
   }

@@ -139,6 +139,8 @@ describe("npm package validation", () => {
       "package/docs/spec/zentext-memory-contract/1.0/formatters-and-portability.md",
       "package/docs/spec/zentext-memory-contract/1.1/README.md",
       "package/docs/spec/zentext-memory-contract/1.1/deterministic-search.md",
+      "package/docs/spec/zentext-memory-contract/1.2/README.md",
+      "package/docs/spec/zentext-memory-contract/1.2/relevance-and-freshness.md",
       "package/docs/environment-formatters.md",
       "package/docs/ci.md",
       "package/docs/integrations/codex-app.md",

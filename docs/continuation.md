@@ -259,11 +259,11 @@ environment-specific memory or write path.
 
 OpenClaw and Antigravity/Gemini are not formatter identifiers in #35. Their
 earlier proof used the provider-neutral skill or RPC interfaces directly.
-After #35, the next implementation dependency is #36 project-memory search.
-
-Issue #36 adds `zentext search` and the shared `searchMemory` contract without
-changing stored schema version 1. CLI, SDK, RPC, and read-only MCP use one
-bounded redacted lexical engine; relevance and freshness remain issue #37.
+After #35, issues #36 and #37 add `zentext search` and a shared `searchMemory`
+contract without changing stored schema version 1. CLI, SDK, RPC, and read-only
+MCP use one bounded redacted lexical engine with deterministic, explainable
+relevance and canonical freshness metadata. Revision-aware derived-result
+caching remains issue #38.
 
 The authoritative packed-package release-readiness evidence is under
 `tests/field-tests/trusted-memory-cross-tool/`. One canonical fixture advanced

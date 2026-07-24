@@ -62,8 +62,8 @@ supersession state are unchanged after each tool call.
   match. It returns the matching records; it does not rank or summarize them.
 - `memory.search` is the schema-versioned project-memory search. It covers task
   and handoff payloads, decisions, blockers, verification, notes, referenced
-  files, and provenance; returns bounded redacted match metadata; and shares
-  exact behavior with CLI, SDK, and RPC.
+  files, and provenance; returns bounded redacted match, relevance, and
+  freshness metadata; and shares exact behavior with CLI, SDK, and RPC.
 - `memory.repack` is the curated current-context payload. It uses the shared
   repack engine to prioritize primary tasks, blockers, decisions, handoffs,
   validations, policies, and other active work, and applies a character budget.

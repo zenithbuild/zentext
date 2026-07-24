@@ -56,7 +56,7 @@ import type {
 } from "./types/records.js";
 import type { StoreMeta } from "./types/store.js";
 
-export const MEMORY_INTERFACE_VERSION = "1.1";
+export const MEMORY_INTERFACE_VERSION = "1.2";
 
 export interface CurrentHandoff {
   record_id: string;

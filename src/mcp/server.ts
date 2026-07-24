@@ -14,6 +14,7 @@ import {
   MEMORY_SEARCH_MAX_LIMIT,
   MEMORY_SEARCH_MAX_OFFSET,
   MEMORY_SEARCH_MAX_QUERY_LENGTH,
+  MEMORY_SEARCH_FRESHNESS_MODES,
 } from "../memory-search.js";
 
 // ---------------------------------------------------------------------------
@@ -81,6 +82,7 @@ const SearchInput = z
     min_revision: z.number().int().positive().optional(),
     max_revision: z.number().int().positive().optional(),
     include_superseded: z.boolean().optional(),
+    freshness_mode: z.enum(MEMORY_SEARCH_FRESHNESS_MODES).optional(),
     limit: z.number().int().positive().max(MEMORY_SEARCH_MAX_LIMIT).optional(),
     offset: z.number().int().nonnegative().max(MEMORY_SEARCH_MAX_OFFSET).optional(),
   })
@@ -257,6 +259,9 @@ export async function memorySearch(
         ...(args.include_superseded !== undefined
           ? { include_superseded: args.include_superseded }
           : {}),
+        ...(args.freshness_mode !== undefined
+          ? { freshness_mode: args.freshness_mode }
+          : {}),
         ...(args.limit !== undefined ? { limit: args.limit } : {}),
         ...(args.offset !== undefined ? { offset: args.offset } : {}),
       }),
@@ -370,7 +375,8 @@ export function createMcpServer(): McpServer {
       description:
         "Bounded deterministic lexical search across redacted canonical tasks, handoffs, " +
         "decisions, blockers, validations, notes, referenced files, and provenance. " +
-        "Returns match metadata and stable offset pagination without mutating memory.",
+        "Returns explainable relevance, freshness, match metadata, and stable offset " +
+        "pagination without mutating memory.",
       inputSchema: SearchInput,
       annotations: readOnly,
     },
