@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { z } from "zod";
 
 import { RecordIdSchema, RecordTypeSchema } from "./schemas.js";
@@ -9,7 +11,7 @@ import {
   type RecordType,
 } from "./types/records.js";
 
-export const MEMORY_SEARCH_SCHEMA_VERSION = 2;
+export const MEMORY_SEARCH_SCHEMA_VERSION = 3;
 export const MEMORY_SEARCH_STRATEGY =
   "lexical-relevance-freshness-v2" as const;
 export const MEMORY_SEARCH_MAX_QUERY_LENGTH = 512;
@@ -191,6 +193,7 @@ export interface MemorySearchPage {
     tuple_order: typeof MEMORY_SEARCH_RANKING_TUPLE;
     active_task_id: string | null;
   };
+  state: MemorySearchState;
   page: {
     offset: number;
     limit: number;
@@ -199,6 +202,14 @@ export interface MemorySearchPage {
     has_more: boolean;
   };
   results: MemorySearchResult[];
+}
+
+export interface MemorySearchState {
+  fingerprint_algorithm: "sha256-envelope-v1";
+  fingerprint: string;
+  record_count: number;
+  active_task_id: string | null;
+  active_task_revision: number | null;
 }
 
 interface SearchField {
@@ -448,6 +459,62 @@ function resolveSearchContext(records: AnyRecord[]): SearchContext {
   };
 }
 
+export function deriveMemorySearchState(
+  records: AnyRecord[],
+  projectId: string,
+): MemorySearchState {
+  const projectRecords = records
+    .filter((record) => record.project === projectId)
+    .sort((a, b) => {
+      if (a.id < b.id) return -1;
+      if (a.id > b.id) return 1;
+      return 0;
+    });
+  const context = resolveSearchContext(projectRecords);
+  const activeTask = context.activeTaskId
+    ? context.recordsById.get(context.activeTaskId)
+    : undefined;
+  const envelope = projectRecords.map((record) => ({
+    id: record.id,
+    type: record.type,
+    status: record.status,
+    revision: record.revision,
+    updated_at: record.updated_at,
+    schema_version: record.schema_version,
+    superseded_by: record.superseded_by ?? null,
+    provenance_task_revision: record.provenance?.task_revision ?? null,
+  }));
+  const fingerprint = createHash("sha256")
+    .update(JSON.stringify({ project_id: projectId, records: envelope }))
+    .digest("hex");
+
+  return {
+    fingerprint_algorithm: "sha256-envelope-v1",
+    fingerprint,
+    record_count: projectRecords.length,
+    active_task_id: context.activeTaskId,
+    active_task_revision:
+      activeTask?.type === "task" ? activeTask.revision : null,
+  };
+}
+
+export function canonicalMemorySearchCacheInput(
+  input: ParsedMemorySearchInput,
+): Record<string, unknown> {
+  return {
+    query: normalizeText(input.query),
+    record_types: [...(input.record_types ?? [])].sort(),
+    statuses: [...(input.statuses ?? [])].sort(),
+    task_id: input.task_id ?? null,
+    min_revision: input.min_revision ?? null,
+    max_revision: input.max_revision ?? null,
+    include_superseded: input.include_superseded,
+    freshness_mode: input.freshness_mode,
+    limit: input.limit,
+    offset: input.offset,
+  };
+}
+
 function recordTaskRevision(record: AnyRecord): number | null {
   if (record.type === "task") return record.revision;
   const handoffReference = handoffTaskReference(record);
@@ -680,6 +747,7 @@ export function searchMemoryRecords(
   records: AnyRecord[],
   input: ParsedMemorySearchInput,
   projectId: string,
+  suppliedState?: MemorySearchState,
 ): MemorySearchPage {
   const normalizedQuery = normalizeText(input.query);
   const terms = [...new Set(normalizedQuery.split(" ").filter(Boolean))];
@@ -687,6 +755,7 @@ export function searchMemoryRecords(
   const selectedStatuses = [...(input.statuses ?? [])].sort();
   const projectRecords = records.filter((record) => record.project === projectId);
   const context = resolveSearchContext(projectRecords);
+  const state = suppliedState ?? deriveMemorySearchState(projectRecords, projectId);
 
   const matched = projectRecords
     .filter(
@@ -773,6 +842,7 @@ export function searchMemoryRecords(
       tuple_order: MEMORY_SEARCH_RANKING_TUPLE,
       active_task_id: context.activeTaskId,
     },
+    state,
     page: {
       offset: input.offset,
       limit: input.limit,

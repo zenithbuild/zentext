@@ -53,6 +53,7 @@
     "docs/rpc.md",
     "docs/safety.md",
     "docs/memory-search.md",
+    "docs/memory-search-cache.md",
     "docs/product-principles.md",
     "docs/spec",
     "docs/environment-formatters.md",

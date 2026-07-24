@@ -4,7 +4,7 @@ Zentext search is a local lexical read over canonical, redacted project
 records. It does not call a model, create an embedding, traverse a graph, read
 source files, or depend on a network service.
 
-Search schema version: `2`
+Search schema version: `3`
 
 Strategy: `lexical-relevance-freshness-v2`
 
@@ -97,11 +97,13 @@ expansion.
 Every page contains:
 
 - project identity and search schema version;
+- the canonical state fingerprint, record count, and active task
+  identity/revision for the SQLite snapshot;
 - normalized query and unique tokens;
 - explicit filters and pagination metadata;
 - deterministic strategy identifier;
 - canonical record ID, type, status, revision, timestamps, refs, and redacted
-  provenance; and
+  provenance;
 - match kind, matching fields, terms, and a redacted excerpt capped at 240
   characters; and
 - an explainable freshness classification, ranking tuple, named ranking
@@ -153,6 +155,17 @@ The tuple uses integers, not a floating score or hidden heuristic. Every result
 returns its tuple and component reasons. Current state therefore cannot be
 outranked by stale state merely because stale text happens to be a closer
 lexical match.
+
+## Revision-aware derived cache
+
+Search schema 3 adds the canonical state descriptor used by the process-local
+cache. The cache key includes that state, every semantic input dimension, the
+search schema, and the retrieval strategy. Cache hit/miss state is deliberately
+absent from the result, so a warm page is semantically equal to a cold page.
+
+The reference implementation is bounded to 64 entries and 4 MiB, returns
+defensive copies, and recomputes canonical state before every lookup. See
+[`memory-search-cache.md`](./memory-search-cache.md).
 
 ## Safety and isolation
 

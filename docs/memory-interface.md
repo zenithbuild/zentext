@@ -5,7 +5,7 @@ memory interface is the provider-neutral domain boundary between canonical
 SQLite records and consumers such as the CLI, TypeScript SDK, stdio RPC, MCP,
 and project-local Codex skill.
 
-Interface version: `1.2`
+Interface version: `1.3`
 Record schema version: `1`
 
 ## Contract
@@ -19,6 +19,7 @@ interface MemoryStore {
   recordProgress(input: RecordProgressInput): Promise<ProgressResult>;
   updateTask(input: TaskUpdateInput): Promise<Task>;
   searchMemory(input: MemorySearchInput): Promise<MemorySearchPage>;
+  getSearchCacheStats(): MemorySearchCacheStats;
   queryMemory(input: MemoryQueryInput): Promise<MemoryRecord[]>;
   close(): void;
 }
@@ -50,6 +51,8 @@ identity; moving them to a different path still produces a different ID.
 `searchMemory` is the schema-versioned deterministic lexical retrieval
 contract. `queryMemory` remains available for compatibility. See
 [`memory-search.md`](./memory-search.md).
+Derived search pages use the bounded revision-aware process cache documented
+in [`memory-search-cache.md`](./memory-search-cache.md).
 
 ## Read and write operations
 
