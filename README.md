@@ -182,6 +182,8 @@ semantically equal continuation state. See the
   project-local Codex skill and acceptance procedure
 - [docs/ci.md](./docs/ci.md) — deterministic GitHub CI coverage and manual
   release gates
+- [docs/releases/0.1.0-dev.3.md](./docs/releases/0.1.0-dev.3.md) — current
+  Developer Preview release-candidate notes and limitations
 
 ## Troubleshooting
 

@@ -1,6 +1,6 @@
 {
   "name": "zentext",
-  "version": "0.1.0-dev.2",
+  "version": "0.1.0-dev.3",
   "description": "Local-first project memory layer for AI tools.",
   "type": "module",
   "main": "dist/index.js",
@@ -52,7 +52,9 @@
     "docs/sdk.md",
     "docs/rpc.md",
     "docs/safety.md",
+    "docs/ci.md",
     "docs/integrations/codex-app.md",
+    "docs/releases/0.1.0-dev.3.md",
     "docs/demo/portable-continuation",
     "LICENSE",
     "!dist/proof"

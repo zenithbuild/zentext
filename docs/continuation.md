@@ -23,16 +23,17 @@ repacked context that Zentext explicitly persists or exports.
 - Package: public, unscoped npm package `zentext`
 - Canonical published Developer Preview: `0.1.0-dev.2`
 - npm dist-tags: both `latest` and `next` resolve to `0.1.0-dev.2`
-- Repository package version on the Developer Preview branch: `0.1.0-dev.2`
+- Repository release-candidate version: `0.1.0-dev.3` (not yet published)
 - License: MIT
 - Binaries: `zentext` and `zentext-mcp`
 - Publish configuration: npm tag `next`
 
-The published versions are `0.1.0-dev.0`, `0.1.0-dev.1`, and
-`0.1.0-dev.2`. The first two are historical previews; new validation and
-continuation work must use `0.1.0-dev.2` or a later version. The original
-pre-publish reports remain useful point-in-time evidence, but their readiness
-language is not the current registry status.
+The published versions remain `0.1.0-dev.0`, `0.1.0-dev.1`, and
+`0.1.0-dev.2`. The first two are historical previews. Version
+`0.1.0-dev.3` is a release candidate until the release PR is merged, its exact
+validated tarball is published, and the registry-installed smoke test passes.
+The original pre-publish reports remain useful point-in-time evidence, but
+their readiness language is not the current registry status.
 
 Verify registry state without changing it:
 
@@ -225,9 +226,9 @@ Historical or regenerable artifacts:
 
 ## Current roadmap position
 
-M1 was merged through PR #63. Draft PR #64 implements the dependency-correct
-batch spanning **M2: Validation and Trust Boundaries** and **M3: Integration
-Surface**:
+M1 was merged through PR #63. The dependency-correct trusted-memory batch
+spanning **M2: Validation and Trust Boundaries** and **M3: Integration
+Surface** merged through PR #64:
 
 1. #27 — formal input schemas
 2. #28 — I/O sanitization
@@ -238,7 +239,11 @@ Surface**:
 7. #33 — machine-readable TypeScript SDK
 8. #34 — structured stdio RPC
 
-Provider-formatting adapters in #35 remain a later presentation layer; the
+All eight issues are closed. Release candidate `0.1.0-dev.3` packages that
+foundation, while npm `next` and `latest` remain on `0.1.0-dev.2` until an
+authenticated release completes.
+
+Provider-formatting adapters in #35 are the next presentation layer; the
 Codex, OpenClaw, Gemini, and Ollama proofs call the provider-neutral skill,
 SDK, or RPC interfaces directly. Their successful use does not complete #35.
 
@@ -248,3 +253,6 @@ from revision `2` to `6` across four unrelated environments. CLI JSON,
 TypeScript SDK, NDJSON RPC, and MCP returned semantically equal final state,
 and each of the four consumed handoffs was stale after its participant's
 write.
+
+Deterministic Node 22 and Node 24 validation is enforced by
+`.github/workflows/ci.yml`. See [the CI and manual release gates](./ci.md).
