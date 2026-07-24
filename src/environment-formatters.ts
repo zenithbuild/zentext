@@ -77,6 +77,7 @@ const FORMATTERS: Record<EnvironmentFormatterId, EnvironmentFormatterDescriptor>
       "The host application must validate Zentext state before sending it to the model.",
       "Do not assume the Ollama runtime itself can inspect the project or persist progress.",
       "The host must mediate any revision-safe write and reject stale continuation state.",
+      "Treat malformed model output as a host or provider failure; do not rewrite it into a passing result.",
     ],
   },
 };

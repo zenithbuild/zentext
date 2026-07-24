@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 import type { ContinuationView } from "../src/continuation.js";
 import {
@@ -174,5 +176,28 @@ describe("environment continuation formatters", () => {
     expect(() =>
       renderEnvironmentContinuation(unsafeFixture, "generic"),
     ).toThrow(ZentextUnsafeInputError);
+  });
+
+  it("keeps normalized real-environment evidence honest and sanitized", () => {
+    const path = join(
+      process.cwd(),
+      "tests/field-tests/environment-formatters/results.json",
+    );
+    const raw = readFileSync(path, "utf8");
+    const evidence = JSON.parse(raw);
+
+    expect(evidence.deterministic.canonical_payload_parity).toBe("pass");
+    expect(evidence.environments).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "codex", result: "pass" }),
+        expect.objectContaining({ id: "claude-code", result: "unavailable" }),
+        expect.objectContaining({
+          id: "ollama-host",
+          result: "semantic_pass_with_response_shape_failures",
+        }),
+      ]),
+    );
+    expect(evidence.conclusion.provider_specific_memory_added).toBe(false);
+    expect(raw).not.toMatch(/\/Users\/|\/home\/|github_pat_|ghp_|npm_|sk-proj-/u);
   });
 });

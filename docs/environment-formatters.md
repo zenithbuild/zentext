@@ -107,3 +107,11 @@ revision-safe write domain.
 Formatter tests prove semantic parity and deterministic output. A formatter
 test is not proof of a native provider integration; real-environment evidence
 is reported separately and named by the actual consuming environment.
+
+The current field smoke used a packed artifact. Fresh Codex CLI consumption
+returned the exact requested canonical identifiers and next action. Claude Code
+was unavailable because its executable was not installed. The Ollama host
+recovered exact semantics, while tested cloud models varied in whether they
+obeyed the requested response shape; those formatting failures are preserved
+rather than rewritten into passes. See the
+[normalized field results](../tests/field-tests/environment-formatters/results.json).
