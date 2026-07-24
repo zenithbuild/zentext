@@ -848,6 +848,7 @@ Options:
   --offset   Skip deterministic search results before returning a page
   --task-id  Restrict search to records related to one canonical task
   --include-superseded Include superseded records in search
+  --freshness Prefer current, current-only, or historical-only search results
   --focus    Prioritize records matching this topic
   --max-size Character budget for the output (default 12000)
   --out      Write the payload to a file instead of stdout

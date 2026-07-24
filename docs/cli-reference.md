@@ -22,6 +22,7 @@ zentext list [--type <type>] [--status <status>] [--limit <number>]
 zentext search "CSS determinism"
 zentext search "CSS determinism" --json
 zentext search "CSS determinism" --type task --status active
+zentext search "CSS determinism" --freshness current-only
 zentext search "CSS determinism" --limit 20 --offset 20
 zentext search "CSS determinism" --include-superseded
 ```
@@ -30,6 +31,10 @@ Search is a bounded deterministic lexical read over redacted canonical
 records. JSON output is one machine-clean `MemorySearchPage`; human output
 shows the same records and match reasons. See
 [`memory-search.md`](./memory-search.md).
+
+`--freshness` accepts `prefer-current` (the default), `current-only`, or
+`historical-only`. The default keeps useful history visible but guarantees that
+current results rank ahead of stale or historical results.
 
 ## Task workflow
 

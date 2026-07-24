@@ -144,6 +144,7 @@ async function main(): Promise<void> {
           "min-revision",
           "max-revision",
           "include-superseded",
+          "freshness",
           "limit",
           "offset",
           "json",
@@ -167,14 +168,14 @@ async function main(): Promise<void> {
             throw new CliError(`--${name} must be a number`, 1);
           }
         }
-        for (const name of ["type", "status", "task-id"] as const) {
+        for (const name of ["type", "status", "task-id", "freshness"] as const) {
           if (flags[name] !== undefined && typeof flags[name] !== "string") {
             throw new CliError(`--${name} requires a value`, 1);
           }
         }
         if (positional.length !== 1) {
           throw new CliError(
-            "Usage: zentext search <query> [--type <type>] [--status <status>] [--limit <n>] [--offset <n>] [--json]",
+            "Usage: zentext search <query> [--type <type>] [--status <status>] [--freshness <prefer-current|current-only|historical-only>] [--limit <n>] [--offset <n>] [--json]",
             1,
           );
         }
@@ -194,6 +195,14 @@ async function main(): Promise<void> {
             ? { max_revision: numberFlag(flags, "max-revision") }
             : {}),
           include_superseded: booleanFlag(flags, "include-superseded"),
+          ...(stringFlag(flags, "freshness")
+            ? {
+                freshness_mode: stringFlag(flags, "freshness") as
+                  | "prefer-current"
+                  | "current-only"
+                  | "historical-only",
+              }
+            : {}),
           ...(numberFlag(flags, "limit") !== undefined
             ? { limit: numberFlag(flags, "limit") }
             : {}),

@@ -5,7 +5,7 @@ memory interface is the provider-neutral domain boundary between canonical
 SQLite records and consumers such as the CLI, TypeScript SDK, stdio RPC, MCP,
 and project-local Codex skill.
 
-Interface version: `1.1`
+Interface version: `1.2`
 Record schema version: `1`
 
 ## Contract

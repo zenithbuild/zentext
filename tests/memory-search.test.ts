@@ -53,7 +53,7 @@ function parsed(
 }
 
 describe("deterministic memory search engine", () => {
-  it("matches exact, phrase, and cross-field tokens without ranking by relevance", () => {
+  it("ranks lexical quality after deterministic current-state semantics", () => {
     const records = [
       fixtureRecord("rec_task_c", "CSS stable", "2026-01-01T00:00:00.000Z"),
       fixtureRecord(
@@ -79,22 +79,28 @@ describe("deterministic memory search engine", () => {
     expect(page.strategy).toBe(MEMORY_SEARCH_STRATEGY);
     expect(page.results.map((result) => result.id)).toEqual([
       "rec_task_b",
-      "rec_task_a",
       "rec_task_c",
+      "rec_task_a",
     ]);
     expect(page.results.map((result) => result.match.kind)).toEqual([
       "tokens",
-      "tokens",
       "exact",
+      "tokens",
     ]);
+    expect(page.results[0].ranking.active_task_relationship).toBe(true);
+    expect(page.results[1].ranking.match_quality).toBe("exact");
   });
 
   it("uses updated_at descending and canonical id ascending as a stable tie-breaker", () => {
     const timestamp = "2026-01-01T00:00:00.000Z";
     const page = searchMemoryRecords(
       [
-        fixtureRecord("rec_task_b", "shared term", timestamp),
-        fixtureRecord("rec_task_a", "shared term", timestamp),
+        fixtureRecord("rec_task_b", "shared term", timestamp, {
+          status: "done",
+        }),
+        fixtureRecord("rec_task_a", "shared term", timestamp, {
+          status: "done",
+        }),
       ],
       parsed({ query: "shared" }),
       "0123456789abcdef",
@@ -103,6 +109,86 @@ describe("deterministic memory search engine", () => {
       "rec_task_a",
       "rec_task_b",
     ]);
+  });
+
+  it("never lets a stale exact handoff outrank current state", () => {
+    const task = fixtureRecord(
+      "rec_task_live",
+      "CSS continuation task",
+      "2026-01-01T00:00:00.000Z",
+      { revision: 2 },
+    );
+    const staleHandoff = fixtureRecord(
+      "rec_handoff_stale",
+      "CSS continuation",
+      "2026-01-02T00:00:00.000Z",
+      {
+        type: "handoff",
+        status: "latest",
+        from: "tool-a",
+        to: "tool-b",
+        context: "CSS continuation",
+        state: "Partial state",
+        next: "Continue",
+        structured_handoff: {
+          active_task: { id: task.id, revision: 1 },
+        },
+      } as Partial<AnyRecord>,
+    );
+    const page = searchMemoryRecords(
+      [staleHandoff, task],
+      parsed({ query: "CSS continuation" }),
+      "0123456789abcdef",
+    );
+
+    expect(page.results.map((result) => result.id)).toEqual([
+      task.id,
+      staleHandoff.id,
+    ]);
+    expect(page.results.map((result) => result.ranking.freshness)).toEqual([
+      "current",
+      "stale",
+    ]);
+    expect(page.results[1].ranking.match_quality).toBe("exact");
+  });
+
+  it("classifies a selected handoff at the live task revision as current", () => {
+    const task = fixtureRecord(
+      "rec_task_live",
+      "Current handoff task",
+      "2026-01-01T00:00:00.000Z",
+      { revision: 2 },
+    );
+    const handoff = fixtureRecord(
+      "rec_handoff_current",
+      "Current handoff",
+      "2026-01-02T00:00:00.000Z",
+      {
+        type: "handoff",
+        status: "latest",
+        from: "tool-a",
+        to: "tool-b",
+        context: "Current handoff state",
+        state: "Ready",
+        next: "Continue",
+        structured_handoff: {
+          active_task: { id: task.id, revision: 2 },
+        },
+      } as Partial<AnyRecord>,
+    );
+    const page = searchMemoryRecords(
+      [task, handoff],
+      parsed({ query: "Current handoff" }),
+      "0123456789abcdef",
+    );
+
+    expect(
+      page.results.find((result) => result.id === handoff.id)?.ranking,
+    ).toMatchObject({
+      freshness: "current",
+      freshness_reason: "handoff:task-revision-current",
+      active_task_relationship: true,
+    });
   });
 
   it("normalizes Unicode deterministically without fuzzy matching", () => {
@@ -119,6 +205,35 @@ describe("deterministic memory search engine", () => {
     );
     expect(page.results.map((result) => result.id)).toEqual(["rec_task_unicode"]);
     expect(page.query.normalized).toBe("café");
+  });
+
+  it("handles missing and malformed timestamps without nondeterministic parsing", () => {
+    const page = searchMemoryRecords(
+      [
+        fixtureRecord("rec_task_b", "timestamp term", "not-a-timestamp", {
+          status: "done",
+        }),
+        fixtureRecord(
+          "rec_task_c",
+          "timestamp term",
+          "2026-02-30T00:00:00.000Z",
+          { status: "done" },
+        ),
+        fixtureRecord("rec_task_a", "timestamp term", "", {
+          status: "done",
+        }),
+      ],
+      parsed({ query: "timestamp" }),
+      "0123456789abcdef",
+    );
+    expect(page.results.map((result) => result.id)).toEqual([
+      "rec_task_a",
+      "rec_task_b",
+      "rec_task_c",
+    ]);
+    expect(page.results.every((result) => !result.ranking.updated_at_valid)).toBe(
+      true,
+    );
   });
 
   it("paginates after deterministic filtering and exposes bounded page metadata", () => {
@@ -346,6 +461,87 @@ describe("project memory search surfaces", () => {
     project.close();
   });
 
+  it("classifies and explains current, historical, stale, and superseded state", async () => {
+    const project = await openProject({ cwd: tempProject });
+    const page = await project.searchMemory({
+      query: "CSS",
+      include_superseded: true,
+      limit: 100,
+    });
+    const byTitle = new Map(
+      page.results.map((result) => [result.title, result]),
+    );
+
+    expect(byTitle.get("Prove CSS determinism")?.ranking).toMatchObject({
+      freshness: "current",
+      active_task_relationship: true,
+    });
+    expect(byTitle.get("Stable renderer decision")?.ranking.freshness).toBe(
+      "current",
+    );
+    expect(byTitle.get("Browser fixture unavailable")?.ranking.freshness).toBe(
+      "current",
+    );
+    expect(byTitle.get("CSS snapshot verification")?.ranking.freshness).toBe(
+      "historical",
+    );
+    expect(byTitle.get("CSS continuation")?.ranking).toMatchObject({
+      freshness: "stale",
+      freshness_reason: "handoff:task-revision-mismatch",
+    });
+    expect(
+      page.results.find((result) => result.id === oldDecisionId)?.ranking
+        .freshness,
+    ).toBe("superseded");
+    expect(
+      page.results.every((result) => result.ranking.reasons.length >= 7),
+    ).toBe(true);
+    project.close();
+  });
+
+  it("supports explicit current-only and historical-only query modes", async () => {
+    const project = await openProject({ cwd: tempProject });
+    const current = await project.searchMemory({
+      query: "CSS",
+      freshness_mode: "current-only",
+      include_superseded: true,
+      limit: 100,
+    });
+    expect(current.results.length).toBeGreaterThan(0);
+    expect(
+      current.results.every(
+        (result) => result.ranking.freshness === "current",
+      ),
+    ).toBe(true);
+
+    const historical = await project.searchMemory({
+      query: "CSS",
+      freshness_mode: "historical-only",
+      include_superseded: true,
+      limit: 100,
+    });
+    expect(
+      new Set(historical.results.map((result) => result.ranking.freshness)),
+    ).toEqual(new Set(["historical", "stale", "superseded"]));
+    project.close();
+  });
+
+  it("identifies direct file matches and verification confidence explicitly", async () => {
+    const project = await openProject({ cwd: tempProject });
+    const files = await project.searchMemory({
+      query: "src/theme.css",
+      limit: 100,
+    });
+    expect(files.results.some((result) => result.ranking.direct_file_match)).toBe(
+      true,
+    );
+    const validation = await project.searchMemory({
+      query: "Snapshot suite",
+    });
+    expect(validation.results[0].ranking.verification_confidence).toBe("passed");
+    project.close();
+  });
+
   it("rejects empty, oversized, unsafe, malformed, and secret-bearing queries", async () => {
     const project = await openProject({ cwd: tempProject });
     for (const query of [
@@ -372,6 +568,12 @@ describe("project memory search surfaces", () => {
         statuses: ["accepted"],
       }),
     ).rejects.toMatchObject({ code: "INVALID_INPUT" });
+    await expect(
+      project.searchMemory({
+        query: "CSS",
+        freshness_mode: "newest" as "prefer-current",
+      }),
+    ).rejects.toMatchObject({ code: "INVALID_INPUT" });
     project.close();
   });
 
@@ -390,6 +592,7 @@ describe("project memory search surfaces", () => {
       query: "CSS determinism",
       task_id: taskId,
       include_superseded: true,
+      freshness_mode: "historical-only" as const,
       limit: 50,
     };
     const project = await openProject({ cwd: tempProject });
