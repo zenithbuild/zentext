@@ -16,7 +16,7 @@ import {
   handoffValidate,
   init,
   list,
-  parseContinuationFormat,
+  parseContinuationOptions,
   parseHandoffExportFormat,
   printUsage,
   repack,
@@ -105,10 +105,17 @@ async function main(): Promise<void> {
       }
       case "continue": {
         if (positional.length > 0) {
-          throw new CliError("Usage: zentext continue [--json | --markdown | --prompt]", 1);
+          throw new CliError(
+            "Usage: zentext continue [--json | --markdown | --prompt] | --for <environment>",
+            1,
+          );
         }
+        const continuation = parseContinuationOptions(flags);
         result = await continueProject(cwd, {
-          format: parseContinuationFormat(flags),
+          format: continuation.format,
+          environment: continuation.environment,
+          compact: continuation.compact,
+          includeInstructions: continuation.includeInstructions,
         });
         break;
       }

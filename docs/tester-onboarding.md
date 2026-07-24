@@ -98,6 +98,20 @@ available with `zentext continue --json|--markdown|--prompt`. If the task has
 been updated in the meantime, continuation exits nonzero and refuses the stale
 state.
 
+Thin environment presentation wrappers are available without changing the
+canonical memory:
+
+```bash
+zentext continue --for generic
+zentext continue --for codex
+zentext continue --for claude-code
+zentext continue --for ollama-host
+```
+
+See [`environment-formatters.md`](./environment-formatters.md) for aliases,
+wrapper controls, and the distinction between formatting and native
+integration.
+
 ### 5. Validate before trusting a handoff
 
 ```bash

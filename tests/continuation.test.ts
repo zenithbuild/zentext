@@ -10,6 +10,7 @@ import {
   handoffExport,
   init,
   parseContinuationFormat,
+  parseContinuationOptions,
   parseHandoffExportFormat,
   taskCreate,
   taskUpdate,
@@ -208,6 +209,14 @@ describe("validated continuation view", () => {
       }
     }
 
+    const adapted = await continueProject(tempProject, {
+      environment: "codex",
+    });
+    expect(adapted.exitCode).toBe(4);
+    expect(adapted.output).toContain("stale");
+    expect(adapted.output).not.toContain("Source A is complete");
+    expect(adapted.output).not.toContain("zentext.environment/codex");
+
     for (const format of ["json", "markdown", "prompt"] as const) {
       const result = await handoffExport(tempProject, { format });
       expect(result.exitCode).toBe(4);
@@ -291,6 +300,45 @@ describe("continue output option parsing", () => {
       expect(error).toBeInstanceOf(CliError);
       expect((error as CliError).exitCode).toBe(1);
     }
+  });
+
+  it("parses environment formatters, aliases, and wrapper controls", () => {
+    expect(parseContinuationOptions({ for: "generic" })).toEqual({
+      format: "human",
+      environment: "generic",
+      compact: false,
+      includeInstructions: false,
+    });
+    expect(
+      parseContinuationOptions({
+        for: "claude",
+        compact: true,
+        "include-instructions": true,
+      }),
+    ).toEqual({
+      format: "human",
+      environment: "claude-code",
+      compact: true,
+      includeInstructions: true,
+    });
+    expect(parseContinuationOptions({ for: "ollama" }).environment).toBe(
+      "ollama-host",
+    );
+  });
+
+  it("rejects unknown adapters and conflicting presentation modes", () => {
+    expect(() => parseContinuationOptions({ for: "gemini" })).toThrow(
+      /Supported values: generic, codex, claude-code, ollama-host/,
+    );
+    expect(() =>
+      parseContinuationOptions({ for: "codex", json: true }),
+    ).toThrow(/cannot be combined/);
+    expect(() => parseContinuationOptions({ compact: true })).toThrow(
+      /require --for/,
+    );
+    expect(() =>
+      parseContinuationOptions({ for: "codex", compact: "yes" }),
+    ).toThrow(/does not accept a value/);
   });
 });
 

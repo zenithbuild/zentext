@@ -23,16 +23,19 @@ repacked context that Zentext explicitly persists or exports.
 - Package: public, unscoped npm package `zentext`
 - Canonical published Developer Preview: `0.1.0-dev.2`
 - npm dist-tags: both `latest` and `next` resolve to `0.1.0-dev.2`
-- Repository package version on the Developer Preview branch: `0.1.0-dev.2`
+- Merged and tagged repository version: `0.1.0-dev.3` (npm publication
+  awaiting the required interactive OTP)
 - License: MIT
 - Binaries: `zentext` and `zentext-mcp`
 - Publish configuration: npm tag `next`
 
-The published versions are `0.1.0-dev.0`, `0.1.0-dev.1`, and
-`0.1.0-dev.2`. The first two are historical previews; new validation and
-continuation work must use `0.1.0-dev.2` or a later version. The original
-pre-publish reports remain useful point-in-time evidence, but their readiness
-language is not the current registry status.
+The published versions remain `0.1.0-dev.0`, `0.1.0-dev.1`, and
+`0.1.0-dev.2`. The first two are historical previews. Version
+`0.1.0-dev.3` is merged, tagged, and available as a GitHub prerelease. It does
+not become the published Developer Preview until the exact validated tarball is
+published and the registry-installed smoke test passes.
+The original pre-publish reports remain useful point-in-time evidence, but
+their readiness language is not the current registry status.
 
 Verify registry state without changing it:
 
@@ -109,8 +112,8 @@ The Developer Preview exposes:
 - tasks: `task create`, `task show`, `task update`
 - handoffs: `handoff create`, `handoff show`, `handoff validate`,
   `handoff acknowledge`, `handoff export`
-- validated continuation: `continue` with human, JSON, Markdown, and canonical
-  tool-neutral prompt output
+- validated continuation: `continue` with human, JSON, Markdown, canonical
+  tool-neutral prompt output, and versioned environment presentation wrappers
 - machine integration: `rpc` with typed NDJSON requests and responses
 
 Task and handoff mutations flow through the transactional writer. General
@@ -229,9 +232,9 @@ Historical or regenerable artifacts:
 
 ## Current roadmap position
 
-M1 was merged through PR #63. Draft PR #64 implements the dependency-correct
-batch spanning **M2: Validation and Trust Boundaries** and **M3: Integration
-Surface**:
+M1 was merged through PR #63. The dependency-correct trusted-memory batch
+spanning **M2: Validation and Trust Boundaries** and **M3: Integration
+Surface** merged through PR #64:
 
 1. #27 — formal input schemas
 2. #28 — I/O sanitization
@@ -242,9 +245,20 @@ Surface**:
 7. #33 — machine-readable TypeScript SDK
 8. #34 — structured stdio RPC
 
-Provider-formatting adapters in #35 remain a later presentation layer; the
-Codex, OpenClaw, Gemini, and Ollama proofs call the provider-neutral skill,
-SDK, or RPC interfaces directly. Their successful use does not complete #35.
+All eight trusted-memory issues are closed. Release `0.1.0-dev.3` is merged,
+tagged, and available as a GitHub prerelease; npm publication remains blocked
+on the required interactive OTP, so npm `next` and `latest` still resolve to
+`0.1.0-dev.2`.
+
+PR #66 closes issue #35 with a thin versioned presentation layer over the same
+`ContinuationView`. Canonical formatter identifiers are `generic`, `codex`,
+`claude-code`, and `ollama-host`; `claude` and `ollama` remain aliases. The
+wrappers preserve a complete redacted canonical payload and create no
+environment-specific memory or write path.
+
+OpenClaw and Antigravity/Gemini are not formatter identifiers in #35. Their
+earlier proof used the provider-neutral skill or RPC interfaces directly.
+After #35, the next implementation dependency is #36 project-memory search.
 
 The authoritative packed-package release-readiness evidence is under
 `tests/field-tests/trusted-memory-cross-tool/`. One canonical fixture advanced
@@ -252,3 +266,6 @@ from revision `2` to `6` across four unrelated environments. CLI JSON,
 TypeScript SDK, NDJSON RPC, and MCP returned semantically equal final state,
 and each of the four consumed handoffs was stale after its participant's
 write.
+
+Deterministic Node 22 and Node 24 validation is enforced by
+`.github/workflows/ci.yml`. See [the CI and manual release gates](./ci.md).

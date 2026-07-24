@@ -37,6 +37,12 @@ import {
   renderStaleContinuation,
   type ContinuationFormat,
 } from "../continuation-format.js";
+import {
+  renderEnvironmentContinuation,
+  resolveEnvironmentFormatterId,
+  UnsupportedEnvironmentFormatterError,
+  type EnvironmentFormatterId,
+} from "../environment-formatters.js";
 import type { FlagValue } from "./args.js";
 import { validateHandoffQuality } from "../handoff-quality.js";
 import { redactForOutput } from "../safety.js";
@@ -74,6 +80,71 @@ export function parseContinuationFormat(
     );
   }
   return modes[0] ?? "human";
+}
+
+export interface ParsedContinuationOptions {
+  format: ContinuationFormat;
+  environment?: EnvironmentFormatterId;
+  compact: boolean;
+  includeInstructions: boolean;
+}
+
+export function parseContinuationOptions(
+  flags: Record<string, FlagValue>,
+): ParsedContinuationOptions {
+  const presentationKeys = new Set(["for", "compact", "include-instructions"]);
+  const formatFlags = Object.fromEntries(
+    Object.entries(flags).filter(([key]) => !presentationKeys.has(key)),
+  );
+  const format = parseContinuationFormat(formatFlags);
+  const requested = flags.for;
+  const compact = flags.compact;
+  const includeInstructions = flags["include-instructions"];
+
+  for (const [name, value] of [
+    ["compact", compact],
+    ["include-instructions", includeInstructions],
+  ] as const) {
+    if (value !== undefined && value !== true) {
+      throw new CliError(`--${name} does not accept a value`, 1);
+    }
+  }
+
+  if (requested === undefined) {
+    if (compact === true || includeInstructions === true) {
+      throw new CliError(
+        "--compact and --include-instructions require --for <environment>",
+        1,
+      );
+    }
+    return { format, compact: false, includeInstructions: false };
+  }
+  if (typeof requested !== "string" || requested.trim() === "") {
+    throw new CliError(
+      "Usage: zentext continue --for <generic|codex|claude-code|ollama-host>",
+      1,
+    );
+  }
+  if (format !== "human") {
+    throw new CliError(
+      "--for cannot be combined with --json, --markdown, or --prompt",
+      1,
+    );
+  }
+
+  try {
+    return {
+      format,
+      environment: resolveEnvironmentFormatterId(requested),
+      compact: compact === true,
+      includeInstructions: includeInstructions === true,
+    };
+  } catch (error) {
+    if (error instanceof UnsupportedEnvironmentFormatterError) {
+      throw new CliError(error.message, 1);
+    }
+    throw error;
+  }
 }
 
 export type HandoffExportFormat = "json" | "markdown" | "prompt";
@@ -432,7 +503,12 @@ export async function handoffValidate(
 
 export async function continueProject(
   cwd: string,
-  options: { format?: ContinuationFormat } = {},
+  options: {
+    format?: ContinuationFormat;
+    environment?: EnvironmentFormatterId;
+    compact?: boolean;
+    includeInstructions?: boolean;
+  } = {},
 ): Promise<{ output: string; exitCode: number }> {
   const format = options.format ?? "human";
   const store = await openStore(cwd);
@@ -440,7 +516,15 @@ export async function continueProject(
     const meta = await store.openProjectStore(cwd);
     try {
       const view = buildContinuationView(store, meta);
-      return { output: renderContinuation(view, format), exitCode: 0 };
+      return {
+        output: options.environment
+          ? renderEnvironmentContinuation(view, options.environment, {
+              compact: options.compact,
+              includeInstructions: options.includeInstructions,
+            })
+          : renderContinuation(view, format),
+        exitCode: 0,
+      };
     } catch (error) {
       if (error instanceof ContinuationStaleError) {
         return {
@@ -676,6 +760,7 @@ Usage:
   zentext init
   zentext status
   zentext continue [--json | --markdown | --prompt]
+  zentext continue --for <environment> [--compact] [--include-instructions]
   zentext rpc
   zentext task {create|show|update}
   zentext show <id>
@@ -714,6 +799,10 @@ Continuation output:
   zentext continue --json     Stable machine-readable continuation
   zentext continue --markdown Portable Markdown continuation
   zentext continue --prompt   Tool-neutral continuation prompt
+  zentext continue --for generic      Generic semantic baseline
+  zentext continue --for codex        Codex project guidance
+  zentext continue --for claude-code  Claude Code project guidance
+  zentext continue --for ollama-host  Ollama host guidance
 
 Options:
   --type     Filter by record type (task, decision, blocker, ...)
@@ -725,6 +814,9 @@ Options:
   --json     Output supported commands as JSON
   --markdown Output continuation as portable Markdown
   --prompt   Output a tool-neutral continuation prompt
+  --for      Format the validated continuation for a documented environment
+  --compact  Reduce environment wrapper text; requires --for
+  --include-instructions Add the complete tool-neutral contract; requires --for
 
 Repeatable options:
   --note, --completed, --blockers, --files-changed, and --verification may be

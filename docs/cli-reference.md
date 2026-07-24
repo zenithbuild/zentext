@@ -59,6 +59,10 @@ zentext continue
 zentext continue --json
 zentext continue --markdown
 zentext continue --prompt
+zentext continue --for generic
+zentext continue --for codex
+zentext continue --for claude-code
+zentext continue --for ollama-host
 ```
 
 `continue` resolves the project, active or blocked task, and current handoff,
@@ -76,7 +80,18 @@ Prompt instructions come from one canonical template documented in
 [`continuation-prompt.md`](./continuation-prompt.md). CLI and handoff export do
 not maintain separate provider instructions.
 
-The modes are mutually exclusive. Unknown options fail with exit code 1. A
+`--for <environment>` applies a versioned presentation wrapper to that same
+validated state. Supported canonical identifiers are `generic`, `codex`,
+`claude-code`, and `ollama-host`; `claude` and `ollama` are aliases for the
+last two. `--compact` shortens the wrapper and `--include-instructions` adds
+the full tool-neutral continuation contract. These options cannot be combined
+with `--json`, `--markdown`, or `--prompt`.
+
+Formatters preserve the complete canonical state and do not create
+environment-specific memory. See
+[`environment-formatters.md`](./environment-formatters.md).
+
+The standard modes are mutually exclusive. Unknown options fail with exit code 1. A
 missing store returns exit code 2, missing actionable task or handoff returns 3,
 stale state returns 4, and malformed canonical state returns 5.
 
