@@ -180,6 +180,8 @@ semantically equal continuation state. See the
   explicit overrides, and output redaction
 - [docs/integrations/codex-app.md](./docs/integrations/codex-app.md) —
   project-local Codex skill and acceptance procedure
+- [docs/ci.md](./docs/ci.md) — deterministic GitHub CI coverage and manual
+  release gates
 
 ## Troubleshooting
 
