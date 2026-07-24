@@ -25,6 +25,7 @@ export type {
   ListFilter,
   RecordType,
   RecordRefs,
+  RecordProvenance,
   TaskRecord,
   DecisionRecord,
   BlockerRecord,
@@ -76,3 +77,54 @@ export {
   TOOL_NEUTRAL_CONTINUATION_INSTRUCTIONS,
   renderToolNeutralContinuationPrompt,
 } from "./continuation-prompt.js";
+
+export {
+  openProject,
+  getContinuation,
+  getActiveTask,
+  validateHandoff,
+  recordProgress,
+  updateTask,
+  queryMemory,
+  type ZentextProject,
+} from "./sdk.js";
+export {
+  MEMORY_INTERFACE_VERSION,
+  SqliteMemoryStore,
+  openMemoryStore,
+  type MemoryStore,
+  type CurrentHandoff,
+  type HandoffValidationResult,
+  type ProgressResult,
+} from "./memory-interface.js";
+export {
+  ZENTEXT_SCHEMA_VERSION,
+  CreateRecordInputSchema,
+  UpdateRecordInputSchema,
+  StructuredHandoffSchema,
+  HandoffAcknowledgementSchema,
+  ExportRequestSchema,
+  StoredRecordSchema,
+  OpenProjectInputSchema,
+  TaskUpdateInputSchema,
+  RecordProgressInputSchema,
+  MemoryQueryInputSchema,
+  type OpenProjectInput,
+  type TaskUpdateInput,
+  type RecordProgressInput,
+  type MemoryQueryInput,
+} from "./schemas.js";
+export {
+  ZentextError,
+  ZentextInputError,
+  ZentextUnsafeInputError,
+  ZentextSecretError,
+  type ZentextErrorCode,
+} from "./errors.js";
+export {
+  RPC_PROTOCOL_VERSION,
+  RPC_SCHEMA_VERSION,
+  RPC_METHODS,
+  type RpcRequest,
+  type RpcResponse,
+} from "./rpc/protocol.js";

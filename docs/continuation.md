@@ -1,6 +1,6 @@
 # Zentext continuation guide
 
-Last verified: 2026-07-22
+Last verified: 2026-07-23
 
 This document is the durable starting point for continuing Zentext from a new
 machine. It describes the implemented repository and published package, not the
@@ -65,7 +65,8 @@ built-in `node:sqlite` fallback. The fallback requires Node 22.13 or newer.
 
 Zentext derives a stable 16-character project ID from the normalized Git
 `origin` URL. HTTPS and SSH forms of the same remote normalize to the same ID.
-When no Git origin exists, the ID is derived from the absolute project path.
+When no Git origin exists, the ID is derived from the canonical real absolute
+project path so equivalent filesystem aliases resolve consistently.
 Branches and worktrees do not alter the ID.
 
 Live stores are outside the repository:
@@ -110,6 +111,7 @@ The Developer Preview exposes:
   `handoff acknowledge`, `handoff export`
 - validated continuation: `continue` with human, JSON, Markdown, and canonical
   tool-neutral prompt output
+- machine integration: `rpc` with typed NDJSON requests and responses
 
 Task and handoff mutations flow through the transactional writer. General
 record-authoring commands such as `zentext add` and `zentext edit` are not part
@@ -117,15 +119,30 @@ of this preview.
 
 ### MCP surface
 
-`zentext-mcp` is a stdio MCP server exposing four read-only tools:
+`zentext-mcp` is a stdio MCP server exposing five read-only tools:
 
+- `memory.continuation`
 - `memory.read`
 - `memory.list`
 - `memory.query`
 - `memory.repack`
 
 MCP mutation tools are not implemented. The public CLI is the supported write
-surface for tasks and handoffs in this preview.
+surface for tasks and handoffs in the published preview. The current development
+branch also exposes the typed SDK and `zentext rpc`; both reuse the same
+validated writer for mutations.
+
+### Stable integration surface
+
+The storage-independent `MemoryStore` domain contract exposes active-task,
+current-handoff, continuation, validation, progress, task-update, and
+deterministic query operations. `SqliteMemoryStore` is the first adapter.
+
+The TypeScript SDK and versioned NDJSON RPC protocol are machine-readable views
+over that contract. Formal schemas, sanitization, likely-secret detection,
+output redaction, optimistic revisions, stale validation, quality warnings, and
+provenance apply at the shared boundary. The repository-local Codex skill is a
+thin RPC client, not a Codex-specific memory system.
 
 ### Repacking and proof artifacts
 
@@ -208,13 +225,26 @@ Historical or regenerable artifacts:
 
 ## Current roadmap position
 
-The active milestone is **M1: Cross-Platform Text Proof**:
+M1 was merged through PR #63. Draft PR #64 implements the dependency-correct
+batch spanning **M2: Validation and Trust Boundaries** and **M3: Integration
+Surface**:
 
-1. #26 — preserve repeated CLI option values
-2. #22 — run the official isolated cross-platform field test
-3. #23 — provide one validated `zentext continue` entry point
-4. #24 — export the same state as JSON, Markdown, and prompt text
-5. #25 — keep one canonical tool-neutral continuation template
+1. #27 — formal input schemas
+2. #28 — I/O sanitization
+3. #29 — secret detection and redaction
+4. #30 — handoff quality validation
+5. #31 — record provenance
+6. #32 — stable memory interface
+7. #33 — machine-readable TypeScript SDK
+8. #34 — structured stdio RPC
 
-After this batch, the next ordered issue is
-[#27 — Define formal input schemas](https://github.com/zenithbuild/zentext/issues/27).
+Provider-formatting adapters in #35 remain a later presentation layer; the
+Codex, OpenClaw, Gemini, and Ollama proofs call the provider-neutral skill,
+SDK, or RPC interfaces directly. Their successful use does not complete #35.
+
+The authoritative packed-package release-readiness evidence is under
+`tests/field-tests/trusted-memory-cross-tool/`. One canonical fixture advanced
+from revision `2` to `6` across four unrelated environments. CLI JSON,
+TypeScript SDK, NDJSON RPC, and MCP returned semantically equal final state,
+and each of the four consumed handoffs was stale after its participant's
+write.

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { mkdtempSync, rmSync, existsSync, writeFileSync } from "node:fs";
 import { join, basename } from "node:path";
 import { tmpdir } from "node:os";
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
@@ -125,6 +125,11 @@ describe("npm package validation", () => {
       "package/docs/continuation-prompt.md",
       "package/docs/portability-audit.md",
       "package/docs/recovery-runbook.md",
+      "package/docs/memory-interface.md",
+      "package/docs/sdk.md",
+      "package/docs/rpc.md",
+      "package/docs/safety.md",
+      "package/docs/integrations/codex-app.md",
       "package/docs/demo/portable-continuation/README.md",
       "package/docs/demo/portable-continuation/run-demo.mjs",
       "package/docs/demo/portable-continuation/tool-a.mjs",
@@ -153,6 +158,7 @@ describe("npm package validation", () => {
     const out = runInstalled(["--help"]);
     expect(out).toContain("Zentext CLI");
     expect(out).toContain("handoff");
+    expect(out).toContain("zentext rpc");
   });
 
   it("installed zentext-mcp completes initialize and tools/list", () => {
@@ -180,7 +186,87 @@ await client.close();
       stdio: "pipe",
       timeout: 30_000,
     });
-    expect(out.trim()).toBe("memory.list,memory.query,memory.read,memory.repack");
+    expect(out.trim()).toBe(
+      "memory.continuation,memory.list,memory.query,memory.read,memory.repack",
+    );
+  });
+
+  it("packed consumer uses the SDK and RPC without terminal parsing", () => {
+    const project = mkdtempSync(join(tmpdir(), "zentext-sdk-rpc-project-"));
+    const home = mkdtempSync(join(tmpdir(), "zentext-sdk-rpc-home-"));
+    runInstalled(["init"], { cwd: project, home });
+    runInstalled(
+      ["task", "create", "--title", "SDK RPC task", "--goal", "Prove packed interfaces"],
+      { cwd: project, home },
+    );
+    runInstalled(
+      [
+        "handoff",
+        "create",
+        "--from",
+        "packed-tool-a",
+        "--stopping-point",
+        "The packed task is initialized and ready for an SDK read.",
+        "--next-action",
+        "Read the same continuation over SDK and RPC.",
+        "--completed",
+        "Initialized packed fixture",
+        "--files-changed",
+        "work/report.md",
+        "--verification",
+        "CLI handoff is current",
+      ],
+      { cwd: project, home },
+    );
+    const script = join(installDir, "sdk-rpc-smoke.mjs");
+    const bin = join(installDir, "node_modules", "zentext", "dist", "cli", "cli.js");
+    writeFileSync(
+      script,
+      `
+import { spawnSync } from "node:child_process";
+import { openProject } from "zentext";
+
+const cwd = ${JSON.stringify(project)};
+const opened = await openProject({ cwd });
+const sdk = await opened.getContinuation();
+const projectId = opened.meta.projectId;
+opened.close();
+const request = {
+  protocol_version: "1.0",
+  id: "packed-rpc",
+  method: "continuation.get",
+  params: { cwd, project_id: projectId }
+};
+const rpcRun = spawnSync(process.execPath, [${JSON.stringify(bin)}, "rpc"], {
+  cwd,
+  env: process.env,
+  input: JSON.stringify(request) + "\\n",
+  encoding: "utf8"
+});
+if (rpcRun.status !== 0) throw new Error(rpcRun.stderr);
+const rpc = JSON.parse(rpcRun.stdout.trim());
+console.log(JSON.stringify({
+  same: JSON.stringify(sdk) === JSON.stringify(rpc.result),
+  status: sdk.validation.status,
+  stdoutLines: rpcRun.stdout.trim().split("\\n").length
+}));
+`,
+      "utf8",
+    );
+    const env = { ...process.env, HOME: home };
+    const output = execFileSync(process.execPath, [script], {
+      cwd: installDir,
+      env,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    expect(JSON.parse(output)).toEqual({
+      same: true,
+      status: "current",
+      stdoutLines: 1,
+    });
+    rmSync(project, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
   });
 
   it("installed zentext init works in a fresh project", () => {
@@ -466,6 +552,24 @@ await client.close();
     expect(runInstalled(["handoff", "export", "--format", "prompt"])).toContain(
       "Tool-neutral Zentext continuation instruction",
     );
+
+    const projectId = JSON.parse(runInstalled(["continue", "--json"])).project.id;
+    const rpcRequest = JSON.stringify({
+      protocol_version: "1.0",
+      id: "fallback-rpc",
+      method: "continuation.get",
+      params: { cwd: project, project_id: projectId },
+    });
+    const rpcOut = execFileSync(process.execPath, [bin, "rpc"], {
+      cwd: project,
+      env,
+      input: `${rpcRequest}\n`,
+      encoding: "utf8",
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    const rpcResponse = JSON.parse(rpcOut);
+    expect(rpcResponse.ok).toBe(true);
+    expect(rpcResponse.result.validation.status).toBe("current");
 
     const updateOut = runInstalled(["task", "update", "--summary", "Updated", "--note", "Progress"]);
     expect(updateOut).toContain("Updated task");

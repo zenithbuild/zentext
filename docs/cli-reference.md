@@ -89,6 +89,18 @@ zentext repack [--focus <text>] [--max-size <characters>] [--out <path>]
 Repacking produces deterministic Markdown from selected project records. Use
 `--out` to write it to a file; otherwise it is printed to standard output.
 
+## Structured stdio
+
+```sh
+zentext rpc
+```
+
+`rpc` reads versioned NDJSON requests from standard input and writes response
+JSON only to standard output. Diagnostics go to standard error. It exposes the
+same validated memory interface as the TypeScript SDK, including continuation
+reads, progress recording, task updates, handoff validation, capability
+discovery, and deterministic queries. See [`rpc.md`](./rpc.md).
+
 ## Current boundaries
 
 The Developer Preview does not implement general `add`, `edit`, or `audit`

@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "status": "passed",
+  "executed_on": "2026-07-23",
+  "package": "zentext@0.1.0-dev.2 packed artifact",
+  "exact_prompt": "Read the current Zentext project memory, explain where the work stopped, then continue from the recorded next action. Do not repeat completed work.",
+  "summary": "Four unrelated tool environments recovered and advanced one canonical packed-package project without prior conversation history. Every participant explained the recovered state, completed one recorded next action, advanced one revision, and made the handoff it consumed stale.",
+  "interface_parity": "CLI JSON = TypeScript SDK = NDJSON RPC = MCP at revision 6",
+  "supported_runtime_validation": [
+    {
+      "node": "v22.23.1",
+      "test_files": 20,
+      "tests": 285,
+      "package_bytes": 129398,
+      "package_files": 137,
+      "native_consumer": "pass",
+      "fallback_consumer": "pass",
+      "field_validator": "pass"
+    },
+    {
+      "node": "v24.18.0",
+      "test_files": 20,
+      "tests": 285,
+      "package_bytes": 129398,
+      "package_files": 137,
+      "native_consumer": "pass",
+      "fallback_consumer": "pass",
+      "field_validator": "pass"
+    }
+  ],
+  "final_state": {
+    "revision": 6,
+    "validation": "current",
+    "report_total": 125,
+    "prior_handoffs_stale": 4,
+    "concurrent_rpc_opens": 16,
+    "task": "Complete the four-region continuity report",
+    "stopping_point": "All four regions are complete and verified.",
+    "next_action": "Run the final cross-interface consistency and stale-handoff validation.",
+    "completed": [
+      "Appended Delta with value 37 after Gamma",
+      "Updated the final total from 88 to 125",
+      "Verified all four regions through the packed package"
+    ]
+  },
+  "participants": [
+    {
+      "tool": "Codex Desktop",
+      "version": "26.721.30844",
+      "model": "gpt-5.6-sol (xhigh)",
+      "surface": "Project-local skill over NDJSON RPC",
+      "isolation": "Fresh native Codex task; no Tool A conversation",
+      "action": "Alpha: 28",
+      "revisions": "2 → 3",
+      "result": "pass",
+      "stale_result": "revision 2 handoff stale",
+      "evidence": "codex-desktop.md"
+    },
+    {
+      "tool": "OpenClaw",
+      "version": "2026.7.1-2 (0790d9f)",
+      "model": "ollama/kimi-k2.7-code:cloud (max)",
+      "surface": "Isolated workspace skill over NDJSON RPC",
+      "isolation": "Fresh OpenClaw agent and session; no Codex conversation",
+      "action": "Beta: 29",
+      "revisions": "3 → 4",
+      "result": "pass",
+      "stale_result": "revision 3 handoff stale",
+      "evidence": "openclaw.md"
+    },
+    {
+      "tool": "Antigravity / Gemini",
+      "version": "Antigravity CLI 1.1.5",
+      "model": "gemini-3.6-flash-high",
+      "surface": "Fresh local coding project using the project skill",
+      "isolation": "New Antigravity project; no earlier provider transcript",
+      "action": "Gamma: 31",
+      "revisions": "4 → 5",
+      "result": "pass",
+      "stale_result": "revision 4 handoff stale",
+      "evidence": "gemini.md"
+    },
+    {
+      "tool": "Ollama",
+      "version": "0.32.1",
+      "model": "glm-5.2:cloud",
+      "surface": "Controlled host over packed RPC",
+      "isolation": "Model received validated continuation and permitted Delta source only",
+      "action": "Delta: 37",
+      "revisions": "5 → 6",
+      "result": "pass",
+      "stale_result": "revision 5 handoff stale",
+      "evidence": "ollama-glm.md"
+    }
+  ]
+}

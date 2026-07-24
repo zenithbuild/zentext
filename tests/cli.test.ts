@@ -572,7 +572,8 @@ describe("Zentext CLI — handoff commands", () => {
     expect(result.output).toContain("revision:   2");
     expect(result.output).toContain("Updated objective");
     expect(result.output).toContain("notes: Making progress");
-    expect(result.output).toContain("next_action: Run tests");
+    expect(result.output).toContain("next: Run tests");
+    expect(result.output).toContain('"task_revision": 2');
   });
 
   it("retains repeated task notes and handoff values through persisted reload and output", async () => {

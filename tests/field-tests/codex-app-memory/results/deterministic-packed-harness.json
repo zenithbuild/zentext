@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "run_date": "2026-07-23",
+  "package": "locally packed zentext@0.1.0-dev.2",
+  "runtime": "Node.js 24.18.0",
+  "participant": "isolated local harness",
+  "input_surface": "project-local zentext-memory skill over zentext rpc",
+  "prior_tool_a_conversation_available": false,
+  "codex_app_exercised": false,
+  "result": "passed",
+  "starting_revision": 2,
+  "ending_revision": 3,
+  "original_handoff_current": false,
+  "continuation_validation": "current",
+  "completed": [
+    "Read the Beta source",
+    "Added Beta and the total to the report"
+  ],
+  "changed_files": [
+    "work/report.md",
+    "work/verification.log"
+  ],
+  "verification": [
+    "Beta arithmetic: passed — 13 + 16 = 29",
+    "Regional total: passed — 28 + 29 = 57"
+  ],
+  "limitations": [
+    "This run proves the packed package, skill helper, RPC reads and writes, provenance path, revision advancement, and stale validation.",
+    "It is not a Codex desktop UI pass because the desktop thread API could not open the generated temporary fixture as a saved project."
+  ]
+}

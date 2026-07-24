@@ -9,3 +9,4 @@ dist/
 .DS_Store
 /proof-results*/
 *.tgz
+/tests/field-tests/trusted-memory-cross-tool/runtime/

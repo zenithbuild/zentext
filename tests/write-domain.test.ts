@@ -119,6 +119,25 @@ describe("updateRecord", () => {
     store.close();
   });
 
+  it("rejects payload fields that do not belong to the record type", async () => {
+    const store = await openStore();
+    const writer = createMemoryWriter(store);
+    const created = writer.createRecord({
+      type: "task",
+      title: "T",
+      goal: "G",
+      author: "agent:a",
+    });
+
+    expect(() =>
+      writer.updateRecord(
+        created.id,
+        { blocker: "not a task field" } as unknown as Partial<AnyRecord>,
+      ),
+    ).toThrow(/task update failed schema validation/);
+    store.close();
+  });
+
   it("returns unchanged on no-op without incrementing revision", async () => {
     const store = await openStore();
     const writer = createMemoryWriter(store);

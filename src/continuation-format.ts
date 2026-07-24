@@ -28,6 +28,12 @@ export function renderContinuationHuman(view: ContinuationView): string {
     ...humanList("Changed files:", view.handoff.files_changed),
     ...humanList("Blockers:", view.handoff.blockers),
     ...humanList("Verification:", view.handoff.verification),
+    ...humanList(
+      "Quality warnings:",
+      view.quality_warnings.map(
+        (warning) => `${warning.message} ${warning.remediation}`,
+      ),
+    ),
     ...humanList("Notes:", view.task.notes),
     "Stopping point:",
     `  ${view.handoff.stopping_point}`,
@@ -75,6 +81,14 @@ export function renderContinuationMarkdown(view: ContinuationView): string {
     "## Verification",
     "",
     ...bulletList(view.handoff.verification),
+    "",
+    "## Handoff quality warnings",
+    "",
+    ...bulletList(
+      view.quality_warnings.map(
+        (warning) => `${warning.message} ${warning.remediation}`,
+      ),
+    ),
     "",
     "## Notes",
     "",

@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "name": "Trusted project memory across four unrelated tool environments",
+  "exact_prompt": "Read the current Zentext project memory, explain where the work stopped, then continue from the recorded next action. Do not repeat completed work.",
+  "required_interfaces": [
+    "cli",
+    "sdk",
+    "rpc",
+    "mcp"
+  ],
+  "participants": [
+    {
+      "id": "codex",
+      "assigned_region": "Alpha",
+      "expected_revision_before": 2,
+      "expected_revision_after": 3
+    },
+    {
+      "id": "openclaw",
+      "assigned_region": "Beta",
+      "expected_revision_before": 3,
+      "expected_revision_after": 4
+    },
+    {
+      "id": "gemini",
+      "assigned_region": "Gamma",
+      "expected_revision_before": 4,
+      "expected_revision_after": 5
+    },
+    {
+      "id": "ollama",
+      "execution_surface": "controlled host harness",
+      "default_model": "glm-5.2:cloud",
+      "assigned_region": "Delta",
+      "expected_revision_before": 5,
+      "expected_revision_after": 6
+    }
+  ],
+  "expected_report": [
+    "Alpha: 28",
+    "Beta: 29",
+    "Gamma: 31",
+    "Delta: 37",
+    "Total: 125"
+  ],
+  "required_final_state": {
+    "task_revision": 6,
+    "validation_status": "current",
+    "every_previous_handoff_stale": true
+  }
+}

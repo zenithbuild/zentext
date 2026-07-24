@@ -11,13 +11,14 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { mkdirSync, existsSync } from "node:fs";
 
-import type { Store, StoreMeta } from "../types/store.js";
+import type { Store, StoreMeta, StoreWriteOptions } from "../types/store.js";
 import type {
   AnyRecord,
   CreateRecordInput,
   ListFilter,
   RecordType,
   RecordRefs,
+  RecordProvenance,
   UpdateRecordInput,
 } from "../types/records.js";
 import {
@@ -31,6 +32,12 @@ import {
 } from "../types/records.js";
 import { deriveProjectId, deriveProjectName } from "./project-id.js";
 import { runMigrations, getSchemaVersion } from "./migrations.js";
+import {
+  parseCreateRecordInput,
+  parseRecordPatch,
+  parseUpdateRecordInput,
+} from "../schemas.js";
+import { assertSafeExternalInput } from "../safety.js";
 
 // ---------------------------------------------------------------------------
 // Validation error
@@ -47,6 +54,16 @@ export class StoreNotFoundError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "StoreNotFoundError";
+  }
+}
+
+export class StoreRevisionConflictError extends Error {
+  constructor(
+    message: string,
+    public readonly currentRevision: number,
+  ) {
+    super(message);
+    this.name = "StoreRevisionConflictError";
   }
 }
 
@@ -273,8 +290,8 @@ export class SqliteStore implements Store {
 
     // Open or create the database
     this.db = openDatabase(dbPath);
-    this.db.pragma("journal_mode = WAL");
     this.db.pragma("busy_timeout = 5000");
+    this.db.pragma("journal_mode = WAL");
 
     // Run migrations
     runMigrations(this.db);
@@ -315,8 +332,8 @@ export class SqliteStore implements Store {
     }
 
     this.db = openDatabase(dbPath);
-    this.db.pragma("journal_mode = WAL");
     this.db.pragma("busy_timeout = 5000");
+    this.db.pragma("journal_mode = WAL");
 
     // Run any pending migrations
     runMigrations(this.db);
@@ -353,8 +370,8 @@ export class SqliteStore implements Store {
     }
 
     this.db = openDatabase(dbPath);
-    this.db.pragma("journal_mode = WAL");
     this.db.pragma("busy_timeout = 5000");
+    this.db.pragma("journal_mode = WAL");
 
     runMigrations(this.db);
 
@@ -380,11 +397,25 @@ export class SqliteStore implements Store {
   // create
   // ------------------------------------------------------------------
 
-  createRecord(input: CreateRecordInput): AnyRecord {
+  createRecord(
+    input: CreateRecordInput,
+    options: StoreWriteOptions = {},
+  ): AnyRecord {
     this.ensureOpen();
 
     // Validate
     validateCreateInput(input);
+    let secretOverrideUsed = false;
+    try {
+      parseCreateRecordInput(input);
+      secretOverrideUsed = assertSafeExternalInput(input, {
+        allowSecretOverride: options.allowSecretOverride,
+      }).secretOverrideUsed;
+    } catch (error) {
+      throw new StoreValidationError(
+        error instanceof Error ? error.message : "Record input is invalid.",
+      );
+    }
 
     // Generate fields
     const id = generateId(input.type);
@@ -397,7 +428,28 @@ export class SqliteStore implements Store {
     const refs = input.refs ?? {};
     const summary = input.summary;
     const supersedes = input.supersedes;
-    const payload = extractPayload(input);
+    const suppliedProvenance = input.provenance;
+    if (suppliedProvenance && suppliedProvenance.project_id !== project) {
+      throw new StoreValidationError(
+        `Provenance project_id '${suppliedProvenance.project_id}' does not match '${project}'.`,
+      );
+    }
+    const provenance = {
+      ...(suppliedProvenance ?? {
+        source_environment: input.author ?? "unknown",
+        captured_at: now,
+        project_id: project,
+        files_inspected: [],
+        commands_executed: [],
+        verification: [],
+        ...(input.type === "task" ? { task_id: id, task_revision: revision } : {}),
+      }),
+      ...(secretOverrideUsed ? { secret_override_used: true } : {}),
+    };
+    const payload = {
+      ...extractPayload(input),
+      provenance,
+    };
     const schemaVersion = 1;
 
     // Build the row
@@ -554,13 +606,34 @@ export class SqliteStore implements Store {
   // update
   // ------------------------------------------------------------------
 
-  updateRecord(input: UpdateRecordInput): AnyRecord {
+  updateRecord(
+    input: UpdateRecordInput,
+    options: StoreWriteOptions = {},
+  ): AnyRecord {
     this.ensureOpen();
 
     // Fetch existing record
     const existing = this.getRecord(input.id);
     if (!existing) {
       throw new StoreValidationError(`Record not found: ${input.id}`);
+    }
+    try {
+      parseUpdateRecordInput(input);
+      parseRecordPatch(existing.type, {
+        ...(input.title !== undefined ? { title: input.title } : {}),
+        ...(input.status !== undefined ? { status: input.status } : {}),
+        ...(input.summary !== undefined ? { summary: input.summary } : {}),
+        ...(input.tags !== undefined ? { tags: input.tags } : {}),
+        ...(input.refs !== undefined ? { refs: input.refs } : {}),
+        ...(input.payload ?? {}),
+      });
+      assertSafeExternalInput(input, {
+        allowSecretOverride: options.allowSecretOverride,
+      });
+    } catch (error) {
+      throw new StoreValidationError(
+        error instanceof Error ? error.message : "Record update input is invalid.",
+      );
     }
 
     // Validate immutable fields are not being changed.
@@ -608,9 +681,36 @@ export class SqliteStore implements Store {
     // Merge payload updates
     const payloadRow = this.db!.prepare("SELECT payload_json FROM records WHERE id = ?").get(input.id) as { payload_json: string };
     const existingPayload = JSON.parse(payloadRow.payload_json) as Record<string, unknown>;
-    const updatedPayload = input.payload
-      ? { ...existingPayload, ...input.payload }
-      : existingPayload;
+    const existingProvenance =
+      typeof existingPayload.provenance === "object" &&
+      existingPayload.provenance !== null
+        ? (existingPayload.provenance as Record<string, unknown>)
+        : {};
+    const suppliedUpdateProvenance =
+      typeof input.payload?.provenance === "object" &&
+      input.payload.provenance !== null
+        ? (input.payload.provenance as Record<string, unknown>)
+        : undefined;
+    const updatedProvenance: RecordProvenance = suppliedUpdateProvenance
+      ? (suppliedUpdateProvenance as unknown as RecordProvenance)
+      : {
+          files_inspected: [],
+          commands_executed: [],
+          verification: [],
+          ...existingProvenance,
+          source_environment: author,
+          captured_at: now,
+          project_id: existing.project,
+          parent_record_id: existing.id,
+          ...(existing.type === "task"
+            ? { task_id: existing.id, task_revision: newRevision }
+            : {}),
+        };
+    const updatedPayload: Record<string, unknown> = {
+      ...existingPayload,
+      ...(input.payload ?? {}),
+      provenance: updatedProvenance,
+    };
 
     // Handle supersession links in payload
     const supersedes = (existing.supersedes !== undefined) ? existing.supersedes : undefined;
@@ -631,6 +731,7 @@ export class SqliteStore implements Store {
       payload_json: JSON.stringify(updatedPayload),
     };
 
+    const expectedRevision = options.expectedRevision ?? existing.revision;
     const updateSql = this.db!.prepare(`
       UPDATE records SET
         title = @title,
@@ -644,7 +745,7 @@ export class SqliteStore implements Store {
         supersedes_json = @supersedes_json,
         superseded_by = @superseded_by,
         payload_json = @payload_json
-      WHERE id = ?
+      WHERE id = ? AND revision = ?
     `);
 
     const insertHistory = this.db!.prepare(`
@@ -669,7 +770,18 @@ export class SqliteStore implements Store {
     } as AnyRecord;
 
     const tx = this.db!.transaction(() => {
-      updateSql.run(updateRow, input.id);
+      const updateResult = updateSql.run(
+        updateRow,
+        input.id,
+        expectedRevision,
+      );
+      if (updateResult.changes !== 1) {
+        const current = this.getRecord(input.id);
+        throw new StoreRevisionConflictError(
+          `Expected revision ${expectedRevision}, but current revision is ${current?.revision ?? existing.revision}.`,
+          current?.revision ?? existing.revision,
+        );
+      }
       insertHistory.run(input.id, newRevision, "update", now, author, JSON.stringify(updatedRecord));
     });
     tx();

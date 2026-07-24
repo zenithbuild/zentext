@@ -7,6 +7,9 @@ import { repack } from "../repack/engine.js";
 import { RECORD_TYPES, ALLOWED_STATUSES } from "../types/records.js";
 import type { AnyRecord, ListFilter, RecordType } from "../types/records.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import { redactForOutput } from "../safety.js";
+import { SqliteMemoryStore } from "../memory-interface.js";
+import { ZentextError } from "../errors.js";
 
 // ---------------------------------------------------------------------------
 // Input schemas
@@ -69,6 +72,10 @@ const RepackInput = z.object({
   max_size: z.number().int().positive().optional(),
 });
 
+const ContinuationInput = z.object({
+  project_id: projectIdSchema,
+});
+
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
@@ -89,11 +96,14 @@ function toolError(message: string): CallToolResult {
 
 function toolSuccess(data: unknown): CallToolResult {
   return {
-    content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+    content: [{ type: "text", text: JSON.stringify(redactForOutput(data), null, 2) }],
   };
 }
 
 function mapToolError(err: unknown): CallToolResult {
+  if (err instanceof ZentextError) {
+    return toolError(`${err.code}: ${redactForOutput(err.message)}`);
+  }
   if (err instanceof McpToolError) {
     return toolError(err.message);
   }
@@ -215,11 +225,25 @@ export async function memoryRepack(args: z.infer<typeof RepackInput>): Promise<C
       focus: args.focus,
       maxSize: args.max_size,
     });
-    return { content: [{ type: "text", text: result.markdown }] };
+    return { content: [{ type: "text", text: redactForOutput(result.markdown) }] };
   } catch (err) {
     return mapToolError(err);
   } finally {
     store?.close();
+  }
+}
+
+export async function memoryContinuation(
+  args: z.infer<typeof ContinuationInput>,
+): Promise<CallToolResult> {
+  let memory: SqliteMemoryStore | undefined;
+  try {
+    memory = await SqliteMemoryStore.openById(args.project_id);
+    return toolSuccess(await memory.getContinuation());
+  } catch (err) {
+    return mapToolError(err);
+  } finally {
+    memory?.close();
   }
 }
 
@@ -234,6 +258,19 @@ export function createMcpServer(): McpServer {
   );
 
   const readOnly = { readOnlyHint: true };
+
+  server.registerTool(
+    "memory.continuation",
+    {
+      title: "Read validated Zentext continuation",
+      description:
+        "Return the same validated canonical continuation used by the CLI, SDK, and RPC. " +
+        "Rejects stale state and never mutates the project.",
+      inputSchema: ContinuationInput,
+      annotations: readOnly,
+    },
+    memoryContinuation,
+  );
 
   server.registerTool(
     "memory.read",

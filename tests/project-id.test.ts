@@ -6,6 +6,9 @@ import {
   getGitOriginUrl,
 } from "../src/store/project-id.js";
 import { resolve } from "node:path";
+import { mkdtempSync, rmSync, symlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 describe("normalizeGitUrl", () => {
   it("strips trailing .git", () => {
@@ -75,6 +78,18 @@ describe("deriveProjectId", () => {
     const id = deriveProjectId(process.cwd());
     // The id is a hash, so it shouldn't contain branch names as readable text
     expect(id).toMatch(/^[0-9a-f]{16}$/);
+  });
+
+  it("normalizes filesystem aliases when no Git origin exists", () => {
+    const root = mkdtempSync(join(tmpdir(), "zentext-project-id-"));
+    const alias = `${root}-alias`;
+    try {
+      symlinkSync(root, alias);
+      expect(deriveProjectId(alias)).toBe(deriveProjectId(root));
+    } finally {
+      rmSync(alias, { force: true });
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
 

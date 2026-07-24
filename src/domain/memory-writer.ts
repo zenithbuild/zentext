@@ -5,7 +5,7 @@
  * should write to the store directly.
  */
 
-import type { Store } from "../types/store.js";
+import type { Store, StoreWriteOptions } from "../types/store.js";
 import type { TransactionScope } from "../store/sqlite-store.js";
 import type {
   AnyRecord,
@@ -14,6 +14,13 @@ import type {
   UpdateRecordInput,
 } from "../types/records.js";
 import { ALLOWED_STATUSES, DEFAULT_STATUSES } from "../types/records.js";
+import { assertSafeExternalInput } from "../safety.js";
+import { StoreRevisionConflictError } from "../store/sqlite-store.js";
+import {
+  parseCreateRecordInput,
+  parseRecordPatch,
+  parseUpdateRecordInput,
+} from "../schemas.js";
 
 // ---------------------------------------------------------------------------
 // Domain errors
@@ -66,6 +73,8 @@ export interface UpdateOptions {
   expectedRevision?: number;
   /** Override author for this mutation. */
   author?: string;
+  /** Explicit local override for a secret-detector false positive. */
+  allowSecretOverride?: boolean;
 }
 
 export interface SupersedeOptions {
@@ -80,6 +89,11 @@ export interface ArchiveOptions {
 
 export interface HandoffOptions {
   author?: string;
+  allowSecretOverride?: boolean;
+}
+
+export interface CreateOptions {
+  allowSecretOverride?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -87,7 +101,7 @@ export interface HandoffOptions {
 // ---------------------------------------------------------------------------
 
 export interface MemoryWriter {
-  createRecord(input: CreateRecordInput): AnyRecord;
+  createRecord(input: CreateRecordInput, options?: CreateOptions): AnyRecord;
   updateRecord(id: string, patch: Partial<AnyRecord>, options?: UpdateOptions): AnyRecord;
   supersedeRecord(sourceId: string, replacementInput: CreateRecordInput, options?: SupersedeOptions): {
     source: AnyRecord;
@@ -99,8 +113,8 @@ export interface MemoryWriter {
 
 export function createMemoryWriter(
   store: Store & TransactionScope & {
-    createRecord(input: CreateRecordInput): AnyRecord;
-    updateRecord(input: UpdateRecordInput): AnyRecord;
+    createRecord(input: CreateRecordInput, options?: StoreWriteOptions): AnyRecord;
+    updateRecord(input: UpdateRecordInput, options?: StoreWriteOptions): AnyRecord;
     getRecord(id: string): AnyRecord | null;
     getRecordHistory(id: string): Array<{ record_json: string }>;
   },
@@ -111,17 +125,23 @@ export function createMemoryWriter(
 class MemoryWriterImpl implements MemoryWriter {
   constructor(
     private readonly store: Store & TransactionScope & {
-      createRecord(input: CreateRecordInput): AnyRecord;
-      updateRecord(input: UpdateRecordInput): AnyRecord;
+      createRecord(input: CreateRecordInput, options?: StoreWriteOptions): AnyRecord;
+      updateRecord(input: UpdateRecordInput, options?: StoreWriteOptions): AnyRecord;
       getRecord(id: string): AnyRecord | null;
       getRecordHistory(id: string): Array<{ record_json: string }>;
     },
   ) {}
 
-  createRecord(input: CreateRecordInput): AnyRecord {
+  createRecord(input: CreateRecordInput, options: CreateOptions = {}): AnyRecord {
     this.validateCreateInput(input);
+    const parsed = parseCreateRecordInput(input);
+    assertSafeExternalInput(parsed, {
+      allowSecretOverride: options.allowSecretOverride,
+    });
     return this.store.withTransaction(() => {
-      return this.store.createRecord(input);
+      return this.store.createRecord(parsed, {
+        allowSecretOverride: options.allowSecretOverride,
+      });
     });
   }
 
@@ -131,6 +151,7 @@ class MemoryWriterImpl implements MemoryWriter {
       throw new MemoryWriterNotFoundError(`Record not found: ${id}`);
     }
     this.checkMutable(existing);
+    parseRecordPatch(existing.type, patch);
 
     if (options.expectedRevision !== undefined && existing.revision !== options.expectedRevision) {
       throw new MemoryWriterConflictError(
@@ -140,13 +161,27 @@ class MemoryWriterImpl implements MemoryWriter {
     }
 
     const updateInput = this.buildUpdateInput(existing, patch, options.author);
+    parseUpdateRecordInput(updateInput);
+    assertSafeExternalInput(updateInput, {
+      allowSecretOverride: options.allowSecretOverride,
+    });
     if (this.isNoOp(existing, updateInput)) {
       return existing;
     }
 
-    return this.store.withTransaction(() => {
-      return this.store.updateRecord(updateInput);
-    });
+    try {
+      return this.store.withTransaction(() => {
+        return this.store.updateRecord(updateInput, {
+          allowSecretOverride: options.allowSecretOverride,
+          expectedRevision: options.expectedRevision ?? existing.revision,
+        });
+      });
+    } catch (error) {
+      if (error instanceof StoreRevisionConflictError) {
+        throw new MemoryWriterConflictError(error.message, error.currentRevision);
+      }
+      throw error;
+    }
   }
 
   supersedeRecord(
@@ -172,10 +207,12 @@ class MemoryWriterImpl implements MemoryWriter {
     }
 
     this.validateCreateInput(replacementInput);
+    const parsedReplacement = parseCreateRecordInput(replacementInput);
+    assertSafeExternalInput(parsedReplacement);
 
     const replacementWithLink: CreateRecordInput = {
-      ...replacementInput,
-      supersedes: [...(replacementInput.supersedes ?? []), sourceId],
+      ...parsedReplacement,
+      supersedes: [...(parsedReplacement.supersedes ?? []), sourceId],
     };
 
     return this.store.withTransaction(() => {
@@ -236,6 +273,10 @@ class MemoryWriterImpl implements MemoryWriter {
     }
 
     this.validateCreateInput(input);
+    const parsed = parseCreateRecordInput(input);
+    assertSafeExternalInput(parsed, {
+      allowSecretOverride: options.allowSecretOverride,
+    });
 
     return this.store.withTransaction(() => {
       const latest = this.store
@@ -246,7 +287,9 @@ class MemoryWriterImpl implements MemoryWriter {
         this.store.updateRecord({ id: latest.id, status: "archived", author: options.author });
       }
 
-      return this.store.createRecord(input);
+      return this.store.createRecord(parsed, {
+        allowSecretOverride: options.allowSecretOverride,
+      });
     });
   }
 
