@@ -6,9 +6,11 @@ import { ZentextError } from "../errors.js";
 import { openProject } from "../sdk.js";
 import { OpenProjectInputSchema } from "../schemas.js";
 import { MAX_RPC_LINE_BYTES, redactForOutput } from "../safety.js";
+import { MEMORY_INTERFACE_VERSION } from "../memory-interface.js";
 import {
   HandoffValidateParamsSchema,
   MemoryQueryParamsSchema,
+  MemorySearchParamsSchema,
   ProgressRecordParamsSchema,
   ProjectParamsSchema,
   RPC_METHODS,
@@ -24,7 +26,7 @@ import {
 export interface RpcCapabilities {
   protocol_version: typeof RPC_PROTOCOL_VERSION;
   schema_version: typeof RPC_SCHEMA_VERSION;
-  memory_interface_version: "1.0";
+  memory_interface_version: typeof MEMORY_INTERFACE_VERSION;
   framing: "ndjson";
   methods: readonly string[];
   limits: {
@@ -42,7 +44,7 @@ export function getRpcCapabilities(): RpcCapabilities {
   return {
     protocol_version: RPC_PROTOCOL_VERSION,
     schema_version: RPC_SCHEMA_VERSION,
-    memory_interface_version: "1.0",
+    memory_interface_version: MEMORY_INTERFACE_VERSION,
     framing: "ndjson",
     methods: RPC_METHODS,
     limits: { maximum_request_bytes: MAX_RPC_LINE_BYTES },
@@ -145,6 +147,12 @@ export async function executeRpcRequest(request: RpcRequest): Promise<unknown> {
       const parsed = MemoryQueryParamsSchema.parse(request.params);
       return withOpenedProject(parsed, (project) =>
         project.queryMemory(parsed.input),
+      );
+    }
+    case "memory.search": {
+      const parsed = MemorySearchParamsSchema.parse(request.params);
+      return withOpenedProject(parsed, (project) =>
+        project.searchMemory(parsed.input),
       );
     }
   }

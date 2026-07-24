@@ -25,6 +25,7 @@ Top-level helpers are also exported:
 - `recordProgress`
 - `updateTask`
 - `queryMemory`
+- `searchMemory`
 
 ## Recording progress
 
@@ -75,6 +76,7 @@ secrets from returned canonical views, including legacy records.
 
 ## Schema compatibility
 
-The initial public schema version is `1`; the stable memory interface version
-is `1.0`. Consumers should use exported TypeScript types and capability
+The initial public record schema version is `1`; the memory search schema is
+`1`; and the stable memory interface version is `1.1`. Consumers should use
+exported TypeScript types and capability
 discovery rather than assume fields added by future versions.

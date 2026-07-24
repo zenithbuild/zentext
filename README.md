@@ -184,6 +184,8 @@ semantically equal continuation state. See the
 - [docs/rpc.md](./docs/rpc.md) — versioned structured stdio protocol
 - [docs/safety.md](./docs/safety.md) — schemas, sanitization, secret detection,
   explicit overrides, and output redaction
+- [docs/memory-search.md](./docs/memory-search.md) — deterministic local
+  project-memory search and cross-interface contract
 - [docs/product-principles.md](./docs/product-principles.md) — user ownership,
   portability, optional cloud, deletion, and anti-lock-in boundaries
 - [docs/spec/README.md](./docs/spec/README.md) — versioned Zentext memory

@@ -45,6 +45,7 @@ paths in evidence.
 | `progress.record` | write | Record structured progress and create a new current handoff. |
 | `task.update` | write | Update a task with optimistic revision checking. |
 | `memory.query` | read | Deterministic structured-record search. |
+| `memory.search` | read | Bounded canonical lexical search with match metadata. |
 
 All methods after `project.open` require both `cwd` and the discovered
 `project_id`. A mismatch returns `PROJECT_IDENTITY_MISMATCH`.
@@ -57,6 +58,10 @@ All methods after `project.open` require both `cwd` and the discovered
 
 The result is the same semantic object returned by `zentext continue --json`,
 the SDK's `getContinuation`, and MCP `memory.continuation`.
+
+`memory.search` is additive to RPC 1.0. Its `input` object uses the contract in
+[`memory-search.md`](./memory-search.md); CLI, SDK, RPC, and MCP return the same
+`MemorySearchPage`.
 
 ## Safety
 

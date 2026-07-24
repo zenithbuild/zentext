@@ -12,6 +12,10 @@ import type {
 } from "./schemas.js";
 import type { ContinuationView } from "./continuation.js";
 import type { AnyRecord, TaskRecord } from "./types/records.js";
+import type {
+  MemorySearchInput,
+  MemorySearchPage,
+} from "./memory-search.js";
 
 export type ZentextProject = MemoryStore;
 
@@ -71,4 +75,11 @@ export async function queryMemory(
   input: MemoryQueryInput,
 ): Promise<AnyRecord[]> {
   return withProject(project, (opened) => opened.queryMemory(input));
+}
+
+export async function searchMemory(
+  project: OpenProjectInput,
+  input: MemorySearchInput,
+): Promise<MemorySearchPage> {
+  return withProject(project, (opened) => opened.searchMemory(input));
 }

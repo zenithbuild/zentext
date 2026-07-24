@@ -6,7 +6,7 @@ and the shared repack engine.
 
 ## What it exposes
 
-Exactly five read-only tools:
+Exactly six read-only tools:
 
 | Tool | Purpose |
 |------|---------|
@@ -14,6 +14,7 @@ Exactly five read-only tools:
 | `memory.read` | Read one canonical record by ID, optionally with revision history. |
 | `memory.list` | List records for a project, filtered by type/status/limit. |
 | `memory.query` | Deterministic substring search across title, summary, and tags. |
+| `memory.search` | Canonical lexical search with match metadata and pagination. |
 | `memory.repack` | Return the current-context markdown payload from the shared engine. |
 
 No mutation tools are exposed in Stage 1.
@@ -54,11 +55,15 @@ archive, supersede, or otherwise mutate canonical records or revision history.
 Tests verify that record counts, revision counts, statuses, payloads, and
 supersession state are unchanged after each tool call.
 
-## `memory.query` vs `memory.repack`
+## `memory.query`, `memory.search`, and `memory.repack`
 
 - `memory.query` is a deterministic structured text search. It searches the
   `title`, `summary`, and `tags` fields with a case-insensitive substring
   match. It returns the matching records; it does not rank or summarize them.
+- `memory.search` is the schema-versioned project-memory search. It covers task
+  and handoff payloads, decisions, blockers, verification, notes, referenced
+  files, and provenance; returns bounded redacted match metadata; and shares
+  exact behavior with CLI, SDK, and RPC.
 - `memory.repack` is the curated current-context payload. It uses the shared
   repack engine to prioritize primary tasks, blockers, decisions, handoffs,
   validations, policies, and other active work, and applies a character budget.
@@ -91,7 +96,8 @@ built-in `node:sqlite` fallback when install scripts are blocked.
 - No model calls, semantic search, embeddings, or fuzzy matching.
 - No network, cloud, sync, auth, or multi-user features.
 - No HTTP/SSE/WebSocket transport; stdio only.
-- `memory.query` searches only `title`, `summary`, and `tags`.
+- `memory.query` remains a compatibility surface limited to title, summary,
+  and tags. New consumers should use `memory.search`.
 
 Machine-readable writes are available through the TypeScript SDK and structured
 stdio RPC. MCP remains intentionally read-only; future MCP write tools must

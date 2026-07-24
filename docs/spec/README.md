@@ -5,6 +5,10 @@ memory behavior.
 
 The current specification is:
 
+- [Zentext memory contract 1.1](./zentext-memory-contract/1.1/README.md)
+
+Previous compatible contracts:
+
 - [Zentext memory contract 1.0](./zentext-memory-contract/1.0/README.md)
 
 The name describes a product contract, not an industry standard. Zentext will

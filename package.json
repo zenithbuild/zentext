@@ -52,6 +52,7 @@
     "docs/sdk.md",
     "docs/rpc.md",
     "docs/safety.md",
+    "docs/memory-search.md",
     "docs/product-principles.md",
     "docs/spec",
     "docs/environment-formatters.md",

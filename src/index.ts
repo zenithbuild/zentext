@@ -97,6 +97,7 @@ export {
   recordProgress,
   updateTask,
   queryMemory,
+  searchMemory,
   type ZentextProject,
 } from "./sdk.js";
 export {
@@ -108,6 +109,22 @@ export {
   type HandoffValidationResult,
   type ProgressResult,
 } from "./memory-interface.js";
+export {
+  MEMORY_SEARCH_SCHEMA_VERSION,
+  MEMORY_SEARCH_STRATEGY,
+  MEMORY_SEARCH_MAX_QUERY_LENGTH,
+  MEMORY_SEARCH_DEFAULT_LIMIT,
+  MEMORY_SEARCH_MAX_LIMIT,
+  MEMORY_SEARCH_MAX_OFFSET,
+  MemorySearchInputSchema,
+  renderMemorySearch,
+  type MemorySearchInput,
+  type ParsedMemorySearchInput,
+  type MemorySearchMatch,
+  type MemorySearchMatchKind,
+  type MemorySearchResult,
+  type MemorySearchPage,
+} from "./memory-search.js";
 export {
   ZENTEXT_SCHEMA_VERSION,
   CreateRecordInputSchema,

@@ -547,7 +547,7 @@ function notification(method: string, params?: Record<string, unknown>): JSONRPC
 }
 
 describe("MCP protocol", () => {
-  it("registers exactly five read-only tools", async () => {
+  it("registers exactly six read-only tools", async () => {
     const transport = new InMemoryTransport();
     const server = createMcpServer();
     await server.connect(transport);
@@ -575,6 +575,7 @@ describe("MCP protocol", () => {
       "memory.query",
       "memory.read",
       "memory.repack",
+      "memory.search",
     ]);
     for (const tool of listResponse!.result!.tools) {
       expect(tool.annotations?.readOnlyHint).toBe(true);

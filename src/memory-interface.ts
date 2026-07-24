@@ -37,6 +37,12 @@ import {
 } from "./schemas.js";
 import { assertSafeExternalInput, redactForOutput } from "./safety.js";
 import {
+  MemorySearchInputSchema,
+  searchMemoryRecords,
+  type MemorySearchInput,
+  type MemorySearchPage,
+} from "./memory-search.js";
+import {
   SqliteStore,
   StoreNotFoundError,
   StoreRevisionConflictError,
@@ -50,7 +56,7 @@ import type {
 } from "./types/records.js";
 import type { StoreMeta } from "./types/store.js";
 
-export const MEMORY_INTERFACE_VERSION = "1.0";
+export const MEMORY_INTERFACE_VERSION = "1.1";
 
 export interface CurrentHandoff {
   record_id: string;
@@ -82,6 +88,7 @@ export interface MemoryStore {
   validateHandoff(handoffId?: string): Promise<HandoffValidationResult>;
   recordProgress(input: RecordProgressInput): Promise<ProgressResult>;
   updateTask(input: TaskUpdateInput): Promise<TaskRecord>;
+  searchMemory(input: MemorySearchInput): Promise<MemorySearchPage>;
   queryMemory(input: MemoryQueryInput): Promise<AnyRecord[]>;
   close(): void;
 }
@@ -509,6 +516,19 @@ export class SqliteMemoryStore implements MemoryStore {
       });
       if (query) records = records.filter((record) => recordText(record).includes(query));
       return redactForOutput(records.sort(sortNewest).slice(0, parsed.limit));
+    } catch (error) {
+      mapError(error);
+    }
+  }
+
+  async searchMemory(input: MemorySearchInput): Promise<MemorySearchPage> {
+    try {
+      const parsed = MemorySearchInputSchema.parse(input);
+      assertSafeExternalInput(parsed);
+      const safeRecords = redactForOutput(this.store.listRecords()) as AnyRecord[];
+      return redactForOutput(
+        searchMemoryRecords(safeRecords, parsed, this.meta.projectId),
+      );
     } catch (error) {
       mapError(error);
     }

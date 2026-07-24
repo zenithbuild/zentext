@@ -20,6 +20,7 @@ import {
   parseHandoffExportFormat,
   printUsage,
   repack,
+  search,
   show,
   status,
   taskCreate,
@@ -36,6 +37,7 @@ import {
 } from "./args.js";
 import { runRpcServer } from "../rpc/server.js";
 import { redactForOutput } from "../safety.js";
+import type { RecordType } from "../types/records.js";
 
 function parseHandoffOptions(
   flags: Record<string, FlagValue>,
@@ -131,6 +133,74 @@ async function main(): Promise<void> {
           type: stringFlag(flags, "type"),
           status: stringFlag(flags, "status"),
           limit: numberFlag(flags, "limit"),
+        });
+        break;
+      }
+      case "search": {
+        const supported = new Set([
+          "type",
+          "status",
+          "task-id",
+          "min-revision",
+          "max-revision",
+          "include-superseded",
+          "limit",
+          "offset",
+          "json",
+        ]);
+        const unsupported = Object.keys(flags).find((key) => !supported.has(key));
+        if (unsupported) {
+          throw new CliError(`Unsupported option for zentext search: --${unsupported}`, 1);
+        }
+        for (const name of ["json", "include-superseded"] as const) {
+          if (flags[name] !== undefined && flags[name] !== true) {
+            throw new CliError(`--${name} does not accept a value`, 1);
+          }
+        }
+        for (const name of [
+          "min-revision",
+          "max-revision",
+          "limit",
+          "offset",
+        ] as const) {
+          if (flags[name] !== undefined && typeof flags[name] !== "number") {
+            throw new CliError(`--${name} must be a number`, 1);
+          }
+        }
+        for (const name of ["type", "status", "task-id"] as const) {
+          if (flags[name] !== undefined && typeof flags[name] !== "string") {
+            throw new CliError(`--${name} requires a value`, 1);
+          }
+        }
+        if (positional.length !== 1) {
+          throw new CliError(
+            "Usage: zentext search <query> [--type <type>] [--status <status>] [--limit <n>] [--offset <n>] [--json]",
+            1,
+          );
+        }
+        const type = stringFlag(flags, "type");
+        const status = stringFlag(flags, "status");
+        result = await search(cwd, {
+          query: positional[0],
+          ...(type ? { record_types: [type as RecordType] } : {}),
+          ...(status ? { statuses: [status] } : {}),
+          ...(stringFlag(flags, "task-id")
+            ? { task_id: stringFlag(flags, "task-id") }
+            : {}),
+          ...(numberFlag(flags, "min-revision") !== undefined
+            ? { min_revision: numberFlag(flags, "min-revision") }
+            : {}),
+          ...(numberFlag(flags, "max-revision") !== undefined
+            ? { max_revision: numberFlag(flags, "max-revision") }
+            : {}),
+          include_superseded: booleanFlag(flags, "include-superseded"),
+          ...(numberFlag(flags, "limit") !== undefined
+            ? { limit: numberFlag(flags, "limit") }
+            : {}),
+          ...(numberFlag(flags, "offset") !== undefined
+            ? { offset: numberFlag(flags, "offset") }
+            : {}),
+          json: booleanFlag(flags, "json"),
         });
         break;
       }
